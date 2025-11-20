@@ -147,9 +147,63 @@
     color: hsl(var(--foreground)) !important;
   }
   
+  /* Force light text color for axis ticks in dark theme */
+  .dark .recharts-cartesian-axis-tick text,
+  .dark .recharts-xAxis .recharts-cartesian-axis-tick text,
+  .dark .recharts-yAxis .recharts-cartesian-axis-tick text,
+  .dark .recharts-text,
+  .dark .recharts-cartesian-axis-tick-value {
+    fill: #e4e4e7 !important;
+  }
+  
+  /* Light theme - dark text */
+  .recharts-cartesian-axis-tick text:not(.dark),
+  .recharts-xAxis .recharts-cartesian-axis-tick text:not(.dark),
+  .recharts-yAxis .recharts-cartesian-axis-tick text:not(.dark) {
+    fill: #262626 !important;
+  }
+  
+  /* Legend text styles for dark theme - using CSS variables directly */
+  .recharts-legend-wrapper,
+  .recharts-default-legend {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  .recharts-legend-item {
+    color: hsl(var(--foreground)) !important;
+  }
+  
   .recharts-legend-item-text {
     fill: hsl(var(--foreground)) !important;
     color: hsl(var(--foreground)) !important;
+  }
+  
+  .recharts-legend-item-text tspan {
+    fill: hsl(var(--foreground)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  .recharts-legend-item span {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  /* Force text color for all legend text in dark theme - using universal selector */
+  .dark .recharts-legend-wrapper *,
+  .dark .recharts-default-legend *,
+  .dark .recharts-legend-item *,
+  .dark .recharts-legend-wrapper svg *,
+  .dark .recharts-legend-wrapper text,
+  .dark .recharts-legend-wrapper tspan {
+    fill: #e4e4e7 !important;
+    color: #e4e4e7 !important;
+    stroke: none !important;
+  }
+  
+  /* Light theme */
+  .recharts-legend-wrapper text:not(.dark),
+  .recharts-legend-wrapper tspan:not(.dark) {
+    fill: #262626 !important;
+    color: #262626 !important;
   }
   
   /* Remove focus styles from all chart elements */
@@ -159,5 +213,22 @@
   .recharts-active-dot:focus {
     outline: none !important;
     box-shadow: none !important;
+  }
+  
+  /* Remove hover effects from bar charts */
+  .recharts-bar-rectangle,
+  .recharts-bar-rectangle:hover,
+  .recharts-bar .recharts-bar-rectangle,
+  .recharts-bar .recharts-bar-rectangle:hover {
+    fill-opacity: 1 !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+  
+  /* Disable any hover state changes */
+  .recharts-bar-rectangle:active,
+  .recharts-bar-rectangle:focus {
+    fill-opacity: 1 !important;
+    opacity: 1 !important;
   }
 }

@@ -6,13 +6,13 @@ import { DollarSign, ChevronDown, Check, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { TaskDetailModal } from "./task-detail-modal"
-import { DealHeader } from './deal/deal-header'
-import { DealFieldsPanel } from './deal/deal-fields-panel'
-import { DealTasksList } from './deal/deal-tasks-list'
-import { TaskQuickCreate } from './deal/task-quick-create'
-import { UnifiedActivityTimeline } from './deal/unified-activity-timeline'
-import { DealCommentsPanel } from './deal/deal-comments-panel'
+import { TaskDetailModal } from "../task-detail-modal"
+import { DealHeader } from './deal-header'
+import { DealFieldsPanel } from './deal-fields-panel'
+import { DealTasksList } from './deal-tasks-list'
+import { DealFilesPanel } from './deal-files-panel'
+import { DealActivityTimeline } from './deal-activity-timeline'
+import { DealCommentsPanel } from './deal-comments-panel'
 import { useDeal } from '@/hooks/use-deal'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
@@ -233,9 +233,9 @@ export function DealDetail({ dealId }: DealDetailProps) {
     }))
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-3rem)] overflow-hidden transition-all duration-200">
+    <div className="flex h-[calc(100vh-3rem)] overflow-hidden">
       {/* LEFT COLUMN: Deal Info */}
-      <div className="w-full md:w-80 flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth">
+      <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5">
         <DealHeader
           deal={deal}
           onTitleUpdate={handleTitleUpdate}
@@ -362,25 +362,15 @@ export function DealDetail({ dealId }: DealDetailProps) {
           </div>
 
           {/* Tasks */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Tasks</h3>
-              <TaskQuickCreate onCreate={handleTaskCreate} dealId={dealId} />
-            </div>
-            {tasks.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">No tasks yet</p>
-            ) : (
-              <DealTasksList
-                tasks={tasks}
-                onTaskCreate={handleTaskCreate}
-                onTaskUpdate={handleTaskUpdate}
-                onTaskClick={(task) => {
-                  setSelectedTask(task)
-                  setIsTaskModalOpen(true)
-                }}
-              />
-            )}
-          </div>
+          <DealTasksList
+            tasks={tasks}
+            onTaskCreate={handleTaskCreate}
+            onTaskUpdate={handleTaskUpdate}
+            onTaskClick={(task) => {
+              setSelectedTask(task)
+              setIsTaskModalOpen(true)
+            }}
+          />
 
           {/* Custom Fields */}
           <DealFieldsPanel
@@ -391,24 +381,29 @@ export function DealDetail({ dealId }: DealDetailProps) {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Unified Activity Timeline + Comments */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background hidden md:flex">
-        <div className="flex-1 overflow-y-auto pl-6 pr-6 py-6 scroll-smooth">
-          {/* Unified Activity Timeline with Tasks, Comments, Activities */}
-          <UnifiedActivityTimeline
-            activities={activities}
-            tasks={tasks}
-            comments={comments}
-            onTaskClick={(task) => {
-              setSelectedTask(task)
-              setIsTaskModalOpen(true)
-            }}
-            onTaskUpdate={handleTaskUpdate}
-          />
+      {/* RIGHT COLUMN: Activity Timeline, Files, Comments */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+        <div className="flex-1 overflow-y-auto pl-6 pr-6 py-6">
+          {/* Activity Timeline */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-foreground mb-4">Activity</h3>
+            <DealActivityTimeline activities={activities} groupByDate />
+          </div>
+
+          {/* Files */}
+          <div className="mb-6">
+            <DealFilesPanel
+              files={files}
+              onUpload={handleFileUpload}
+              onDelete={deleteFile}
+              onDownload={downloadFile}
+              uploading={uploading}
+            />
+          </div>
         </div>
 
         {/* Comments Panel (Fixed at bottom) */}
-        <div className="sticky bottom-0 z-10 flex-shrink-0 border-t border-border/50 bg-card/95 backdrop-blur-sm px-6 py-4 transition-all duration-200">
+        <div className="flex-shrink-0 border-t border-border/50 bg-card/95 backdrop-blur-sm px-6 py-4">
           <DealCommentsPanel
             comments={comments}
             onAddComment={handleCommentAdd}
@@ -419,20 +414,13 @@ export function DealDetail({ dealId }: DealDetailProps) {
       {/* Task Detail Modal */}
       {isTaskModalOpen && selectedTask && (
         <TaskDetailModal
-          task={{
-            ...selectedTask,
-            assignee: typeof selectedTask.assignee === 'string' ? selectedTask.assignee : selectedTask.assignee.name,
-            dealId: selectedTask.dealId || null,
-            dealName: selectedTask.dealName || null
-          } as any}
+          task={selectedTask}
           isOpen={isTaskModalOpen}
           onClose={() => {
             setIsTaskModalOpen(false)
             setSelectedTask(null)
           }}
-          onUpdate={(updatedTask: any) => {
-            handleTaskUpdate(selectedTask.id, updatedTask)
-          }}
+          onUpdate={handleTaskUpdate}
         />
       )}
     </div>

@@ -1,8 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { useState } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const data = [
   { week: 'Week 1', deals: 12 },
@@ -16,7 +15,6 @@ const data = [
 ]
 
 export function BarChartCard() {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   return (
     <Card className="border-border/50 bg-card">
@@ -29,12 +27,6 @@ export function BarChartCard() {
           <BarChart 
             data={data}
             style={{ outline: 'none' }}
-            onMouseMove={(state) => {
-              if (state.isTooltipActive) {
-                setHoveredIndex(state.activeTooltipIndex ?? null)
-              }
-            }}
-            onMouseLeave={() => setHoveredIndex(null)}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
@@ -57,14 +49,7 @@ export function BarChartCard() {
               }}
               labelStyle={{ color: 'hsl(var(--foreground))' }}
             />
-            <Bar dataKey="deals" radius={[4, 4, 0, 0]}>
-              {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={hoveredIndex === index ? '#6B8AFF' : '#A1A1AA'}
-                  style={{ transition: 'fill 0.2s ease' }}
-                />
-              ))}
+            <Bar dataKey="deals" radius={[4, 4, 0, 0]} fill="#A1A1AA">
             </Bar>
           </BarChart>
         </ResponsiveContainer>

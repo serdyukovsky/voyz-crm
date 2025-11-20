@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useState } from 'react'
 
 const data = [
@@ -32,6 +32,7 @@ export function TaskLoadChartCard() {
               }
             }}
             onMouseLeave={() => setHoveredIndex(null)}
+            margin={{ bottom: 0, top: 0, left: 0, right: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
@@ -54,11 +55,7 @@ export function TaskLoadChartCard() {
               }}
               labelStyle={{ color: 'hsl(var(--foreground))' }}
             />
-            <Legend 
-              wrapperStyle={{ fontSize: '12px' }}
-              iconType="circle"
-            />
-            <Bar dataKey="active" radius={[4, 4, 0, 0]} name="Active">
+            <Bar dataKey="active" radius={[4, 4, 0, 0]}>
               {data.map((entry, index) => (
                 <Cell 
                   key={`cell-active-${index}`} 
@@ -67,7 +64,7 @@ export function TaskLoadChartCard() {
                 />
               ))}
             </Bar>
-            <Bar dataKey="completed" radius={[4, 4, 0, 0]} name="Completed">
+            <Bar dataKey="completed" radius={[4, 4, 0, 0]}>
               {data.map((entry, index) => (
                 <Cell 
                   key={`cell-completed-${index}`} 
@@ -78,6 +75,18 @@ export function TaskLoadChartCard() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        
+        {/* Custom Legend */}
+        <div className="flex justify-center gap-4 pt-4 mt-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#A1A1AA]" />
+            <span className="text-xs text-foreground">Active</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#71717A]" />
+            <span className="text-xs text-foreground">Completed</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
