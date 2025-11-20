@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES
+  SUPPORT
+  VIEWER
+}
+
+enum DealStage {
+  NEW
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MessageDirection {
+  INCOMING
+  OUTGOING
+}
+
+enum IntegrationType {
+  WHATSAPP
+  TELEGRAM
+  VK
+  EMAIL
+  TELEPHONY
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  avatar        String?
+  role          UserRole @default(VIEWER)
+  isActive      Boolean  @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  deals         Deal[]
+  tasks         Task[]
+  comments      Comment[]
+  activities    Activity[]
+  messages      Message[]
+  calls         Call[]
+  assignedDeals Deal[]   @relation("DealAssignee")
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  permissions Json     // Array of permission strings
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Stage {
+  id          String   @id @default(uuid())
+  name        String
+  order       Int
+  color       String   @default("#6B7280")
+  isDefault   Boolean  @default(false)
+  isClosed    Boolean  @default(false) // For closed-won/lost stages
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deals       Deal[]
+
+  @@unique([name, order])
+  @@map("stages")
+}
+
+model Deal {
+  id              String     @id @default(uuid())
+  title           String
+  number          String     @unique
+  amount          Decimal    @default(0) @db.Decimal(12, 2)
+  stageId         String
+  assignedToId    String?    @relation("DealAssignee", fields: [assignedToId], references: [id])
+  createdById     String
+  expectedCloseAt DateTime?
+  closedAt        DateTime?
+  description     String?
+  tags            String[]   @default([])
+  customFields    Json?       // Flexible custom fields
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  stage           Stage      @relation(fields: [stageId], references: [id])
+  createdBy       User       @relation(fields: [createdById], references: [id])
+  assignedTo      User?      @relation("DealAssignee")
+  tasks           Task[]
+  comments        Comment[]
+  activities      Activity[]
+  messages        Message[]
+  calls           Call[]
+
+  @@index([stageId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@map("deals")
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  dealId      String?
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    Int        @default(0)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdById String
+  assignedToId String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  deal        Deal?      @relation(fields: [dealId], references: [id])
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  assignedTo User        @relation(fields: [assignedToId], references: [id])
+  activities  Activity[]
+
+  @@index([dealId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  dealId   String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  deal      Deal     @relation(fields: [dealId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@map("comments")
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  type      String   // stage_change, comment, task_created, task_completed, field_update, etc.
+  dealId    String?
+  taskId    String?
+  userId    String
+  metadata  Json?    // Flexible metadata for different activity types
+  createdAt DateTime @default(now())
+
+  // Relations
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  task      Task?    @relation(fields: [taskId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+model Message {
+  id                String           @id @default(uuid())
+  dealId            String?
+  externalMessageId String           // ID from external system
+  integrationType   IntegrationType
+  direction         MessageDirection
+  sender            String           // Phone, email, username, etc.
+  recipient         String           // Phone, email, username, etc.
+  content           String
+  attachments       Json?            // Array of attachment objects
+  metadata          Json?            // Additional integration-specific data
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Relations
+  deal              Deal?            @relation(fields: [dealId], references: [id])
+  userId            String?          // User who sent/received
+  user              User?            @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([externalMessageId, integrationType])
+  @@index([integrationType, direction])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Call {
+  id            String         @id @default(uuid())
+  dealId        String?
+  userId        String?
+  externalCallId String?       // ID from telephony system
+  phone         String
+  direction     CallDirection
+  duration      Int?           // Duration in seconds
+  recordingUrl  String?
+  status        String?        // answered, missed, busy, etc.
+  metadata      Json?          // Additional call data
+  createdAt     DateTime       @default(now())
+
+  // Relations
+  deal          Deal?          @relation(fields: [dealId], references: [id])
+  user          User?          @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([phone])
+  @@index([createdAt])
+  @@map("calls")
+}
+
+model IntegrationSettings {
+  id          String           @id @default(uuid())
+  type        IntegrationType  @unique
+  credentials Json             // Encrypted credentials
+  enabled     Boolean          @default(false)
+  config      Json?            // Additional configuration
+  webhookUrl  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("integration_settings")
+}
+
+model LeadSource {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("lead_sources")
+}
+
