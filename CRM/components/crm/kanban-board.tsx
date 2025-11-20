@@ -6,6 +6,7 @@ import { KanbanColumn } from "./kanban-column"
 import { AddStageModal } from "./add-stage-modal"
 import { Button } from "@/components/ui/button"
 import { Plus } from 'lucide-react'
+import type { Trigger } from "./trigger-card"
 
 export interface Deal {
   id: string
@@ -25,6 +26,7 @@ export interface Stage {
   label: string
   color: string
   isCustom?: boolean
+  triggers?: Trigger[]
 }
 
 const defaultStages: Stage[] = [
@@ -40,15 +42,18 @@ interface KanbanBoardProps {
   initialDeals?: Deal[]
   onStagesChange?: (stages: Stage[]) => void
   onDealsChange?: (deals: Deal[]) => void
+  isEditMode?: boolean
 }
 
 export function KanbanBoard({ 
   initialStages,
   initialDeals, 
   onStagesChange,
-  onDealsChange 
+  onDealsChange,
+  isEditMode = false
 }: KanbanBoardProps = {}) {
   const [draggedDeal, setDraggedDeal] = useState<Deal | null>(null)
+  const [draggedStage, setDraggedStage] = useState<number | null>(null)
   const [deals, setDeals] = useState<Deal[]>(initialDeals || [
     {
       id: "1",
@@ -197,20 +202,115 @@ export function KanbanBoard({
     setDraggedDeal(null)
   }
 
+  const handleStageDragStart = (index: number) => {
+    setDraggedStage(index)
+  }
+
+  const handleStageDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedStage === null || draggedStage === index) return
+    
+    const newStages = [...stages]
+    const [removed] = newStages.splice(draggedStage, 1)
+    newStages.splice(index, 0, removed)
+    
+    setStages(newStages)
+    setDraggedStage(index)
+  }
+
+  const handleStageDragEnd = () => {
+    setDraggedStage(null)
+  }
+
+  const handleStageUpdate = (stageId: string, updates: Partial<Stage>) => {
+    setStages(stages.map(stage => 
+      stage.id === stageId ? { ...stage, ...updates } : stage
+    ))
+  }
+
+  const handleTriggerAdd = (stageId: string, trigger: Trigger) => {
+    setStages(stages.map(stage => 
+      stage.id === stageId 
+        ? { ...stage, triggers: [...(stage.triggers || []), trigger] }
+        : stage
+    ))
+  }
+
+  const handleTriggerUpdate = (stageId: string, triggerId: string, updates: Partial<Trigger>) => {
+    setStages(stages.map(stage => 
+      stage.id === stageId
+        ? { 
+            ...stage, 
+            triggers: (stage.triggers || []).map(t => 
+              t.id === triggerId ? { ...t, ...updates } : t
+            )
+          }
+        : stage
+    ))
+  }
+
+  const handleTriggerDelete = (stageId: string, triggerId: string) => {
+    setStages(stages.map(stage => 
+      stage.id === stageId
+        ? { 
+            ...stage, 
+            triggers: (stage.triggers || []).filter(t => t.id !== triggerId)
+          }
+        : stage
+    ))
+  }
+
+  const handleDealAdd = (dealData: Omit<Deal, "id" | "updatedAt">) => {
+    const newDeal: Deal = {
+      ...dealData,
+      id: `deal-${Date.now()}`,
+      updatedAt: new Date().toISOString(),
+    }
+    setDeals([...deals, newDeal])
+  }
+
   return (
     <div className="flex gap-3 overflow-x-auto pb-4">
       {stages.map((stage, index) => (
         <KanbanColumn
           key={stage.id}
           stage={stage}
-          deals={deals.filter((deal) => deal.stage === stage.id)}
+          deals={isEditMode ? [] : deals.filter((deal) => deal.stage === stage.id)}
           onAddStageClick={() => handleOpenAddStageModal(index)}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDrop={handleDrop}
           isDraggedOver={draggedDeal !== null && draggedDeal.stage !== stage.id}
+          isEditMode={isEditMode}
+          onStageUpdate={(updates) => handleStageUpdate(stage.id, updates)}
+          onTriggerAdd={(trigger) => handleTriggerAdd(stage.id, trigger)}
+          onTriggerUpdate={(triggerId, updates) => handleTriggerUpdate(stage.id, triggerId, updates)}
+          onTriggerDelete={(triggerId) => handleTriggerDelete(stage.id, triggerId)}
+          isStageDragged={draggedStage === index}
+          onStageDragStart={() => handleStageDragStart(index)}
+          onStageDragOver={(e) => handleStageDragOver(e, index)}
+          onStageDragEnd={handleStageDragEnd}
+          onDealAdd={handleDealAdd}
         />
       ))}
+
+      {/* Add Stage Button in Edit Mode */}
+      {isEditMode && (
+        <div className="flex-shrink-0 w-72">
+          <div className="mb-3 h-6" />
+          <Button
+            variant="outline"
+            className="w-full h-[500px] border-dashed flex flex-col items-center justify-center gap-2"
+            onClick={() => {
+              setInsertAfterIndex(stages.length - 1)
+              setIsAddStageModalOpen(true)
+            }}
+          >
+            <Plus className="h-6 w-6 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Добавить этап</span>
+          </Button>
+        </div>
+      )}
 
       <AddStageModal
         isOpen={isAddStageModalOpen}

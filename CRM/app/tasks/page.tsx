@@ -10,7 +10,7 @@ import { Plus, Search, Filter } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function TasksPage() {
-  const [view, setView] = useState<"list" | "kanban" | "calendar">("list")
+  const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
   const [searchQuery, setSearchQuery] = useState("")
   const [userFilter, setUserFilter] = useState<string>("")
   const [dealFilter, setDealFilter] = useState<string>("")
@@ -42,11 +42,11 @@ export default function TasksPage() {
           {/* Tabs */}
           <Tabs value={view} onValueChange={(v) => setView(v as "list" | "kanban" | "calendar")}>
             <TabsList className="bg-secondary">
-              <TabsTrigger value="list" className="text-xs">
-                List
-              </TabsTrigger>
               <TabsTrigger value="kanban" className="text-xs">
                 Kanban
+              </TabsTrigger>
+              <TabsTrigger value="list" className="text-xs">
+                List
               </TabsTrigger>
               <TabsTrigger value="calendar" className="text-xs">
                 Calendar
@@ -120,16 +120,16 @@ export default function TasksPage() {
         </div>
 
         {/* Content */}
-        {view === "list" ? (
-          <TasksListView 
+        {view === "kanban" ? (
+          <TasksKanbanView 
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}
             dateFilter={dateFilter}
             statusFilter={statusFilter}
           />
-        ) : view === "kanban" ? (
-          <TasksKanbanView 
+        ) : view === "list" ? (
+          <TasksListView 
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}

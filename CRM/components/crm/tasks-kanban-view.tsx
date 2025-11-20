@@ -9,13 +9,16 @@ import { Plus } from 'lucide-react'
 interface Task {
   id: string
   title: string
-  dealId: string
-  dealName: string
+  dealId: string | null
+  dealName: string | null
   dueDate: string
   assignee: string
   completed: boolean
   priority: "low" | "medium" | "high"
   status: string
+  description?: string
+  createdAt?: string
+  result?: string
 }
 
 interface Stage {
@@ -33,12 +36,12 @@ const defaultStages: Stage[] = [
 ]
 
 const initialTasks: Task[] = [
-  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress" },
-  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo" },
-  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo" },
-  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done" },
-  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog" },
-  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress" },
+  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress", description: "Call the decision maker to discuss pricing and timeline", createdAt: "2024-03-10T10:00:00" },
+  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo", description: "Prepare and send detailed pricing proposal for TechStart", createdAt: "2024-03-11T14:00:00" },
+  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo", description: "Coordinate with client to schedule a product demonstration", createdAt: "2024-03-12T09:00:00" },
+  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done", description: "Review contract terms and conditions with legal team", createdAt: "2024-03-09T11:00:00" },
+  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog", description: "Discuss technical requirements and integration details", createdAt: "2024-03-13T16:00:00" },
+  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress", description: "Prepare final presentation and present to the client", createdAt: "2024-03-14T08:00:00" },
 ]
 
 interface TasksKanbanViewProps {
@@ -113,6 +116,12 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, dateFilte
     setIsModalOpen(true)
   }
 
+  const handleTaskUpdate = (updatedTask: Task) => {
+    setTasks(tasks.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ))
+  }
+
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -148,7 +157,7 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, dateFilte
                 {/* Tasks */}
                 <div className="p-3 space-y-2 min-h-[200px]">
                   {stageTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} />
+                    <TaskCard key={task.id} task={task} onTaskUpdate={handleTaskUpdate} />
                   ))}
                 </div>
               </div>

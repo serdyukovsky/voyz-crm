@@ -56,7 +56,7 @@ export function LineChartCard() {
                 fontSize: '12px'
               }}
               labelStyle={{ color: 'hsl(var(--foreground))' }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+              formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Revenue']}
             />
             <Line 
               type="monotone" 

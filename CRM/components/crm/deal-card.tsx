@@ -21,6 +21,7 @@ function formatRelativeTime(dateString: string): string {
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
+  // Use fixed locale to avoid hydration mismatch
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -79,7 +80,7 @@ export function DealCard({ deal, stage, onDragStart, onDragEnd }: DealCardProps)
         <div className="flex items-center gap-1.5 mb-3">
           <DollarSign className="h-3.5 w-3.5 text-primary" />
           <span className="text-sm font-semibold text-foreground">
-            ${deal.amount.toLocaleString()}
+            ${deal.amount.toLocaleString('en-US')}
           </span>
         </div>
 

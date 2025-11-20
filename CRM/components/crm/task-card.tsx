@@ -1,23 +1,30 @@
 "use client"
 
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, User } from 'lucide-react'
+import { Calendar, User, Link as LinkIcon } from 'lucide-react'
+import { TaskDetailModal } from "./task-detail-modal"
+import { DealDetailModal } from "./deal-detail-modal"
 
 interface Task {
   id: string
   title: string
-  dealId: string
-  dealName: string
+  dealId: string | null
+  dealName: string | null
   dueDate: string
   assignee: string
   completed: boolean
   priority: "low" | "medium" | "high"
   status: string
+  description?: string
+  createdAt?: string
+  result?: string
 }
 
 interface TaskCardProps {
   task: Task
+  onTaskUpdate?: (task: Task) => void
 }
 
 const priorityColors = {
@@ -26,7 +33,10 @@ const priorityColors = {
   high: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, onTaskUpdate }: TaskCardProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDealModalOpen, setIsDealModalOpen] = useState(false)
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -35,43 +45,92 @@ export function TaskCard({ task }: TaskCardProps) {
       .toUpperCase()
   }
 
+  const handleTaskClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsModalOpen(true)
+  }
+
+  const handleDealClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsDealModalOpen(true)
+  }
+
+  const handleTaskUpdate = (updatedTask: Task) => {
+    onTaskUpdate?.(updatedTask)
+  }
+
   return (
-    <Card className="p-3 border-border bg-card hover:border-primary/50 transition-colors cursor-pointer">
-      <div className="space-y-2">
-        {/* Title */}
-        <h4 className="text-sm font-medium text-foreground leading-tight">
-          {task.title}
-        </h4>
-
-        {/* Due Date */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          <span>
-            {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-1">
-          {/* Assignee Avatar */}
-          <div 
-            className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20"
-            title={task.assignee}
+    <>
+      <Card className="p-3 border-border bg-card hover:border-primary/50 transition-colors cursor-pointer">
+        <div className="space-y-2">
+          {/* Title - clickable */}
+          <h4 
+            className="text-sm font-medium text-foreground leading-tight hover:text-primary transition-colors"
+            onClick={handleTaskClick}
           >
-            <span className="text-[10px] font-medium text-primary">
-              {getInitials(task.assignee)}
+            {task.title}
+          </h4>
+
+          {/* Deal Name - if task is linked to a deal */}
+          {task.dealId && task.dealName && (
+            <button
+              onClick={handleDealClick}
+              className="flex items-center gap-1.5 text-xs text-primary hover:underline text-left"
+            >
+              <LinkIcon className="h-3 w-3" />
+              <span>{task.dealName}</span>
+            </button>
+          )}
+
+          {/* Due Date */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            <span>
+              {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           </div>
 
-          {/* Priority Badge */}
-          <Badge 
-            variant="outline" 
-            className={`text-[10px] ${priorityColors[task.priority]}`}
-          >
-            {task.priority}
-          </Badge>
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1">
+            {/* Assignee Avatar */}
+            <div 
+              className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20"
+              title={task.assignee}
+            >
+              <span className="text-[10px] font-medium text-primary">
+                {getInitials(task.assignee)}
+              </span>
+            </div>
+
+            {/* Priority Badge */}
+            <Badge 
+              variant="outline" 
+              className={`text-[10px] ${priorityColors[task.priority]}`}
+            >
+              {task.priority}
+            </Badge>
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+
+      <TaskDetailModal
+        task={task}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onUpdate={handleTaskUpdate}
+      />
+
+      {/* Deal Detail Modal */}
+      {task.dealId && task.dealName && (
+        <DealDetailModal
+          deal={{
+            id: task.dealId,
+            title: task.dealName,
+          }}
+          isOpen={isDealModalOpen}
+          onClose={() => setIsDealModalOpen(false)}
+        />
+      )}
+    </>
   )
 }

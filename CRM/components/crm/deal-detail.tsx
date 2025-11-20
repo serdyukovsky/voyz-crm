@@ -1,21 +1,25 @@
 "use client"
 
-import { useState } from 'react'
-import { DollarSign, MessageSquare, CheckCircle2, Clock, ChevronDown, MoreHorizontal, Check, Paperclip, Send, ChevronRight, FileText, Download, ArrowLeft } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { DollarSign, MessageSquare, CheckCircle2, Clock, ChevronDown, MoreHorizontal, Check, Paperclip, Send, ChevronRight, FileText, Download, ArrowLeft, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import { useRouter } from 'next/navigation'
+import { TaskCard } from "./task-card"
+import { TaskDetailModal } from "./task-detail-modal"
 
 interface DealDetailProps {
   dealId: string
 }
 
 export function DealDetail({ dealId }: DealDetailProps) {
-  const [selectedStage, setSelectedStage] = useState("qualified")
-  const [assignedUser, setAssignedUser] = useState("Alex Chen")
+  const router = useRouter()
+  const [selectedStage, setSelectedStage] = useState("new")
+  const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -25,18 +29,78 @@ export function DealDetail({ dealId }: DealDetailProps) {
   })
   const [activeChatTab, setActiveChatTab] = useState<'comment' | 'employee' | 'client'>('comment')
   const [chatMessage, setChatMessage] = useState("")
+  const [selectedTask, setSelectedTask] = useState<any>(null)
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [dealTitle, setDealTitle] = useState("")
+  const [dealClient, setDealClient] = useState("")
+  const [dealAmount, setDealAmount] = useState(0)
+  const [isNewDeal, setIsNewDeal] = useState(false)
+
+  // Load deal data from sessionStorage or use defaults
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDeal = sessionStorage.getItem(`deal-${dealId}`)
+      const isNew = sessionStorage.getItem(`deal-${dealId}-isNew`) === 'true'
+      
+      if (savedDeal) {
+        const dealData = JSON.parse(savedDeal)
+        setDealTitle(dealData.title || "")
+        setDealClient(dealData.client || "")
+        setDealAmount(dealData.amount || 0)
+        setSelectedStage(dealData.stage || "new")
+        setAssignedUser(dealData.assignedTo?.name || "Current User")
+        setIsNewDeal(isNew)
+      } else {
+        // Default values for existing deals
+        setDealTitle("Enterprise License - Q1 2024")
+        setDealClient("Acme Corporation")
+        setDealAmount(125000)
+        setSelectedStage("qualified")
+        setAssignedUser("Alex Chen")
+        setIsNewDeal(false)
+      }
+    }
+  }, [dealId])
+
+  // Check if deal has any data - if not, don't save
+  const hasDealData = dealTitle.trim() || dealClient.trim() || dealAmount > 0
+
+  // Handle navigation away - check if deal should be saved
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isNewDeal && !hasDealData) {
+        // Remove from sessionStorage if no data
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem(`deal-${dealId}`)
+          sessionStorage.removeItem(`deal-${dealId}-isNew`)
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isNewDeal, hasDealData, dealId])
 
   const deal = {
     id: dealId,
     number: "DL-2024-0342",
-    title: "Enterprise License - Q1 2024",
-    client: "Acme Corporation",
-    amount: 125000,
+    title: dealTitle,
+    client: dealClient,
+    amount: dealAmount,
     stage: selectedStage,
     assignedTo: assignedUser,
     createdAt: "2024-01-15",
     expectedClose: "2024-03-01",
-    tags: ["Enterprise", "High Priority", "Q1"],
+    tags: [] as string[],
+  }
+
+  // Tasks related to this deal - empty for new deals
+  const [dealTasks, setDealTasks] = useState<any[]>([])
+
+  const handleTaskUpdate = (updatedTask: any) => {
+    setDealTasks(dealTasks.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ))
   }
 
   const stages = [
@@ -54,7 +118,8 @@ export function DealDetail({ dealId }: DealDetailProps) {
   ]
 
   // Unified timeline with all activities, tasks, and files sorted by date
-  const timeline = [
+  // Empty for new deals
+  const defaultTimeline = [
     {
       id: "1",
       type: "stage_change",
@@ -157,8 +222,10 @@ export function DealDetail({ dealId }: DealDetailProps) {
     },
   ].sort((a, b) => a.dateSort.getTime() - b.dateSort.getTime())
 
+  const timeline = isNewDeal ? [] : defaultTimeline
 
-  const customFieldSections = [
+
+  const defaultCustomFieldSections = [
     {
       id: 'basic',
       title: 'Basic Information',
@@ -188,6 +255,9 @@ export function DealDetail({ dealId }: DealDetailProps) {
     }
   ]
 
+  // Empty custom fields for new deals
+  const customFieldSections = isNewDeal ? [] : defaultCustomFieldSections
+
 
   const handleSendMessage = () => {
     if (chatMessage.trim()) {
@@ -211,15 +281,30 @@ export function DealDetail({ dealId }: DealDetailProps) {
         {/* Deal Header */}
         <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/50 pl-6 pr-3 py-4">
           <div className="flex items-start gap-2">
-            <Link href="/deals">
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 flex-shrink-0"
+              onClick={() => {
+                if (isNewDeal && !hasDealData) {
+                  // Remove from sessionStorage if no data
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.removeItem(`deal-${dealId}`)
+                    sessionStorage.removeItem(`deal-${dealId}-isNew`)
+                  }
+                }
+                router.push('/deals')
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
             <div className="flex-1 min-w-0">
               <Input 
-                defaultValue={deal.title}
+                value={dealTitle}
+                onChange={(e) => setDealTitle(e.target.value)}
+                placeholder="Название сделки"
                 className="text-lg font-semibold border-0 px-0 py-0 h-auto focus-visible:ring-0 bg-transparent mb-2"
+                autoFocus={isNewDeal}
               />
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs text-muted-foreground font-mono">{deal.number}</span>
@@ -329,7 +414,40 @@ export function DealDetail({ dealId }: DealDetailProps) {
             <label className="text-xs text-muted-foreground mb-2 block">Budget</label>
             <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-background/50 border border-border/50">
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">{deal.amount.toLocaleString()}</span>
+              <Input
+                type="text"
+                value={dealAmount === 0 ? "" : dealAmount.toString()}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "")
+                  setDealAmount(value ? parseFloat(value) : 0)
+                }}
+                placeholder="0"
+                className="border-0 px-0 h-auto bg-transparent focus-visible:ring-0 text-sm font-medium flex-1"
+              />
+            </div>
+          </div>
+
+          {/* Related Tasks */}
+          <div className="pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs text-muted-foreground">Tasks</label>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <Plus className="h-3 w-3 mr-1" />
+                Add Task
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {dealTasks.length > 0 ? (
+                dealTasks.map((task) => (
+                  <TaskCard 
+                    key={task.id} 
+                    task={task}
+                    onTaskUpdate={handleTaskUpdate}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">No tasks yet</p>
+              )}
             </div>
           </div>
 
@@ -382,7 +500,12 @@ export function DealDetail({ dealId }: DealDetailProps) {
           <div className="flex-1 overflow-y-auto pl-3 pr-6 py-6">
           <div className="space-y-6">
             {/* Timeline Events */}
-            {timeline.map((activity, index) => (
+            {timeline.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                Нет истории изменений
+              </div>
+            ) : (
+              timeline.map((activity, index) => (
               <div key={activity.id} className="flex gap-3 relative">
                 {/* Timeline line */}
                 {index !== timeline.length - 1 && (
@@ -492,7 +615,8 @@ export function DealDetail({ dealId }: DealDetailProps) {
                   )}
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
           </div>
 
@@ -572,6 +696,21 @@ export function DealDetail({ dealId }: DealDetailProps) {
           </div>
         </div>
       </div>
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          isOpen={isTaskModalOpen}
+          onClose={() => {
+            setIsTaskModalOpen(false)
+            setSelectedTask(null)
+          }}
+          onUpdate={(updatedTask) => {
+            handleTaskUpdate(updatedTask)
+            setSelectedTask(updatedTask)
+          }}
+        />
+      )}
     </div>
   )
 }

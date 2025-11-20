@@ -3,27 +3,31 @@
 import { useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import Link from "next/link"
+import { TaskDetailModal } from "./task-detail-modal"
+import { DealDetailModal } from "./deal-detail-modal"
 
 interface Task {
   id: string
   title: string
-  dealId: string
-  dealName: string
+  dealId: string | null
+  dealName: string | null
   dueDate: string
   assignee: string
   completed: boolean
   priority: "low" | "medium" | "high"
   status: string
+  description?: string
+  createdAt?: string
+  result?: string
 }
 
 const initialTasks: Task[] = [
-  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress" },
-  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo" },
-  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo" },
-  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done" },
-  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog" },
-  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress" },
+  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress", description: "Call the decision maker to discuss pricing and timeline", createdAt: "2024-03-10T10:00:00" },
+  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo", description: "Prepare and send detailed pricing proposal for TechStart", createdAt: "2024-03-11T14:00:00" },
+  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo", description: "Coordinate with client to schedule a product demonstration", createdAt: "2024-03-12T09:00:00" },
+  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done", description: "Review contract terms and conditions with legal team", createdAt: "2024-03-09T11:00:00" },
+  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog", description: "Discuss technical requirements and integration details", createdAt: "2024-03-13T16:00:00" },
+  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress", description: "Prepare final presentation and present to the client", createdAt: "2024-03-14T08:00:00" },
 ]
 
 const priorityColors = {
@@ -40,8 +44,12 @@ interface TasksListViewProps {
   statusFilter: string
 }
 
-export function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, statusFilter }: TasksListViewProps) {
+function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, statusFilter }: TasksListViewProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
+  const [isDealModalOpen, setIsDealModalOpen] = useState(false)
 
   const filteredTasks = tasks.filter(task => {
     // Search filter
@@ -82,6 +90,26 @@ export function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter,
     ))
   }
 
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task)
+    setIsModalOpen(true)
+  }
+
+  const handleTaskUpdate = (updatedTask: Task) => {
+    setTasks(tasks.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ))
+    setSelectedTask(updatedTask)
+  }
+
+  const handleDealClick = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (task.dealId && task.dealName) {
+      setSelectedDeal({ id: task.dealId, name: task.dealName })
+      setIsDealModalOpen(true)
+    }
+  }
+
   return (
     <div className="rounded-md border border-border bg-card">
       <table className="w-full">
@@ -111,17 +139,24 @@ export function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter,
                 />
               </td>
               <td className="p-3">
-                <button className={`text-sm text-left hover:text-primary transition-colors ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                <button 
+                  onClick={() => handleTaskClick(task)}
+                  className={`text-sm text-left hover:text-primary transition-colors ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                >
                   {task.title}
                 </button>
               </td>
               <td className="p-3">
-                <Link
-                  href={`/deals/${task.dealId}`}
-                  className="text-sm text-primary hover:underline"
-                >
-                  {task.dealName}
-                </Link>
+                {task.dealId && task.dealName ? (
+                  <button
+                    onClick={(e) => handleDealClick(task, e)}
+                    className="text-sm text-primary hover:underline text-left"
+                  >
+                    {task.dealName}
+                  </button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
               </td>
               <td className="p-3">
                 <span className="text-sm text-muted-foreground">
@@ -149,6 +184,31 @@ export function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter,
           <p className="text-sm text-muted-foreground">No tasks found</p>
         </div>
       )}
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onUpdate={handleTaskUpdate}
+        />
+      )}
+
+      {selectedDeal && (
+        <DealDetailModal
+          deal={{
+            id: selectedDeal.id,
+            title: selectedDeal.name,
+          }}
+          isOpen={isDealModalOpen}
+          onClose={() => {
+            setIsDealModalOpen(false)
+            setSelectedDeal(null)
+          }}
+        />
+      )}
     </div>
   )
 }
+
+export { TasksListView }
