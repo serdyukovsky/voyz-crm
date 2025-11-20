@@ -10,28 +10,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
 enum UserRole {
   ADMIN
   MANAGER
-  SALES
-  SUPPORT
-  VIEWER
-}
-
-enum DealStage {
-  NEW
-  QUALIFIED
-  PROPOSAL
-  NEGOTIATION
-  CLOSED_WON
-  CLOSED_LOST
 }
 
 enum TaskStatus {
-  PENDING
+  OPEN
   IN_PROGRESS
   COMPLETED
-  CANCELLED
+  OVERDUE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTI_SELECT
+  DATE
+  BOOLEAN
+  RELATION
+}
+
+enum ActivityType {
+  DEAL_CREATED
+  FIELD_UPDATED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_COMPLETED
+  FILE_UPLOADED
+  FILE_DELETED
+  STAGE_CHANGED
+  COMMENT
+  INTERNAL_NOTE
+  CLIENT_MESSAGE
+  ASSIGNEE_CHANGED
+}
+
+enum CommentType {
+  COMMENT
+  INTERNAL_NOTE
+  CLIENT_MESSAGE
 }
 
 enum MessageDirection {
@@ -52,6 +81,18 @@ enum CallDirection {
   OUTBOUND
 }
 
+enum FileType {
+  IMAGE
+  DOCUMENT
+  SPREADSHEET
+  PDF
+  OTHER
+}
+
+// ============================================
+// USERS & AUTH
+// ============================================
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -59,36 +100,67 @@ model User {
   firstName     String
   lastName      String
   avatar        String?
-  role          UserRole @default(VIEWER)
+  role          UserRole @default(MANAGER)
   isActive      Boolean  @default(true)
   lastLoginAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relations
-  deals         Deal[]
-  tasks         Task[]
+  deals         Deal[]            @relation("DealCreator")
+  assignedDeals Deal[]            @relation("DealAssignee")
+  tasks         Task[]            @relation("TaskCreator")
+  assignedTasks Task[]            @relation("TaskAssignee")
   comments      Comment[]
   activities    Activity[]
   messages      Message[]
   calls         Call[]
-  assignedDeals Deal[]   @relation("DealAssignee")
+  permissions   UserPermission[]
+  files         File[]        @relation("FileUploader")
 
+  @@index([email])
+  @@index([role])
   @@map("users")
 }
 
-model Role {
+model UserPermission {
+  id        String   @id @default(uuid())
+  userId    String
+  permission String  // e.g., "deals.delete", "fields.manage"
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([userId])
+  @@map("user_permissions")
+}
+
+// ============================================
+// PIPELINES & STAGES
+// ============================================
+
+model Pipeline {
   id          String   @id @default(uuid())
-  name        String   @unique
-  permissions Json     // Array of permission strings
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@map("roles")
+  // Relations
+  stages      Stage[]
+  deals       Deal[]
+
+  @@index([isDefault])
+  @@map("pipelines")
 }
 
 model Stage {
   id          String   @id @default(uuid())
+  pipelineId  String
   name        String
   order       Int
   color       String   @default("#6B7280")
@@ -97,105 +169,235 @@ model Stage {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals       Deal[]
+  triggers    StageTrigger[]
 
-  @@unique([name, order])
+  @@unique([pipelineId, order])
+  @@index([pipelineId])
   @@map("stages")
 }
 
+model StageTrigger {
+  id          String   @id @default(uuid())
+  stageId     String
+  triggerType String   // "on_enter", "on_exit", "on_create"
+  actionType  String   // "create_task", "send_email", "webhook", etc.
+  actionData  Json?    // Action-specific configuration
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stage       Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@map("stage_triggers")
+}
+
+// ============================================
+// DEALS
+// ============================================
+
 model Deal {
-  id              String     @id @default(uuid())
+  id              String    @id @default(uuid())
+  number          String    @unique
   title           String
-  number          String     @unique
-  amount          Decimal    @default(0) @db.Decimal(12, 2)
+  amount          Decimal   @default(0) @db.Decimal(12, 2)
+  budget          Decimal?  @db.Decimal(12, 2)
+  pipelineId      String
   stageId         String
-  assignedToId    String?    @relation("DealAssignee", fields: [assignedToId], references: [id])
+  assignedToId    String?
   createdById     String
   expectedCloseAt DateTime?
   closedAt        DateTime?
   description     String?
-  tags            String[]   @default([])
-  customFields    Json?       // Flexible custom fields
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  tags            String[]  @default([])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   // Relations
-  stage           Stage      @relation(fields: [stageId], references: [id])
-  createdBy       User       @relation(fields: [createdById], references: [id])
-  assignedTo      User?      @relation("DealAssignee")
+  pipeline        Pipeline  @relation(fields: [pipelineId], references: [id])
+  stage           Stage     @relation(fields: [stageId], references: [id])
+  createdBy       User      @relation("DealCreator", fields: [createdById], references: [id])
+  assignedTo      User?     @relation("DealAssignee", fields: [assignedToId], references: [id])
   tasks           Task[]
   comments        Comment[]
   activities      Activity[]
-  messages        Message[]
-  calls           Call[]
+  files           File[]
+  customFieldValues CustomFieldValue[]
 
+  @@index([pipelineId])
   @@index([stageId])
   @@index([assignedToId])
   @@index([createdById])
+  @@index([createdAt])
   @@map("deals")
 }
 
+// ============================================
+// CUSTOM FIELDS
+// ============================================
+
+model CustomField {
+  id          String          @id @default(uuid())
+  name        String
+  key         String          @unique // Unique identifier for the field
+  type        CustomFieldType
+  entityType  String          // "deal", "contact", "company"
+  group       String?         // For grouping fields
+  order       Int             @default(0)
+  isRequired  Boolean         @default(false)
+  isUnique    Boolean         @default(false)
+  defaultValue Json?          // Default value based on type
+  options     Json?           // For select/multi-select: array of options
+  description String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  values      CustomFieldValue[]
+
+  @@unique([key, entityType])
+  @@index([entityType, isActive])
+  @@map("custom_fields")
+}
+
+model CustomFieldValue {
+  id            String       @id @default(uuid())
+  customFieldId String
+  dealId        String?
+  entityId      String?      // For future: contactId, companyId, etc.
+  value         Json         // Flexible value storage
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  customField   CustomField  @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  deal          Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, dealId])
+  @@index([customFieldId])
+  @@index([dealId])
+  @@map("custom_field_values")
+}
+
+// ============================================
+// TASKS
+// ============================================
+
 model Task {
-  id          String     @id @default(uuid())
+  id          String       @id @default(uuid())
   dealId      String?
   title       String
   description String?
-  status      TaskStatus @default(PENDING)
-  priority    Int        @default(0)
+  status      TaskStatus   @default(OPEN)
+  priority    TaskPriority @default(MEDIUM)
   dueDate     DateTime?
   completedAt DateTime?
+  result      String?      // Task result/outcome
   createdById String
   assignedToId String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   // Relations
-  deal        Deal?      @relation(fields: [dealId], references: [id])
-  createdBy   User       @relation(fields: [createdById], references: [id])
-  assignedTo User        @relation(fields: [assignedToId], references: [id])
+  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedTo User          @relation("TaskAssignee", fields: [assignedToId], references: [id])
   activities  Activity[]
 
   @@index([dealId])
   @@index([assignedToId])
   @@index([status])
+  @@index([dueDate])
   @@map("tasks")
 }
 
+// ============================================
+// COMMENTS
+// ============================================
+
 model Comment {
-  id        String   @id @default(uuid())
-  dealId   String
+  id        String      @id @default(uuid())
+  dealId    String
   userId    String
+  type      CommentType @default(COMMENT)
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   // Relations
-  deal      Deal     @relation(fields: [dealId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@index([dealId])
-  @@map("comments")
-}
-
-model Activity {
-  id        String   @id @default(uuid())
-  type      String   // stage_change, comment, task_created, task_completed, field_update, etc.
-  dealId    String?
-  taskId    String?
-  userId    String
-  metadata  Json?    // Flexible metadata for different activity types
-  createdAt DateTime @default(now())
-
-  // Relations
-  deal      Deal?    @relation(fields: [dealId], references: [id])
-  task      Task?    @relation(fields: [taskId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  deal      Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+  files     File[]
 
   @@index([dealId])
   @@index([userId])
+  @@index([type])
+  @@map("comments")
+}
+
+// ============================================
+// ACTIVITY LOG
+// ============================================
+
+model Activity {
+  id        String       @id @default(uuid())
+  type      ActivityType
+  dealId    String?
+  taskId    String?
+  userId    String
+  payload   Json?        // Flexible metadata for different activity types
+  createdAt DateTime     @default(now())
+
+  // Relations
+  deal      Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@index([dealId])
+  @@index([taskId])
+  @@index([userId])
+  @@index([type])
   @@index([createdAt])
   @@map("activities")
 }
+
+// ============================================
+// FILES
+// ============================================
+
+model File {
+  id          String   @id @default(uuid())
+  dealId      String?
+  commentId   String?
+  name        String
+  originalName String
+  mimeType    String
+  size        Int      // Size in bytes
+  type        FileType
+  url         String   // Storage URL or path
+  thumbnailUrl String? // For images
+  uploadedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation("FileUploader", fields: [uploadedById], references: [id])
+
+  @@index([dealId])
+  @@index([commentId])
+  @@index([uploadedById])
+  @@map("files")
+}
+
+// ============================================
+// INTEGRATIONS
+// ============================================
 
 model Message {
   id                String           @id @default(uuid())
@@ -212,8 +414,8 @@ model Message {
   updatedAt         DateTime         @updatedAt
 
   // Relations
-  deal              Deal?            @relation(fields: [dealId], references: [id])
-  userId            String?          // User who sent/received
+  deal              Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  userId            String?
   user              User?            @relation(fields: [userId], references: [id])
 
   @@index([dealId])
@@ -237,7 +439,7 @@ model Call {
   createdAt     DateTime       @default(now())
 
   // Relations
-  deal          Deal?          @relation(fields: [dealId], references: [id])
+  deal          Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   user          User?          @relation(fields: [userId], references: [id])
 
   @@index([dealId])
@@ -259,13 +461,66 @@ model IntegrationSettings {
   @@map("integration_settings")
 }
 
-model LeadSource {
+// ============================================
+// IMPORT/EXPORT
+// ============================================
+
+model ImportJob {
   id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
+  fileName    String
+  fileType    String   // "csv", "xlsx"
+  status      String   // "pending", "processing", "completed", "failed"
+  progress    Int      @default(0)
+  totalRows   Int?
+  processedRows Int    @default(0)
+  errors      Json?    // Array of errors
+  mapping     Json?    // Column mapping
+  createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@map("lead_sources")
+  @@index([status])
+  @@index([createdById])
+  @@map("import_jobs")
 }
 
+model ExportJob {
+  id          String   @id @default(uuid())
+  fileType    String   // "csv", "xlsx"
+  status      String   // "pending", "processing", "completed", "failed"
+  filters     Json?    // Export filters
+  fields      Json?    // Selected fields
+  fileUrl     String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdById])
+  @@map("export_jobs")
+}
+
+// ============================================
+// LOGS
+// ============================================
+
+model Log {
+  id        String   @id @default(uuid())
+  level     String   // "info", "warn", "error"
+  action    String   // "create", "update", "delete", "login", etc.
+  entity    String?  // "deal", "task", "user", etc.
+  entityId  String?
+  userId    String?
+  message   String
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([action])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("logs")
+}

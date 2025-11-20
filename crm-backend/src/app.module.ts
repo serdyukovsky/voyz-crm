@@ -5,7 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { DealsModule } from './deals/deals.module';
 import { MessagesModule } from './messages/messages.module';
-import { WsModule } from './ws/ws.module';
+import { WebsocketModule } from './websocket/websocket.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 
@@ -19,7 +19,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     UsersModule,
     DealsModule,
     MessagesModule,
-    WsModule,
+    WebsocketModule,
     IntegrationsModule,
     AnalyticsModule,
   ],

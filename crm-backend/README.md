@@ -1,130 +1,219 @@
 # CRM Backend
 
-Internal CRM system with modular integrations built with NestJS, PostgreSQL, and Prisma.
+Полнофункциональный backend для CRM-системы, построенный на NestJS, TypeScript, PostgreSQL и Prisma ORM.
 
-## Features
+## 🎯 Статус проекта
 
-- **User Management** - Authentication with JWT (access + refresh tokens)
-- **Deals Management** - Full CRUD with pipeline stages
-- **Tasks** - Task assignment and tracking
-- **Comments** - Deal comments
-- **Activity Logs** - Automatic activity tracking
-- **Messages** - Unified message system across all integrations
-- **Calls** - Telephony integration with call history
-- **Analytics** - Comprehensive analytics and reporting
-- **Real-time Updates** - WebSocket support for live updates
+### ✅ Выполнено
 
-## Integrations
+1. **Prisma Schema** - Полная схема базы данных со всеми таблицами:
+   - Users & Permissions (RBAC)
+   - Pipelines & Stages
+   - Deals (сделки)
+   - Tasks (задачи)
+   - Custom Fields & Values (динамические поля)
+   - Comments (комментарии с типами)
+   - Activity Log (история изменений)
+   - Files (файлы)
+   - Messages & Calls (интеграции)
+   - Import/Export Jobs
+   - Logs
 
-- **WhatsApp Business API** - Send/receive messages
-- **Telegram Bot API** - Telegram integration
-- **VK Messages API** - VKontakte integration
-- **Email (IMAP/SMTP)** - Email integration
-- **Telephony** - Call tracking and recording
+2. **Common Module** - Общие утилиты:
+   - RBAC Guard (проверка ролей и прав)
+   - Permissions decorator
+   - CurrentUser decorator
+   - Prisma Service (подключение к БД)
+   - HTTP Exception Filter
+   - Permissions constants
 
-## Tech Stack
+3. **WebSocket Gateway** - Real-time обновления:
+   - RealtimeGateway с событиями для всех типов обновлений
+   - Подписка/отписка на сделки
+   - События для deals, tasks, comments, files, activity
 
-- Node.js + TypeScript
-- NestJS
-- PostgreSQL
-- Prisma ORM
-- WebSockets (Socket.IO)
-- JWT Authentication
+4. **Swagger** - API документация:
+   - Настроен в main.ts
+   - Доступен по `/api/docs`
 
-## Getting Started
+### 🚧 Требуется реализация
 
-### Prerequisites
+См. `IMPLEMENTATION-GUIDE.md` для полного списка модулей, которые нужно создать.
 
-- Node.js 20+
-- PostgreSQL 15+
-- npm or yarn
+## 📋 Быстрый старт
 
-### Installation
+### 1. Установка зависимостей
 
-1. Clone the repository
-2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
+### 2. Настройка .env
+
+Создайте `.env` файл:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/crm"
+JWT_SECRET="your-secret-key"
+JWT_EXPIRES_IN="1d"
+PORT=3001
+FRONTEND_URL="http://localhost:3000"
 ```
 
-4. Set up the database:
+### 3. Генерация Prisma Client
+
 ```bash
-npx prisma migrate dev
-npx prisma generate
+npm run prisma:generate
 ```
 
-5. Start the development server:
+### 4. Создание миграций
+
 ```bash
+npm run prisma:migrate dev --name init
+```
+
+### 5. Запуск проекта
+
+```bash
+# Development
 npm run start:dev
+
+# Production
+npm run build
+npm run start:prod
 ```
 
-### Docker
+### 6. Доступ к API
 
-```bash
-docker-compose up -d
-```
+- API: http://localhost:3001/api
+- Swagger: http://localhost:3001/api/docs
 
-## API Endpoints
+## 🏗️ Архитектура
 
-### Authentication
-- `POST /auth/login` - Login
-- `POST /auth/refresh` - Refresh token
-
-### Deals
-- `GET /deals` - List all deals
-- `POST /deals` - Create deal
-- `GET /deals/:id` - Get deal details
-- `PATCH /deals/:id` - Update deal
-- `DELETE /deals/:id` - Delete deal
-
-### Messages
-- `GET /messages` - List all messages
-- `POST /messages` - Create message
-- `GET /messages/deal/:dealId` - Get messages for deal
-
-### Webhooks
-- `POST /integrations/whatsapp/webhook` - WhatsApp webhook
-- `POST /integrations/telegram/webhook/:token` - Telegram webhook
-- `POST /integrations/vk/webhook` - VK webhook
-- `POST /integrations/email/webhook` - Email webhook
-- `POST /integrations/telephony/webhook` - Telephony webhook
-
-## WebSocket Events
-
-- `message:new` - New message received
-- `call:new` - New call received
-- `deal:update` - Deal updated
-- `activity:new` - New activity
-- `task:update` - Task updated
-
-## Project Structure
+Проект следует чистой архитектуре и DDD-подходу:
 
 ```
 src/
-  /auth          - Authentication module
-  /users         - User management
-  /deals         - Deal management
-  /tasks         - Task management
-  /messages      - Message management
-  /calls         - Call management
-  /integrations  - Integration modules
-    /common      - Base integration classes
-    /whatsapp    - WhatsApp integration
-    /telegram    - Telegram integration
-    /vk          - VK integration
-    /email       - Email integration
-    /telephony   - Telephony integration
-  /ws            - WebSocket gateway
-  /common        - Shared services
+├── modules/          # Бизнес-модули по доменам
+│   ├── auth/
+│   ├── users/
+│   ├── deals/
+│   ├── tasks/
+│   ├── fields/
+│   ├── activity/
+│   ├── files/
+│   ├── pipelines/
+│   ├── comments/
+│   ├── import-export/
+│   └── logs/
+├── common/           # Общие утилиты
+│   ├── guards/
+│   ├── decorators/
+│   ├── filters/
+│   ├── services/
+│   └── constants/
+├── websocket/        # WebSocket Gateway
+└── main.ts          # Точка входа
 ```
 
-## License
+## 🔐 RBAC (Role-Based Access Control)
 
-Private - Internal use only
+### Роли
 
+- **ADMIN** - Полный доступ ко всему
+- **MANAGER** - Ограниченный доступ (см. permissions)
+
+### Permissions
+
+См. `src/common/constants/permissions.ts` для полного списка прав.
+
+## 📡 WebSocket Events
+
+См. `src/websocket/realtime.gateway.ts` для всех WebSocket событий.
+
+### Подписка на события
+
+```typescript
+// Подписка на обновления сделки
+socket.emit('subscribe:deal', { dealId: 'deal-id' });
+
+// Отписка
+socket.emit('unsubscribe:deal', { dealId: 'deal-id' });
+```
+
+## 🧪 Тестирование
+
+```bash
+# Unit тесты
+npm run test
+
+# E2E тесты
+npm run test:e2e
+
+# Coverage
+npm run test:cov
+```
+
+## 📚 Документация
+
+- `ARCHITECTURE.md` - Архитектура проекта
+- `IMPLEMENTATION-GUIDE.md` - Руководство по реализации модулей
+- `SETUP.md` - Инструкции по настройке
+- Swagger: http://localhost:3001/api/docs
+
+## 🔧 Скрипты
+
+```bash
+# Development
+npm run start:dev
+
+# Production
+npm run build
+npm run start:prod
+
+# Prisma
+npm run prisma:generate    # Генерация Prisma Client
+npm run prisma:migrate     # Создание миграций
+npm run prisma:studio      # Prisma Studio (GUI для БД)
+
+# Testing
+npm run test
+npm run test:watch
+npm run test:cov
+
+# Linting
+npm run lint
+npm run format
+```
+
+## 📦 Зависимости
+
+### Основные
+- `@nestjs/common` - NestJS core
+- `@nestjs/core` - NestJS core
+- `@nestjs/config` - Конфигурация
+- `@nestjs/jwt` - JWT токены
+- `@nestjs/passport` - Аутентификация
+- `@nestjs/websockets` - WebSockets
+- `@nestjs/platform-socket.io` - Socket.IO
+- `@prisma/client` - Prisma ORM
+- `prisma` - Prisma CLI
+- `socket.io` - WebSocket сервер
+
+### Дополнительные
+- `bcrypt` - Хеширование паролей
+- `class-validator` - Валидация DTOs
+- `class-transformer` - Трансформация данных
+- `csv-parser` - Парсинг CSV
+- `xlsx` - Работа с Excel файлами
+
+## 🚀 Следующие шаги
+
+1. Реализовать модули согласно `IMPLEMENTATION-GUIDE.md`
+2. Настроить CI/CD
+3. Добавить unit тесты для ключевых сервисов
+4. Настроить мониторинг и логирование
+5. Оптимизировать производительность
+
+## 📝 Лицензия
+
+Private
