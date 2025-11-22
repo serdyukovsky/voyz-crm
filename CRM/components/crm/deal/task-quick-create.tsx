@@ -24,10 +24,11 @@ import type { Task } from '@/hooks/use-deal-tasks'
 
 interface TaskQuickCreateProps {
   dealId: string
+  dealContactId?: string
   onCreate: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>
 }
 
-export function TaskQuickCreate({ dealId, onCreate }: TaskQuickCreateProps) {
+export function TaskQuickCreate({ dealId, dealContactId, onCreate }: TaskQuickCreateProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -42,6 +43,7 @@ export function TaskQuickCreate({ dealId, onCreate }: TaskQuickCreateProps) {
       title: title.trim(),
       description: description.trim() || undefined,
       dealId,
+      contactId: dealContactId || undefined,
       dueDate: dueDate?.toISOString(),
       assignee: { id: "1", name: "Current User" },
       status,

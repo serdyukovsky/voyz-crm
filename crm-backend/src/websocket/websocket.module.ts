@@ -8,9 +8,9 @@ import { RealtimeGateway } from './realtime.gateway';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1d'),
+          expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN', '15m'),
         },
       }),
       inject: [ConfigService],

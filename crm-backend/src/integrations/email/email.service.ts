@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import { BaseIntegration } from '../common/base.integration';
 import { IntegrationType, MessageDirection } from '@prisma/client';
 import { ParsedMessage, SendMessageOptions } from '../common/integration.interface';
@@ -31,8 +31,9 @@ export class EmailService extends BaseIntegration {
 
   async sendMessage(options: SendMessageOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      const fromEmail = (this.transporter.options.auth as any)?.user || options.metadata?.from || 'noreply@crm.local';
       const info = await this.transporter.sendMail({
-        from: this.transporter.options.auth.user,
+        from: fromEmail,
         to: options.recipient,
         subject: options.metadata?.subject || 'Message from CRM',
         text: options.content,

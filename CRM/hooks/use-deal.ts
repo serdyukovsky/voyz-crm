@@ -14,6 +14,27 @@ export interface Deal {
     name: string
     avatar?: string
   }
+  contactId?: string
+  contact?: {
+    id: string
+    fullName: string
+    email?: string
+    phone?: string
+    position?: string
+    companyName?: string
+    social?: {
+      instagram?: string
+      telegram?: string
+      whatsapp?: string
+      vk?: string
+    }
+    stats?: {
+      activeDeals: number
+      closedDeals: number
+      totalDeals: number
+      totalDealVolume?: number
+    }
+  }
   createdAt: string
   expectedClose?: string
   tags: string[]

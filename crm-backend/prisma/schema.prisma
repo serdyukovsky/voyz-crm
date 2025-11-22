@@ -17,13 +17,22 @@ datasource db {
 enum UserRole {
   ADMIN
   MANAGER
+  VIEWER
 }
 
 enum TaskStatus {
-  OPEN
+  TODO
   IN_PROGRESS
-  COMPLETED
+  DONE
   OVERDUE
+}
+
+enum TaskType {
+  CALL
+  MEETING
+  FOLLOW_UP
+  EMAIL
+  OTHER
 }
 
 enum TaskPriority {
@@ -44,17 +53,32 @@ enum CustomFieldType {
 
 enum ActivityType {
   DEAL_CREATED
+  DEAL_UPDATED
+  DEAL_DELETED
   FIELD_UPDATED
+  STAGE_CHANGED
+  CONTACT_LINKED
+  CONTACT_UNLINKED
+  CONTACT_UPDATED_IN_DEAL
   TASK_CREATED
   TASK_UPDATED
   TASK_COMPLETED
+  TASK_DELETED
+  COMMENT_ADDED
   FILE_UPLOADED
   FILE_DELETED
-  STAGE_CHANGED
-  COMMENT
-  INTERNAL_NOTE
-  CLIENT_MESSAGE
   ASSIGNEE_CHANGED
+  TAG_ADDED
+  TAG_REMOVED
+  CONTACT_CREATED
+  CONTACT_UPDATED
+  CONTACT_DELETED
+  COMPANY_CREATED
+  COMPANY_UPDATED
+  COMPANY_DELETED
+  EMAIL_SENT
+  LOGIN
+  LOGOUT
 }
 
 enum CommentType {
@@ -116,7 +140,10 @@ model User {
   messages      Message[]
   calls         Call[]
   permissions   UserPermission[]
-  files         File[]        @relation("FileUploader")
+  refreshTokens RefreshToken[]
+  files         File[]            @relation("FileUploader")
+  importJobs    ImportJob[]
+  exportJobs    ExportJob[]
 
   @@index([email])
   @@index([role])
@@ -134,6 +161,22 @@ model UserPermission {
   @@unique([userId, permission])
   @@index([userId])
   @@map("user_permissions")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([userId, expiresAt])
+  @@map("refresh_tokens")
 }
 
 // ============================================
@@ -196,6 +239,68 @@ model StageTrigger {
 }
 
 // ============================================
+// CONTACTS
+// ============================================
+
+model Contact {
+  id        String   @id @default(uuid())
+  fullName  String
+  email     String?
+  phone     String?
+  position  String?
+  companyName String? // For now, later can be linked to Company
+  companyId String?
+  tags      String[] @default([])
+  notes     String?
+  social    Json?    // { instagram, telegram, whatsapp, vk }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  deals     Deal[]
+  tasks     Task[]
+  comments  Comment[]
+  activities Activity[]
+  files     File[]
+  customFieldValues CustomFieldValue[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([companyName])
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([fullName])
+  @@index([email, phone]) // Composite index for search
+  @@map("contacts")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  website   String?
+  industry  String?
+  email     String?
+  phone     String?
+  social    Json?    // { instagram, telegram, whatsapp, vk, linkedin }
+  address   String?
+  notes     String?
+  employees Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  contacts  Contact[]
+  deals     Deal[]
+
+  @@index([name])
+  @@index([industry])
+  @@index([email])
+  @@index([createdAt])
+  @@map("companies")
+}
+
+// ============================================
 // DEALS
 // ============================================
 
@@ -209,6 +314,8 @@ model Deal {
   stageId         String
   assignedToId    String?
   createdById     String
+  contactId       String?
+  companyId       String?
   expectedCloseAt DateTime?
   closedAt        DateTime?
   description     String?
@@ -221,16 +328,21 @@ model Deal {
   stage           Stage     @relation(fields: [stageId], references: [id])
   createdBy       User      @relation("DealCreator", fields: [createdById], references: [id])
   assignedTo      User?     @relation("DealAssignee", fields: [assignedToId], references: [id])
+  contact         Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   tasks           Task[]
   comments        Comment[]
   activities      Activity[]
   files           File[]
   customFieldValues CustomFieldValue[]
+  messages        Message[]
+  calls           Call[]
 
   @@index([pipelineId])
   @@index([stageId])
   @@index([assignedToId])
   @@index([createdById])
+  @@index([contactId])
   @@index([createdAt])
   @@map("deals")
 }
@@ -268,7 +380,9 @@ model CustomFieldValue {
   id            String       @id @default(uuid())
   customFieldId String
   dealId        String?
-  entityId      String?      // For future: contactId, companyId, etc.
+  contactId     String?
+  entityId      String?      // Generic entity ID for future extensions
+  entityType    String?      // "deal", "contact"
   value         Json         // Flexible value storage
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -276,10 +390,14 @@ model CustomFieldValue {
   // Relations
   customField   CustomField  @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
   deal          Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([customFieldId, dealId])
+  @@unique([customFieldId, contactId])
   @@index([customFieldId])
   @@index([dealId])
+  @@index([contactId])
+  @@index([entityType, entityId])
   @@map("custom_field_values")
 }
 
@@ -290,11 +408,13 @@ model CustomFieldValue {
 model Task {
   id          String       @id @default(uuid())
   dealId      String?
+  contactId   String?
   title       String
   description String?
-  status      TaskStatus   @default(OPEN)
+  status      TaskStatus   @default(TODO)
   priority    TaskPriority @default(MEDIUM)
-  dueDate     DateTime?
+  type        TaskType?    @default(OTHER)
+  deadline    DateTime?    // Renamed from dueDate
   completedAt DateTime?
   result      String?      // Task result/outcome
   createdById String
@@ -304,14 +424,19 @@ model Task {
 
   // Relations
   deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id])
   assignedTo User          @relation("TaskAssignee", fields: [assignedToId], references: [id])
   activities  Activity[]
+  comments    Comment[]
+  files       File[]
 
   @@index([dealId])
+  @@index([contactId])
   @@index([assignedToId])
   @@index([status])
-  @@index([dueDate])
+  @@index([deadline])
+  @@index([type])
   @@map("tasks")
 }
 
@@ -321,7 +446,9 @@ model Task {
 
 model Comment {
   id        String      @id @default(uuid())
-  dealId    String
+  dealId    String?
+  taskId    String?
+  contactId String?
   userId    String
   type      CommentType @default(COMMENT)
   content   String
@@ -329,11 +456,15 @@ model Comment {
   updatedAt DateTime    @updatedAt
 
   // Relations
-  deal      Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal?       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task      Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id])
   files     File[]
 
   @@index([dealId])
+  @@index([taskId])
+  @@index([contactId])
   @@index([userId])
   @@index([type])
   @@map("comments")
@@ -348,6 +479,7 @@ model Activity {
   type      ActivityType
   dealId    String?
   taskId    String?
+  contactId String?
   userId    String
   payload   Json?        // Flexible metadata for different activity types
   createdAt DateTime     @default(now())
@@ -355,10 +487,12 @@ model Activity {
   // Relations
   deal      Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
   task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   user      User         @relation(fields: [userId], references: [id])
 
   @@index([dealId])
   @@index([taskId])
+  @@index([contactId])
   @@index([userId])
   @@index([type])
   @@index([createdAt])
@@ -372,12 +506,15 @@ model Activity {
 model File {
   id          String   @id @default(uuid())
   dealId      String?
+  taskId      String?
+  contactId   String?
   commentId   String?
-  name        String
+  fileName    String
   originalName String
-  mimeType    String
+  mime        String   // Renamed from mimeType
   size        Int      // Size in bytes
-  type        FileType
+  entityType  String   // "deal", "task", "contact", "comment"
+  entityId    String?  // Generic entity ID
   url         String   // Storage URL or path
   thumbnailUrl String? // For images
   uploadedById String
@@ -386,11 +523,16 @@ model File {
 
   // Relations
   deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   uploadedBy  User     @relation("FileUploader", fields: [uploadedById], references: [id])
 
   @@index([dealId])
+  @@index([taskId])
+  @@index([contactId])
   @@index([commentId])
+  @@index([entityType, entityId])
   @@index([uploadedById])
   @@map("files")
 }
@@ -469,6 +611,7 @@ model ImportJob {
   id          String   @id @default(uuid())
   fileName    String
   fileType    String   // "csv", "xlsx"
+  entityType  String   // "contact", "deal", "task"
   status      String   // "pending", "processing", "completed", "failed"
   progress    Int      @default(0)
   totalRows   Int?
@@ -479,7 +622,11 @@ model ImportJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
   @@index([status])
+  @@index([entityType])
   @@index([createdById])
   @@map("import_jobs")
 }
@@ -487,6 +634,7 @@ model ImportJob {
 model ExportJob {
   id          String   @id @default(uuid())
   fileType    String   // "csv", "xlsx"
+  entityType  String   // "deal", "contact", "task"
   status      String   // "pending", "processing", "completed", "failed"
   filters     Json?    // Export filters
   fields      Json?    // Selected fields
@@ -495,7 +643,11 @@ model ExportJob {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
   @@index([status])
+  @@index([entityType])
   @@index([createdById])
   @@map("export_jobs")
 }

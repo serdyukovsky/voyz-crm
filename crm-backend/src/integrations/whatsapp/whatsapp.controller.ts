@@ -25,6 +25,9 @@ export class WhatsAppController {
   @UseGuards(
     new WebhookGuard({
       validateSignature: async (payload, signature, headers) => {
+        if (!this.whatsappService) {
+          return false;
+        }
         return await this.whatsappService.validateWebhook(payload, signature, headers);
       },
     }),

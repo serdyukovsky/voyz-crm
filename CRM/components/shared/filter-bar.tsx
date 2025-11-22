@@ -1,0 +1,206 @@
+"use client"
+
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Search, X, Filter } from "lucide-react"
+import { MultiSelectFilter, MultiSelectOption } from "./multi-select-filter"
+import { useState, useEffect } from "react"
+
+interface FilterBarProps {
+  searchPlaceholder?: string
+  tagOptions?: MultiSelectOption[]
+  statusOptions?: MultiSelectOption[]
+  companyOptions?: MultiSelectOption[]
+  onFiltersChange?: (filters: Record<string, string[]>) => void
+  className?: string
+}
+
+export function FilterBar({
+  searchPlaceholder = "Search...",
+  tagOptions = [],
+  statusOptions = [],
+  companyOptions = [],
+  onFiltersChange,
+  className,
+}: FilterBarProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const [search, setSearch] = useState(searchParams.get('search') || '')
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    searchParams.get('tags')?.split(',').filter(Boolean) || []
+  )
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+    searchParams.get('statuses')?.split(',').filter(Boolean) || []
+  )
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>(
+    searchParams.get('companies')?.split(',').filter(Boolean) || []
+  )
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    
+    if (search) params.set('search', search)
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','))
+    if (selectedStatuses.length > 0) params.set('statuses', selectedStatuses.join(','))
+    if (selectedCompanies.length > 0) params.set('companies', selectedCompanies.join(','))
+
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    
+    onFiltersChange?.({
+      search: search ? [search] : [],
+      tags: selectedTags,
+      statuses: selectedStatuses,
+      companies: selectedCompanies,
+    })
+  }, [search, selectedTags, selectedStatuses, selectedCompanies, router, pathname, onFiltersChange])
+
+  const clearAll = () => {
+    setSearch('')
+    setSelectedTags([])
+    setSelectedStatuses([])
+    setSelectedCompanies([])
+  }
+
+  const hasActiveFilters = search || selectedTags.length > 0 || selectedStatuses.length > 0 || selectedCompanies.length > 0
+
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Filter className="h-3 w-3" />
+          <span>Filters:</span>
+        </div>
+
+        {/* Search */}
+        <div className="flex items-center gap-2 border border-border rounded-md px-3 h-9 bg-background flex-1 min-w-[200px]">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border-0 px-0 h-auto bg-transparent focus-visible:ring-0 text-sm"
+          />
+          {search && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0"
+              onClick={() => setSearch('')}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Multi-select Filters */}
+        {tagOptions.length > 0 && (
+          <MultiSelectFilter
+            options={tagOptions}
+            selected={selectedTags}
+            onSelectionChange={setSelectedTags}
+            placeholder="Tags"
+            searchPlaceholder="Search tags..."
+          />
+        )}
+
+        {statusOptions.length > 0 && (
+          <MultiSelectFilter
+            options={statusOptions}
+            selected={selectedStatuses}
+            onSelectionChange={setSelectedStatuses}
+            placeholder="Status"
+            searchPlaceholder="Search statuses..."
+          />
+        )}
+
+        {companyOptions.length > 0 && (
+          <MultiSelectFilter
+            options={companyOptions}
+            selected={selectedCompanies}
+            onSelectionChange={setSelectedCompanies}
+            placeholder="Companies"
+            searchPlaceholder="Search companies..."
+          />
+        )}
+
+        {/* Clear All */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAll}
+            className="h-9"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {/* Active Filters Display */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {search && (
+            <Badge variant="secondary" className="gap-1">
+              Search: {search}
+              <button
+                onClick={() => setSearch('')}
+                className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {selectedTags.map((tag) => {
+            const option = tagOptions.find((o) => o.value === tag)
+            return (
+              <Badge key={tag} variant="secondary" className="gap-1">
+                Tag: {option?.label || tag}
+                <button
+                  onClick={() => setSelectedTags(selectedTags.filter((t) => t !== tag))}
+                  className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )
+          })}
+          {selectedStatuses.map((status) => {
+            const option = statusOptions.find((o) => o.value === status)
+            return (
+              <Badge key={status} variant="secondary" className="gap-1">
+                Status: {option?.label || status}
+                <button
+                  onClick={() => setSelectedStatuses(selectedStatuses.filter((s) => s !== status))}
+                  className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )
+          })}
+          {selectedCompanies.map((company) => {
+            const option = companyOptions.find((o) => o.value === company)
+            return (
+              <Badge key={company} variant="secondary" className="gap-1">
+                Company: {option?.label || company}
+                <button
+                  onClick={() => setSelectedCompanies(selectedCompanies.filter((c) => c !== company))}
+                  className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+

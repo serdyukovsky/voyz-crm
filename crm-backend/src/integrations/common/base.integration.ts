@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import {
   IntegrationServiceInterface,
   SendMessageOptions,
@@ -123,18 +123,28 @@ export abstract class BaseIntegration implements IntegrationServiceInterface {
    * Find deal by phone/email/etc.
    */
   protected async findDealByContact(contact: string): Promise<string | null> {
-    // Try to find deal by phone number or email in custom fields
-    const deal = await this.prisma.deal.findFirst({
+    // Try to find deal by contact phone or email
+    // First try to find contact by phone/email, then find deals linked to that contact
+    const foundContact = await this.prisma.contact.findFirst({
       where: {
         OR: [
-          { customFields: { path: ['phone'], equals: contact } },
-          { customFields: { path: ['email'], equals: contact } },
+          { phone: { contains: contact } },
+          { email: { contains: contact } },
         ],
       },
-      orderBy: { updatedAt: 'desc' },
     });
 
-    return deal?.id || null;
+    if (foundContact) {
+      const deal = await this.prisma.deal.findFirst({
+        where: {
+          contactId: foundContact.id,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      return deal?.id || null;
+    }
+
+    return null;
   }
 
   /**
@@ -148,9 +158,10 @@ export abstract class BaseIntegration implements IntegrationServiceInterface {
   ): Promise<void> {
     if (!dealId) return;
 
+    // Cast type to ActivityType (will be validated at runtime)
     await this.prisma.activity.create({
       data: {
-        type,
+        type: type as any, // Type assertion needed as we're using dynamic types
         dealId,
         userId,
         metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,

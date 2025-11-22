@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
-import { ROLES_KEY } from '../decorators/roles.decorator';
+import { ROLES_KEY } from '@/auth/decorators/roles.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { UserRole } from '@prisma/client';
 
@@ -37,13 +37,18 @@ export class RbacGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
+    // Admins have all permissions
+    if (user.role === UserRole.ADMIN) {
+      return true;
+    }
+
     // Check roles
     if (requiredRoles && !requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Insufficient role permissions');
     }
 
-    // Check permissions (for managers)
-    if (requiredPermissions && user.role === UserRole.MANAGER) {
+    // Check permissions
+    if (requiredPermissions) {
       const userPermissions = user.permissions || [];
       const hasPermission = requiredPermissions.some((permission) =>
         userPermissions.includes(permission),
@@ -52,11 +57,6 @@ export class RbacGuard implements CanActivate {
       if (!hasPermission) {
         throw new ForbiddenException('Insufficient permissions');
       }
-    }
-
-    // Admins have all permissions
-    if (user.role === UserRole.ADMIN) {
-      return true;
     }
 
     return true;

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import { BaseIntegration } from '../common/base.integration';
 import { IntegrationType, MessageDirection } from '@prisma/client';
 import { ParsedMessage, SendMessageOptions } from '../common/integration.interface';

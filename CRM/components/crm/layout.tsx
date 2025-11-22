@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { SidebarProvider, useSidebar } from "./sidebar-context"
+import { QuickSearch } from "@/components/shared/quick-search"
 import { cn } from "@/lib/utils"
 
 interface LayoutProps {
@@ -11,6 +13,7 @@ interface LayoutProps {
 
 function LayoutContent({ children }: LayoutProps) {
   const { isCollapsed } = useSidebar()
+  const [searchOpen, setSearchOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,6 +28,7 @@ function LayoutContent({ children }: LayoutProps) {
       >
         {children}
       </main>
+      <QuickSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   )
 }

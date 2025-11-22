@@ -56,6 +56,38 @@ export default function SettingsPage() {
             </Card>
           </Link>
 
+          <Link href="/settings/pipelines">
+            <Card className="border-border bg-card hover:bg-secondary/50 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Settings className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Pipelines</CardTitle>
+                    <CardDescription className="text-xs">Manage sales pipelines and stages</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          </Link>
+
+          <Link href="/settings/users">
+            <Card className="border-border bg-card hover:bg-secondary/50 transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Users</CardTitle>
+                    <CardDescription className="text-xs">Manage team members and roles</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          </Link>
+
           <Link href="/settings/shortcuts">
             <Card className="border-border bg-card hover:bg-secondary/50 transition-colors cursor-pointer h-full">
               <CardHeader className="pb-3">

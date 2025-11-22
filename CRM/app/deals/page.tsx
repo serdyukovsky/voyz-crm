@@ -3,12 +3,14 @@
 import { useState } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
+import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
 import { DealsListView } from "@/components/crm/deals-list-view"
 import { PipelineSettingsModal, Funnel } from "@/components/crm/pipeline-settings-modal"
 import { DealSourcesPanel, DealSource } from "@/components/crm/deal-sources-panel"
 import { Button } from "@/components/ui/button"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { PageSkeleton } from "@/components/shared/loading-skeleton"
 
 const defaultFunnels: Funnel[] = [
   { id: "default", name: "Sales Pipeline" },
@@ -470,13 +472,17 @@ export default function DealsPage() {
               />
             )}
             <div className="flex-1">
-              <KanbanBoard
-                initialStages={stages}
-                initialDeals={deals}
-                onStagesChange={setStages}
-                onDealsChange={setDeals}
-                isEditMode={isEditMode}
-              />
+              {isEditMode ? (
+                <KanbanBoard
+                  initialStages={stages}
+                  initialDeals={deals}
+                  onStagesChange={setStages}
+                  onDealsChange={setDeals}
+                  isEditMode={isEditMode}
+                />
+              ) : (
+                <DealsKanbanBoard />
+              )}
             </div>
           </div>
         ) : (

@@ -10,6 +10,9 @@ export class VkController {
   @UseGuards(
     new WebhookGuard({
       validateSignature: async (payload) => {
+        if (!this.vkService) {
+          return false;
+        }
         return await this.vkService.validateWebhook(payload);
       },
     }),

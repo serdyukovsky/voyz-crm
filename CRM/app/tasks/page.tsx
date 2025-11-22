@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { TasksListView } from "@/components/crm/tasks-list-view"
 import { TasksKanbanView } from "@/components/crm/tasks-kanban-view"
@@ -8,19 +8,36 @@ import { CalendarView } from "@/components/crm/calendar-view"
 import { Button } from "@/components/ui/button"
 import { Plus, Search, Filter } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getContacts } from '@/lib/api/contacts'
+import { Contact } from '@/types/contact'
 
 export default function TasksPage() {
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
   const [searchQuery, setSearchQuery] = useState("")
   const [userFilter, setUserFilter] = useState<string>("")
   const [dealFilter, setDealFilter] = useState<string>("")
+  const [contactFilter, setContactFilter] = useState<string>("")
   const [dateFilter, setDateFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
+  const [contacts, setContacts] = useState<Contact[]>([])
 
   const users = ["All Users", "Alex Chen", "Sarah Lee", "Mike Johnson"]
   const deals = ["All Deals", "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]
   const dateOptions = ["All Dates", "Today", "This Week", "Overdue", "Upcoming"]
   const statusOptions = ["All Status", "Completed", "Incomplete"]
+
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const contactsData = await getContacts()
+        setContacts(contactsData)
+      } catch (error) {
+        console.error('Failed to load contacts:', error)
+      }
+    }
+    loadContacts()
+  }, [])
 
   return (
     <CRMLayout>
@@ -83,6 +100,20 @@ export default function TasksPage() {
               ))}
             </select>
 
+            <Select value={contactFilter || "all"} onValueChange={(value) => setContactFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="h-8 w-[180px]">
+                <SelectValue placeholder="All Contacts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Contacts</SelectItem>
+                {contacts.map((contact) => (
+                  <SelectItem key={contact.id} value={contact.id}>
+                    {contact.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
@@ -125,6 +156,7 @@ export default function TasksPage() {
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}
+            contactFilter={contactFilter}
             dateFilter={dateFilter}
             statusFilter={statusFilter}
           />
@@ -133,6 +165,7 @@ export default function TasksPage() {
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}
+            contactFilter={contactFilter}
             dateFilter={dateFilter}
             statusFilter={statusFilter}
           />

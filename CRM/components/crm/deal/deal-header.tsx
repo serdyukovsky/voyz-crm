@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { RoleGuard } from '@/components/shared/role-guard'
 import type { Deal } from '@/hooks/use-deal'
 
 interface DealHeaderProps {
@@ -139,27 +140,31 @@ export function DealHeader({
                 Duplicate Deal
               </DropdownMenuItem>
             )}
-            {onArchive && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onArchive}>
-                  <Archive className="h-4 w-4 mr-2" />
-                  Archive
-                </DropdownMenuItem>
-              </>
-            )}
-            {onDelete && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={onDelete}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </>
-            )}
+            <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+              {onArchive && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onArchive}>
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archive
+                  </DropdownMenuItem>
+                </>
+              )}
+            </RoleGuard>
+            <RoleGuard allowedRoles={['ADMIN']}>
+              {onDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </RoleGuard>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

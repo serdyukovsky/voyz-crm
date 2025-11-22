@@ -11,15 +11,24 @@ import { DealHeader } from './deal/deal-header'
 import { DealFieldsPanel } from './deal/deal-fields-panel'
 import { DealTasksList } from './deal/deal-tasks-list'
 import { TaskQuickCreate } from './deal/task-quick-create'
-import { UnifiedActivityTimeline } from './deal/unified-activity-timeline'
+import { ActivityTimeline } from '@/components/shared/activity-timeline'
+import { useActivity } from '@/hooks/use-activity'
 import { DealCommentsPanel } from './deal/deal-comments-panel'
+import { ContactPerson } from './deal/contact-person'
 import { useDeal } from '@/hooks/use-deal'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
 import { useRealtimeDeal } from '@/hooks/use-realtime-deal'
+import { getContacts } from '@/lib/api/contacts'
+import { Contact } from '@/types/contact'
 import type { Task } from '@/hooks/use-deal-tasks'
 import type { Activity } from '@/hooks/use-deal-activity'
+import { CrossNavigation } from '@/components/shared/cross-navigation'
+import { DetailSkeleton } from '@/components/shared/loading-skeleton'
+import { useToastNotification } from '@/hooks/use-toast-notification'
+import { SendEmailModal } from '@/components/crm/send-email-modal'
+import { Mail } from 'lucide-react'
 // Comment type defined inline for now
 interface Comment {
   id: string
@@ -40,18 +49,35 @@ interface DealDetailProps {
 
 export function DealDetail({ dealId }: DealDetailProps) {
   const router = useRouter()
+  const { showSuccess, showError } = useToastNotification()
   const [selectedStage, setSelectedStage] = useState("new")
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
 
   // Use hooks
   const { deal, loading: dealLoading, updateDeal, updateField } = useDeal({ dealId })
   const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
-  const { activities, addActivity, groupByDate } = useDealActivity({ dealId })
+  const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
+  const { activities, loading: activitiesLoading } = useActivity({ entityType: 'deal', entityId: dealId })
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
+
+  // Load contacts
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const contactsData = await getContacts()
+        setContacts(contactsData)
+      } catch (error) {
+        console.error('Failed to load contacts:', error)
+      }
+    }
+    loadContacts()
+  }, [])
 
   // Realtime updates
   useRealtimeDeal({
@@ -188,11 +214,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
   }
 
   if (dealLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-muted-foreground">Loading deal...</div>
-      </div>
-    )
+    return <DetailSkeleton />
   }
 
   if (!deal) {
@@ -343,6 +365,114 @@ export function DealDetail({ dealId }: DealDetailProps) {
             </div>
           </div>
 
+          {/* Cross Navigation */}
+          <CrossNavigation
+            contacts={
+              deal?.contact
+                ? [
+                    {
+                      id: deal.contact.id,
+                      fullName: deal.contact.fullName || deal.contact.name,
+                      email: deal.contact.email,
+                      position: deal.contact.position,
+                      companyName: deal.contact.companyName,
+                      stats: deal.contact.stats,
+                    },
+                  ]
+                : []
+            }
+            companies={
+              deal?.company
+                ? [
+                    {
+                      id: deal.company.id,
+                      name: deal.company.name,
+                      industry: deal.company.industry,
+                      stats: deal.company.stats,
+                    },
+                  ]
+                : deal?.contact?.company
+                ? [
+                    {
+                      id: deal.contact.company.id,
+                      name: deal.contact.company.name,
+                      industry: deal.contact.company.industry,
+                      stats: deal.contact.company.stats,
+                    },
+                  ]
+                : []
+            }
+            tasks={tasks.map((task) => ({
+              id: task.id,
+              title: task.title || task.name,
+              status: task.status,
+              priority: task.priority,
+              deadline: task.deadline,
+            }))}
+          />
+
+          {/* Contact Person */}
+          <ContactPerson
+            contact={
+              deal?.contact
+                ? {
+                    id: deal.contact.id,
+                    fullName: deal.contact.fullName || deal.contact.name,
+                    email: deal.contact.email,
+                    phone: deal.contact.phone,
+                    position: deal.contact.position,
+                    companyName: deal.contact.companyName,
+                    social: deal.contact.social,
+                    tags: [],
+                    createdAt: '',
+                    updatedAt: '',
+                    deals: [],
+                    stats: {
+                      activeDeals: 0,
+                      closedDeals: 0,
+                      totalDeals: 0,
+                    },
+                  }
+                : null
+            }
+            contacts={contacts}
+            onContactChange={async (contactId) => {
+              try {
+                if (contactId) {
+                  await linkContactToDeal(dealId, contactId)
+                } else {
+                  await unlinkContactFromDeal(dealId)
+                }
+                // Reload deal to get updated contact data
+                await refetchDeal()
+                // Reload contacts list to get updated data
+                const updatedContacts = await getContacts()
+                setContacts(updatedContacts)
+              } catch (error) {
+                console.error('Failed to link/unlink contact:', error)
+              }
+            }}
+            onContactsUpdate={async (updatedContacts) => {
+              setContacts(updatedContacts)
+            }}
+            isRequired={!deal?.contact}
+          />
+
+          {/* Send Email Button */}
+          {deal?.contact?.email && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEmailModalOpen(true)}
+                className="w-full"
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Send Email
+              </Button>
+            </div>
+          )}
+
           {/* Budget */}
           <div>
             <label className="text-xs text-muted-foreground mb-2 block">Budget</label>
@@ -365,7 +495,11 @@ export function DealDetail({ dealId }: DealDetailProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Tasks</h3>
-              <TaskQuickCreate onCreate={handleTaskCreate} dealId={dealId} />
+              <TaskQuickCreate 
+                onCreate={handleTaskCreate} 
+                dealId={dealId}
+                dealContactId={deal?.contactId}
+              />
             </div>
             {tasks.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">No tasks yet</p>
@@ -394,17 +528,15 @@ export function DealDetail({ dealId }: DealDetailProps) {
       {/* RIGHT COLUMN: Unified Activity Timeline + Comments */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background hidden md:flex">
         <div className="flex-1 overflow-y-auto pl-6 pr-6 py-6 scroll-smooth">
-          {/* Unified Activity Timeline with Tasks, Comments, Activities */}
-          <UnifiedActivityTimeline
-            activities={activities}
-            tasks={tasks}
-            comments={comments}
-            onTaskClick={(task) => {
-              setSelectedTask(task)
-              setIsTaskModalOpen(true)
-            }}
-            onTaskUpdate={handleTaskUpdate}
-          />
+          {/* Activity Timeline */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-foreground mb-4">Activity</h3>
+            {activitiesLoading ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">Loading activities...</div>
+            ) : (
+              <ActivityTimeline activities={activities} />
+            )}
+          </div>
         </div>
 
         {/* Comments Panel (Fixed at bottom) */}
@@ -435,6 +567,17 @@ export function DealDetail({ dealId }: DealDetailProps) {
           }}
         />
       )}
+
+      {/* Send Email Modal */}
+      <SendEmailModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        to={deal?.contact?.email}
+        dealId={dealId}
+        contactId={deal?.contact?.id}
+        companyId={deal?.company?.id}
+        defaultSubject={deal ? `Re: ${deal.title}` : ''}
+      />
     </div>
   )
 }

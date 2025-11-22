@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import { WsGateway } from '@/ws/ws.gateway';
 import { IntegrationType, MessageDirection } from '@prisma/client';
 
@@ -23,7 +23,7 @@ export class MessagesService {
     if (message.dealId) {
       await this.prisma.activity.create({
         data: {
-          type: 'message_received',
+          type: 'COMMENT_ADDED', // Using COMMENT_ADDED as closest match for message received
           dealId: message.dealId,
           userId: message.userId || null,
           metadata: {

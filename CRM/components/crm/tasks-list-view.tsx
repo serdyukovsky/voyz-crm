@@ -1,16 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Contact as ContactIcon } from "lucide-react"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
+import { ContactBadge } from "./contact-badge"
+import { getContacts } from '@/lib/api/contacts'
+import type { Contact } from '@/lib/api/contacts'
 
 interface Task {
   id: string
   title: string
   dealId: string | null
   dealName: string | null
+  contactId?: string | null
+  contactName?: string | null
   dueDate: string
   assignee: string
   completed: boolean
@@ -40,16 +47,30 @@ interface TasksListViewProps {
   searchQuery: string
   userFilter: string
   dealFilter: string
+  contactFilter: string
   dateFilter: string
   statusFilter: string
 }
 
-function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, statusFilter }: TasksListViewProps) {
+function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksListViewProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
+  const [contacts, setContacts] = useState<Contact[]>([])
+
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const contactsData = await getContacts()
+        setContacts(contactsData)
+      } catch (error) {
+        console.error('Failed to load contacts:', error)
+      }
+    }
+    loadContacts()
+  }, [])
 
   const filteredTasks = tasks.filter(task => {
     // Search filter
@@ -60,6 +81,9 @@ function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, status
     
     // Deal filter
     if (dealFilter && task.dealName !== dealFilter) return false
+    
+    // Contact filter
+    if (contactFilter && task.contactId !== contactFilter) return false
     
     // Status filter
     if (statusFilter === "completed" && !task.completed) return false
@@ -120,6 +144,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, status
             </th>
             <th className="p-3 text-left text-xs font-medium text-muted-foreground">Title</th>
             <th className="p-3 text-left text-xs font-medium text-muted-foreground">Deal</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Contact</th>
             <th className="p-3 text-left text-xs font-medium text-muted-foreground">Due Date</th>
             <th className="p-3 text-left text-xs font-medium text-muted-foreground">Assigned</th>
             <th className="w-20 p-3 text-left text-xs font-medium text-muted-foreground">Priority</th>
@@ -154,6 +179,24 @@ function TasksListView({ searchQuery, userFilter, dealFilter, dateFilter, status
                   >
                     {task.dealName}
                   </button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </td>
+              <td className="p-3">
+                {task.contactName ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5">
+                          <Contact className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{task.contactName}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : (
                   <span className="text-sm text-muted-foreground">—</span>
                 )}

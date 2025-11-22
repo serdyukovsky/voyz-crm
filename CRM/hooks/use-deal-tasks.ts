@@ -8,6 +8,8 @@ export interface Task {
   description?: string
   dealId: string
   dealName?: string
+  contactId?: string
+  contactName?: string
   dueDate?: string
   assignee: {
     id: string

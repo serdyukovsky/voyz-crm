@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import { IntegrationType } from '@prisma/client';
 import { IntegrationServiceInterface, IntegrationConfig } from './common/integration.interface';
 import { WhatsAppService } from './whatsapp/whatsapp.service';

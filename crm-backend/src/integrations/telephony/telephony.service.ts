@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import { BaseIntegration } from '../common/base.integration';
 import { IntegrationType, MessageDirection, CallDirection } from '@prisma/client';
 import { ParsedMessage, SendMessageOptions } from '../common/integration.interface';
@@ -60,7 +60,7 @@ export class TelephonyService extends BaseIntegration {
         data: {
           dealId: call.dealId,
           title: `Missed call from ${payload.phone}`,
-          status: 'PENDING',
+          status: 'TODO',
           assignedToId: call.dealId ? (await this.prisma.deal.findUnique({ where: { id: call.dealId } }))?.assignedToId || undefined : undefined,
           createdById: call.dealId ? (await this.prisma.deal.findUnique({ where: { id: call.dealId } }))?.createdById || undefined : undefined,
         },

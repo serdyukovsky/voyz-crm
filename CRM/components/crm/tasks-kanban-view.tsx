@@ -11,6 +11,8 @@ interface Task {
   title: string
   dealId: string | null
   dealName: string | null
+  contactId?: string | null
+  contactName?: string | null
   dueDate: string
   assignee: string
   completed: boolean
@@ -48,11 +50,12 @@ interface TasksKanbanViewProps {
   searchQuery: string
   userFilter: string
   dealFilter: string
+  contactFilter: string
   dateFilter: string
   statusFilter: string
 }
 
-export function TasksKanbanView({ searchQuery, userFilter, dealFilter, dateFilter, statusFilter }: TasksKanbanViewProps) {
+export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksKanbanViewProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -67,6 +70,9 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, dateFilte
     
     // Deal filter
     if (dealFilter && task.dealName !== dealFilter) return false
+    
+    // Contact filter
+    if (contactFilter && task.contactId !== contactFilter) return false
     
     // Status filter
     if (statusFilter === "completed" && !task.completed) return false

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
+import { login } from "@/lib/api/auth"
 
 export function LoginForm() {
   const router = useRouter()
@@ -21,9 +22,26 @@ export function LoginForm() {
     setError("")
     setIsLoading(true)
 
-    setTimeout(() => {
+    try {
+      console.log('Attempting login with:', email)
+      const response = await login({ email, password })
+      console.log('Login successful:', response)
+      
+      // Save tokens and user data
+      localStorage.setItem('access_token', response.access_token)
+      if (response.refresh_token) {
+        localStorage.setItem('refresh_token', response.refresh_token)
+      }
+      localStorage.setItem('user', JSON.stringify(response.user))
+      
+      // Redirect to home page
       router.push("/")
-    }, 300)
+    } catch (err) {
+      console.error('Login error:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please check your credentials.'
+      setError(errorMessage)
+      setIsLoading(false)
+    }
   }
 
   return (

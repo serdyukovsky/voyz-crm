@@ -11,23 +11,34 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Pencil } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Pencil, Contact } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { DealDetailModal } from "./deal-detail-modal"
+import { getContacts } from '@/lib/api/contacts'
+import { Contact as ContactType } from '@/types/contact'
 
 interface Task {
   id: string
   title: string
   dealId: string | null
   dealName: string | null
+  contactId?: string | null
+  contactName?: string | null
   dueDate: string
   assignee: string
   completed: boolean
@@ -56,19 +67,39 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
   const [dueDate, setDueDate] = useState(task.dueDate)
   const [description, setDescription] = useState(task.description || "")
   const [title, setTitle] = useState(task.title)
+  const [contactId, setContactId] = useState<string | null>(task.contactId || null)
+  const [contacts, setContacts] = useState<ContactType[]>([])
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [isRescheduleDropdownOpen, setIsRescheduleDropdownOpen] = useState(false)
   const calendarButtonRef = useRef<HTMLButtonElement>(null)
 
+  // Load contacts
+  useEffect(() => {
+    if (isOpen) {
+      const loadContacts = async () => {
+        try {
+          const contactsData = await getContacts()
+          setContacts(contactsData)
+        } catch (error) {
+          console.error('Failed to load contacts:', error)
+        }
+      }
+      loadContacts()
+    }
+  }, [isOpen])
+
   const handleSave = () => {
+    const selectedContact = contacts.find((c) => c.id === contactId)
     const updatedTask = {
       ...task,
       title,
       result,
       dueDate,
       description,
+      contactId: contactId || undefined,
+      contactName: selectedContact?.name || undefined,
     }
     onUpdate(updatedTask)
     setIsEditingDescription(false)
@@ -194,6 +225,39 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
               </button>
             </div>
           )}
+
+          {/* Contact */}
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground flex items-center gap-2">
+              <Contact className="h-4 w-4" />
+              Contact
+            </label>
+            <Select
+              value={contactId || "none"}
+              onValueChange={(value) => {
+                setContactId(value === "none" ? null : value)
+                const selectedContact = contacts.find((c) => c.id === value)
+                const updatedTask = {
+                  ...task,
+                  contactId: value === "none" ? undefined : value,
+                  contactName: selectedContact?.fullName || undefined,
+                }
+                onUpdate(updatedTask)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select contact" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {contacts.map((contact) => (
+                  <SelectItem key={contact.id} value={contact.id}>
+                    {contact.fullName} {contact.email && `(${contact.email})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Task Info */}
           <div className="grid grid-cols-2 gap-4">

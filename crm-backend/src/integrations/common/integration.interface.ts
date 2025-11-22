@@ -82,6 +82,11 @@ export interface IntegrationServiceInterface {
    * Health check for integration
    */
   healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; message?: string }>;
+
+  /**
+   * Initialize integration with configuration
+   */
+  initialize(config: IntegrationConfig): Promise<void>;
 }
 
 export interface IntegrationConfig {
