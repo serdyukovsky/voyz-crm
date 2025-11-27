@@ -470,7 +470,7 @@ export default function DealsPage() {
     }
   }, [viewMode, selectedPipelineForList])
 
-  const handleCreateNewDeal = async () => {
+  const handleCreateNewDeal = async (stageId?: string) => {
     try {
       if (!currentFunnelId) {
         showError('No pipeline selected', 'Please select or create a pipeline first.')
@@ -483,13 +483,14 @@ export default function DealsPage() {
         return
       }
 
-      const firstStage = currentFunnel.stages.sort((a, b) => a.order - b.order)[0]
+      // Use provided stageId or default to first stage
+      const targetStageId = stageId || currentFunnel.stages.sort((a, b) => a.order - b.order)[0].id
 
       const newDeal = await createDealMutation.mutateAsync({
         title: 'New Deal',
         amount: 0,
         pipelineId: currentFunnelId,
-        stageId: firstStage.id,
+        stageId: targetStageId,
         status: 'open',
       })
 
@@ -853,6 +854,7 @@ export default function DealsPage() {
                     sort={sort}
                     onFiltersChange={setFilters}
                     onSortChange={setSort}
+                    onAddDeal={handleCreateNewDeal}
                   />
                 </Suspense>
               )}

@@ -32,7 +32,9 @@
     "submit": "Отправить",
     "confirm": "Подтвердить",
     "yes": "Да",
-    "no": "Нет"
+    "no": "Нет",
+    "add": "Добавить",
+    "settings": "Настройки"
   },
   "sidebar": {
     "pipelineCrm": "Pipeline CRM",
@@ -70,7 +72,15 @@
     "markAsWon": "Отметить как выигранную",
     "markAsLost": "Отметить как проигранную",
     "reassignContact": "Переназначить контакт",
-    "openInSidebar": "Открыть в боковой панели"
+    "openInSidebar": "Открыть в боковой панели",
+    "addDeal": "Добавить сделку",
+    "dealName": "Название",
+    "contactName": "Контакт: Имя",
+    "contactPhone": "Контакт: Телефон",
+    "contactEmail": "Контакт: Email",
+    "companyName": "Компания: Название",
+    "companyAddress": "Компания: Адрес",
+    "deals": "сделок"
   },
   "companies": {
     "title": "Компании",

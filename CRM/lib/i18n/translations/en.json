@@ -32,7 +32,9 @@
     "submit": "Submit",
     "confirm": "Confirm",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "add": "Add",
+    "settings": "Settings"
   },
   "sidebar": {
     "pipelineCrm": "Pipeline CRM",
@@ -70,7 +72,15 @@
     "markAsWon": "Mark as Won",
     "markAsLost": "Mark as Lost",
     "reassignContact": "Reassign contact",
-    "openInSidebar": "Open in sidebar"
+    "openInSidebar": "Open in sidebar",
+    "addDeal": "Add Deal",
+    "dealName": "Name",
+    "contactName": "Contact: Name",
+    "contactPhone": "Contact: Phone",
+    "contactEmail": "Contact: Email",
+    "companyName": "Company: Name",
+    "companyAddress": "Company: Address",
+    "deals": "deals"
   },
   "companies": {
     "title": "Companies",

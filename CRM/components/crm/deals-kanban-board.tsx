@@ -29,7 +29,8 @@ import {
   X,
   Calendar,
   Building2,
-  User
+  User,
+  Plus
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
@@ -41,6 +42,7 @@ import { useToastNotification } from "@/hooks/use-toast-notification"
 import { cn } from "@/lib/utils"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
+import { CreateDealModal } from './create-deal-modal'
 
 interface DealCardData {
   id: string
@@ -73,6 +75,7 @@ interface DealsKanbanBoardProps {
   sort?: SortState
   onFiltersChange?: (filters: FilterState) => void
   onSortChange?: (sort: SortState) => void
+  onAddDeal?: (stageId: string) => void
 }
 
 interface FilterState {
@@ -295,7 +298,9 @@ interface KanbanColumnProps {
   onMarkAsLost: (dealId: string) => void
   onReassignContact: (dealId: string) => void
   onOpenInSidebar: (dealId: string) => void
+  onAddDeal?: (stageId: string) => void
   availableContacts: Contact[]
+  pipelineId: string
 }
 
 function KanbanColumn({ 
@@ -309,7 +314,9 @@ function KanbanColumn({
   onMarkAsLost,
   onReassignContact,
   onOpenInSidebar,
-  availableContacts
+  onAddDeal,
+  availableContacts,
+  pipelineId
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const handleDragOver = (e: React.DragEvent) => {
@@ -326,6 +333,16 @@ function KanbanColumn({
       onDrop(stage.id)
     }
   }
+
+  const handleAddDeal = () => {
+    if (onAddDeal) {
+      onAddDeal(stage.id)
+    }
+  }
+
+  // Calculate deals count and total amount for this stage
+  const stageDealsCount = deals.length
+  const stageTotalAmount = deals.reduce((sum, deal) => sum + deal.amount, 0)
 
   return (
     <div className="flex-shrink-0 w-72">
@@ -349,6 +366,15 @@ function KanbanColumn({
         onDrop={handleDrop}
       >
         <CardContent className="p-3">
+          {onAddDeal && !stage.isClosed && (
+            <button
+              className="w-full flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground transition-colors font-normal cursor-pointer"
+              onClick={handleAddDeal}
+            >
+              <Plus className="h-4 w-4" />
+              {t('deals.addDeal') || 'Добавить сделку'}
+            </button>
+          )}
           {deals.length === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-8">
               {t('dealCard.noDeals')}
@@ -382,7 +408,8 @@ export function DealsKanbanBoard({
   filters: externalFilters,
   sort: externalSort,
   onFiltersChange: externalOnFiltersChange,
-  onSortChange: externalOnSortChange
+  onSortChange: externalOnSortChange,
+  onAddDeal
 }: DealsKanbanBoardProps) {
   const { showSuccess, showError } = useToastNotification()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
@@ -392,6 +419,8 @@ export function DealsKanbanBoard({
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [draggedDeal, setDraggedDeal] = useState<DealCardData | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   
   // Use external state if provided, otherwise use internal state
   const [internalFilters, setInternalFilters] = useState<FilterState>({})
@@ -836,6 +865,99 @@ export function DealsKanbanBoard({
   // Don't show empty state - always show columns even if empty
   // Empty state is handled within each KanbanColumn component
 
+  // Handle deal creation from modal
+  const handleCreateDeal = async (dealData: {
+    title: string
+    amount: number
+    stageId: string
+    contactName?: string
+    contactPhone?: string
+    contactEmail?: string
+    companyName?: string
+    companyAddress?: string
+  }) => {
+    if (!selectedPipeline) {
+      showError('No pipeline selected', 'Please select a pipeline first')
+      return
+    }
+
+    try {
+      let contactId: string | undefined
+      let companyId: string | undefined
+
+      // Create contact if provided
+      if (dealData.contactName || dealData.contactPhone || dealData.contactEmail) {
+        const { createContact } = await import('@/lib/api/contacts')
+        try {
+          const contact = await createContact({
+            fullName: dealData.contactName || '',
+            phone: dealData.contactPhone,
+            email: dealData.contactEmail,
+            companyId: companyId,
+          })
+          contactId = contact.id
+        } catch (error) {
+          console.error('Failed to create contact:', error)
+          // Continue without contact
+        }
+      }
+
+      // Create company if provided
+      if (dealData.companyName) {
+        const { createCompany } = await import('@/lib/api/companies')
+        try {
+          const company = await createCompany({
+            name: dealData.companyName,
+            address: dealData.companyAddress,
+          })
+          companyId = company.id
+          
+          // Update contact with company if contact was created
+          if (contactId && !dealData.contactName) {
+            const { updateContact } = await import('@/lib/api/contacts')
+            try {
+              await updateContact(contactId, { companyId })
+            } catch (error) {
+              console.error('Failed to update contact with company:', error)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to create company:', error)
+          // Continue without company
+        }
+      }
+
+      // Create deal
+      const { createDeal } = await import('@/lib/api/deals')
+      const newDeal = await createDeal({
+        title: dealData.title,
+        amount: dealData.amount,
+        pipelineId: selectedPipeline.id,
+        stageId: dealData.stageId,
+        contactId,
+        companyId,
+      })
+
+      showSuccess('Deal created successfully')
+      loadDeals() // Reload deals to show the new one
+      
+      // If onAddDeal callback is provided, call it (e.g., to navigate to deal detail)
+      if (onAddDeal) {
+        onAddDeal(newDeal.id)
+      }
+    } catch (error) {
+      console.error('Failed to create deal:', error)
+      showError('Failed to create deal', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+
+  // Calculate deals count and total amount for selected stage
+  const selectedStageDeals = selectedStageId 
+    ? filteredAndSortedDeals.filter(deal => deal.stageId === selectedStageId)
+    : []
+  const selectedStageDealsCount = selectedStageDeals.length
+  const selectedStageTotalAmount = selectedStageDeals.reduce((sum, deal) => sum + deal.amount, 0)
+
   return (
     <div className="flex flex-col h-full">
       {/* Kanban Board - Scrollable */}
@@ -858,12 +980,33 @@ export function DealsKanbanBoard({
               onMarkAsLost={handleMarkAsLost}
               onReassignContact={handleReassignContact}
               onOpenInSidebar={handleOpenInSidebar}
+              onAddDeal={onAddDeal ? (stageId) => {
+                setSelectedStageId(stageId)
+                setIsCreateModalOpen(true)
+              } : undefined}
               availableContacts={contacts}
+              pipelineId={selectedPipeline.id}
             />
           )
           })}
         </div>
       </div>
+
+      {/* Create Deal Modal */}
+      {selectedPipeline && selectedStageId && (
+        <CreateDealModal
+          isOpen={isCreateModalOpen}
+          onClose={() => {
+            setIsCreateModalOpen(false)
+            setSelectedStageId(null)
+          }}
+          onSave={handleCreateDeal}
+          stageId={selectedStageId}
+          pipelineId={selectedPipeline.id}
+          dealsCount={selectedStageDealsCount}
+          totalAmount={selectedStageTotalAmount}
+        />
+      )}
     </div>
   )
 }
