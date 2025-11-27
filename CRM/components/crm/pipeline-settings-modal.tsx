@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X, Plus, GripVertical, Trash2, Edit2 } from 'lucide-react'
@@ -14,7 +14,7 @@ interface PipelineSettingsModalProps {
   funnels: Funnel[]
   currentFunnelId: string
   onSelectFunnel: (funnelId: string) => void
-  onAddFunnel: (name: string) => void
+  onAddFunnel: (name: string) => Promise<void> | void
   onDeleteFunnel: (funnelId: string) => void
 }
 
@@ -40,6 +40,12 @@ export function PipelineSettingsModal({
   const [editingColor, setEditingColor] = useState("")
   const [newFunnelName, setNewFunnelName] = useState("")
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [isCreatingPipeline, setIsCreatingPipeline] = useState(false)
+
+  // Update localStages when stages prop changes
+  useEffect(() => {
+    setLocalStages(stages)
+  }, [stages])
 
   if (!isOpen) return null
 
@@ -97,10 +103,27 @@ export function PipelineSettingsModal({
     setDraggedIndex(null)
   }
 
-  const handleAddFunnel = () => {
-    if (newFunnelName.trim()) {
-      onAddFunnel(newFunnelName.trim())
+  const handleAddFunnel = async () => {
+    const name = newFunnelName.trim()
+    if (!name) {
+      return
+    }
+
+    try {
+      setIsCreatingPipeline(true)
+      console.log('Modal: Calling onAddFunnel with name:', name)
+      const result = onAddFunnel(name)
+      // Handle both async and sync functions
+      if (result instanceof Promise) {
+        await result
+      }
+      console.log('Modal: onAddFunnel completed')
       setNewFunnelName("")
+    } catch (error) {
+      console.error('Modal: Error in handleAddFunnel:', error)
+      // Error is already handled in parent component
+    } finally {
+      setIsCreatingPipeline(false)
     }
   }
 
@@ -156,10 +179,23 @@ export function PipelineSettingsModal({
                 value={newFunnelName}
                 onChange={(e) => setNewFunnelName(e.target.value)}
                 className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && handleAddFunnel()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isCreatingPipeline) {
+                    handleAddFunnel()
+                  }
+                }}
+                disabled={isCreatingPipeline}
               />
-              <Button onClick={handleAddFunnel} size="sm">
-                <Plus className="h-4 w-4" />
+              <Button 
+                onClick={handleAddFunnel} 
+                size="sm"
+                disabled={isCreatingPipeline || !newFunnelName.trim()}
+              >
+                {isCreatingPipeline ? (
+                  <span className="text-xs">Creating...</span>
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </div>

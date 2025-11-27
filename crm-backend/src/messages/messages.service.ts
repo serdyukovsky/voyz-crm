@@ -26,7 +26,7 @@ export class MessagesService {
           type: 'COMMENT_ADDED', // Using COMMENT_ADDED as closest match for message received
           dealId: message.dealId,
           userId: message.userId || null,
-          metadata: {
+          payload: {
             integrationType: message.integrationType,
             direction: message.direction,
           },

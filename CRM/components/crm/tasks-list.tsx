@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Filter, X } from 'lucide-react'
-import Link from "next/link"
+import { Link } from 'react-router-dom'
 
 interface Task {
   id: string

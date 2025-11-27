@@ -10,3 +10,7 @@ export class UpdatePipelineDto extends PartialType(CreatePipelineDto) {
   isActive?: boolean;
 }
 
+
+
+
+

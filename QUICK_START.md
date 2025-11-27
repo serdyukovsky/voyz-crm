@@ -69,3 +69,6 @@ npm run create:admin
 - Доступ ко всем функциям CRM
 - Настройки пользователей в `/settings/users`
 
+
+
+

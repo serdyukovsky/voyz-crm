@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Building2, Globe, Mail, Phone, MapPin, Users, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { SocialLinks } from './social-links'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 
 interface CompanyCardProps {
   company: Company
@@ -107,4 +107,6 @@ export function CompanyCard({ company, className }: CompanyCardProps) {
     </Card>
   )
 }
+
+
 

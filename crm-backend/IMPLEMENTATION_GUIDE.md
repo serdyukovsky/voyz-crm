@@ -179,3 +179,7 @@ When adding new modules:
 7. Update documentation
 8. Register module in `app.module.ts`
 
+
+
+
+

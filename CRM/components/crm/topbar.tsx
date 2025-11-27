@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Search, Bell, Command, X } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { 
@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 
 interface Notification {
   id: string
@@ -28,11 +28,11 @@ const initialNotifications: Notification[] = [
 ]
 
 export function Topbar() {
-  const router = useRouter()
+  const navigate = useNavigate()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
 
   const handleLogout = () => {
-    router.push("/login")
+    navigate("/login")
   }
 
   const handleRemoveNotification = (id: string, e: React.MouseEvent) => {
@@ -159,13 +159,13 @@ export function Topbar() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/settings/profile">Profile</Link>
+                <Link to="/settings/profile">Profile</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/settings/preferences">Settings</Link>
+                <Link to="/settings/preferences">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/settings/shortcuts">Keyboard shortcuts</Link>
+                <Link to="/settings/shortcuts">Keyboard shortcuts</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={handleLogout}>

@@ -26,7 +26,7 @@ export function useRealtimeCompany({
     const token = localStorage.getItem('access_token')
     if (!token) return
 
-    const socket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001/realtime', {
+    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3001/realtime', {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
@@ -80,4 +80,8 @@ export function useRealtimeCompany({
     connected: socketRef.current?.connected || false,
   }
 }
+
+
+
+
 

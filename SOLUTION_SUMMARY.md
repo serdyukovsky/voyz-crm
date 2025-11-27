@@ -110,3 +110,5 @@ curl -X GET "http://localhost:3001/api/deals" \
 
 Все данные созданы с корректными связями и `userId` для админа.
 
+
+

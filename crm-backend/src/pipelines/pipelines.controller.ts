@@ -24,6 +24,8 @@ import { UpdateStageDto } from './dto/update-stage.dto';
 import { PipelineResponseDto } from './dto/pipeline-response.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
+import { Roles } from '@/auth/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @ApiTags('Pipelines')
 @Controller('pipelines')
@@ -45,14 +47,25 @@ export class PipelinesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a new pipeline', description: 'Create a new sales pipeline' })
   @ApiResponse({
     status: 201,
     description: 'Pipeline created successfully',
     type: PipelineResponseDto,
   })
-  create(@Body() createPipelineDto: CreatePipelineDto) {
-    return this.pipelinesService.create(createPipelineDto);
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
+  async create(@Body() createPipelineDto: CreatePipelineDto) {
+    try {
+      console.log('PipelinesController.create called with:', createPipelineDto);
+      const result = await this.pipelinesService.create(createPipelineDto);
+      console.log('PipelinesController.create result:', result);
+      return result;
+    } catch (error) {
+      console.error('PipelinesController.create error:', error);
+      throw error;
+    }
   }
 
   @Patch(':id')
@@ -81,4 +94,6 @@ export class PipelinesController {
     return this.pipelinesService.createStage(pipelineId, createStageDto);
   }
 }
+
+
 

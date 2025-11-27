@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mail, Phone, Building2, Edit, Trash2, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,7 @@ import { getContact, getContactTasks, deleteContact } from '@/lib/api/contacts'
 import { Contact, Task } from '@/types/contact'
 import { CreateContactModal } from './create-contact-modal'
 import { getCompanies } from '@/lib/api/contacts'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Target, CheckSquare, Clock } from 'lucide-react'
@@ -31,7 +31,7 @@ interface ContactDetailProps {
 }
 
 export function ContactDetail({ contactId }: ContactDetailProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
   const [contact, setContact] = useState<Contact | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -113,7 +113,7 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
     try {
       await deleteContact(contactId)
       showSuccess('Contact deleted successfully')
-      router.push('/contacts')
+      navigate('/contacts')
     } catch (error) {
       console.error('Failed to delete contact:', error)
       showError('Failed to delete contact', 'Please try again')
@@ -156,7 +156,7 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/contacts')}
+              onClick={() => navigate('/contacts')}
               className="h-8 w-8 p-0"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -422,7 +422,7 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                               <TableRow
                                 key={deal.id}
                                 className="cursor-pointer hover:bg-accent/50"
-                                onClick={() => router.push(`/deals/${deal.id}`)}
+                                onClick={() => navigate(`/deals/${deal.id}`)}
                               >
                                 <TableCell className="font-medium">{deal.name}</TableCell>
                                 <TableCell>
@@ -486,7 +486,7 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                               <TableRow
                                 key={task.id}
                                 className="cursor-pointer hover:bg-accent/50"
-                                onClick={() => router.push(`/tasks?contactId=${contactId}`)}
+                                onClick={() => navigate(`/tasks?contactId=${contactId}`)}
                               >
                                 <TableCell className="font-medium">{task.title}</TableCell>
                                 <TableCell>

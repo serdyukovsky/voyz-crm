@@ -1,7 +1,7 @@
 "use client"
 
 import { Contact } from '@/types/contact'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { Instagram, MessageCircle, Phone, Users } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'

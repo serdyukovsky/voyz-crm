@@ -61,3 +61,7 @@ export class CompanyResponseDto {
   stats: CompanyStatsDto;
 }
 
+
+
+
+

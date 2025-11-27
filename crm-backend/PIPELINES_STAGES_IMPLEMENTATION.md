@@ -179,3 +179,7 @@ PATCH /api/deals/{dealId}
 5. **Stage Permissions**: Restrict stage changes based on user roles
 6. **Stage Automation**: Auto-move deals based on conditions
 
+
+
+
+

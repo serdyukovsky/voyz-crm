@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER'
 
@@ -110,4 +110,8 @@ export async function deleteUser(id: string): Promise<void> {
     throw new Error('Failed to delete user')
   }
 }
+
+
+
+
 

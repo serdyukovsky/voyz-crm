@@ -1,7 +1,7 @@
 "use client"
 
 import { Deal, Stage } from "./kanban-board"
-import Link from "next/link"
+import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from "date-fns"
 import { Trash2, MoveRight } from 'lucide-react'
 import { Button } from "@/components/ui/button"

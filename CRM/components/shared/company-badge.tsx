@@ -2,7 +2,7 @@
 
 import { Company } from '@/lib/api/companies'
 import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -44,4 +44,6 @@ export function CompanyBadge({
     </Link>
   )
 }
+
+
 

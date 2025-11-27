@@ -253,3 +253,7 @@ npm run prisma:migrate dev --name add_contact_updated_in_deal_activity
 - WebSocket events for contact.deal.updated and contact.task.updated
 - Frontend-compatible response format with stats
 
+
+
+
+

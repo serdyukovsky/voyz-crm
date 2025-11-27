@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 export interface Deal {
   id: string
@@ -9,6 +9,7 @@ export interface Deal {
     id: string
     name: string
   }
+  stageId?: string // For updates
   contact?: {
     id: string
     fullName: string
@@ -17,12 +18,14 @@ export interface Deal {
   company?: {
     id: string
     name: string
+    industry?: string
   }
   assignedTo?: {
     id: string
     name: string
     avatar?: string
   }
+  assignedToId?: string // For updates
   status?: string
   tags?: string[]
   createdAt?: string
@@ -106,7 +109,49 @@ export async function getDeal(id: string): Promise<Deal> {
   return response.json()
 }
 
-export async function updateDeal(id: string, data: Partial<Deal>): Promise<Deal> {
+export async function createDeal(data: {
+  title: string
+  amount?: number
+  pipelineId: string
+  stageId: string
+  contactId?: string
+  companyId?: string
+  assignedToId?: string
+  description?: string
+}): Promise<Deal> {
+  // Check if we're on the client side
+  if (typeof window === 'undefined') {
+    throw new Error('createDeal can only be called on the client side')
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/deals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error')
+      throw new Error(`Failed to create deal: ${response.status} ${errorText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('Error creating deal:', error)
+    throw error
+  }
+}
+
+export async function updateDeal(id: string, data: Partial<Deal> & { stageId?: string; assignedToId?: string }): Promise<Deal> {
   const response = await fetch(`${API_BASE_URL}/deals/${id}`, {
     method: 'PATCH',
     headers: {
@@ -121,5 +166,23 @@ export async function updateDeal(id: string, data: Partial<Deal>): Promise<Deal>
   }
 
   return response.json()
+}
+
+export async function deleteDeal(id: string): Promise<void> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const response = await fetch(`${API_BASE_URL}/deals/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to delete deal')
+  }
 }
 

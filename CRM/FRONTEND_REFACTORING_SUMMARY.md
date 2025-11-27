@@ -212,3 +212,7 @@ CRM/
 - TypeScript types are kept in sync with backend DTOs
 - Components are fully typed and documented
 
+
+
+
+

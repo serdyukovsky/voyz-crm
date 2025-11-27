@@ -218,3 +218,7 @@ npm run prisma:migrate dev --name complete_crm_schema
 - Integrations need implementation
 - Testing needs to be added
 
+
+
+
+

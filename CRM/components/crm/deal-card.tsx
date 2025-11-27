@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, memo, useCallback } from "react"
+import { Link } from 'react-router-dom'
 import { DollarSign, GripVertical } from 'lucide-react'
 import type { Deal, Stage } from "./kanban-board"
 
@@ -25,30 +25,30 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function DealCard({ deal, stage, onDragStart, onDragEnd }: DealCardProps) {
+export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDragEnd }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
 
-  const handleDragStart = (e: React.DragEvent) => {
+  const handleDragStart = useCallback((e: React.DragEvent) => {
     e.stopPropagation()
     setIsDragging(true)
     onDragStart?.(deal)
-  }
+  }, [deal, onDragStart])
 
-  const handleDragEnd = (e: React.DragEvent) => {
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
     e.stopPropagation()
     setIsDragging(false)
     onDragEnd?.()
-  }
+  }, [onDragEnd])
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
     // Prevent navigation when clicking on drag handle
     if ((e.target as HTMLElement).closest('[data-drag-handle]')) {
       e.preventDefault()
     }
-  }
+  }, [])
 
   return (
-    <Link href={`/deals/${deal.id}`} onClick={handleClick}>
+    <Link to={`/deals/${deal.id}`} onClick={handleClick}>
       <div 
         draggable
         onDragStart={handleDragStart}
@@ -122,4 +122,13 @@ export function DealCard({ deal, stage, onDragStart, onDragEnd }: DealCardProps)
       </div>
     </Link>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for memo
+  return (
+    prevProps.deal.id === nextProps.deal.id &&
+    prevProps.deal.amount === nextProps.deal.amount &&
+    prevProps.deal.updatedAt === nextProps.deal.updatedAt &&
+    prevProps.stage.id === nextProps.stage.id &&
+    prevProps.stage.color === nextProps.stage.color
+  )
+})

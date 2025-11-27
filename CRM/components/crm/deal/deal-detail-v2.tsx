@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 import { DollarSign, ChevronDown, Check, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,7 +39,7 @@ interface DealDetailProps {
 }
 
 export function DealDetail({ dealId }: DealDetailProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const [selectedStage, setSelectedStage] = useState("new")
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
@@ -184,7 +184,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
       sessionStorage.removeItem(`deal-${dealId}`)
       sessionStorage.removeItem(`deal-${dealId}-isNew`)
     }
-    router.push('/deals')
+    navigate('/deals')
   }
 
   if (dealLoading) {

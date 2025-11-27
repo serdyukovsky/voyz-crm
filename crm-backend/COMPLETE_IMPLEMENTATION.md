@@ -297,3 +297,7 @@ npm run prisma:migrate deploy
 
 The backend is production-ready for core CRM functionality. Advanced features can be added incrementally.
 
+
+
+
+

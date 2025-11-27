@@ -1,37 +1,46 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Target, CheckSquare, BarChart3, ScrollText, Upload, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, Contact } from 'lucide-react'
-import Link from "next/link"
-import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Target, CheckSquare, BarChart3, ScrollText, Upload, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, Contact, Building2, Languages } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
 import { cn } from "@/lib/utils"
 import { useTheme } from 'next-themes'
 import { useSidebar } from './sidebar-context'
+import { useTranslation } from '@/lib/i18n/i18n-context'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
-const navItems = [
-  { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/deals", icon: Target, label: "Deals" },
-  { href: "/tasks", icon: CheckSquare, label: "Tasks" },
-  { href: "/contacts", icon: Contact, label: "Contacts" },
-  { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/logs", icon: ScrollText, label: "Logs" },
-  { href: "/import-export", icon: Upload, label: "Import/Export" },
-  { href: "/users", icon: Users, label: "Users" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+const navItemsConfig = [
+  { href: "/", icon: LayoutDashboard, key: "common.dashboard" },
+  { href: "/deals", icon: Target, key: "common.deals" },
+  { href: "/tasks", icon: CheckSquare, key: "common.tasks" },
+  { href: "/contacts", icon: Contact, key: "common.contacts" },
+  { href: "/companies", icon: Building2, key: "common.companies" },
+  { href: "/analytics", icon: BarChart3, key: "common.analytics" },
+  { href: "/logs", icon: ScrollText, key: "common.logs" },
+  { href: "/import-export", icon: Upload, key: "common.importExport" },
+  { href: "/users", icon: Users, key: "common.users" },
+  { href: "/settings", icon: Settings, key: "common.settings" },
 ]
 
 export function Sidebar() {
-  const pathname = usePathname()
+  const location = useLocation()
+  const pathname = location.pathname
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const [isHovered, setIsHovered] = useState(false)
+  const { t, language, setLanguage } = useTranslation()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   const isExpanded = !isCollapsed || isHovered
+  
+  const navItems = navItemsConfig.map(item => ({
+    ...item,
+    label: t(item.key)
+  }))
 
   return (
     <aside 
@@ -57,7 +66,7 @@ export function Sidebar() {
             <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
             {isExpanded && (
               <span className="text-sm font-medium text-sidebar-foreground whitespace-nowrap">
-                Pipeline CRM
+                {t('sidebar.pipelineCrm')}
               </span>
             )}
             <button
@@ -82,7 +91,7 @@ export function Sidebar() {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                to={item.href}
                 className={cn(
                   "flex items-center rounded-md text-sm font-medium transition-colors",
                   isExpanded ? "gap-3 px-3 py-1.5" : "justify-center px-2 py-1.5",
@@ -105,26 +114,66 @@ export function Sidebar() {
         {/* User section */}
         <div className="border-t border-border/50 p-2">
           {mounted && (
-            <button 
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className={cn(
-                "flex w-full items-center rounded-md text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                isExpanded ? "gap-3 px-3 py-2" : "justify-center px-2 py-2"
-              )}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              title={!isExpanded ? (theme === "dark" ? "Light Mode" : "Dark Mode") : undefined}
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-              ) : (
-                <Moon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-              )}
-              {isExpanded && (
-                <span className="flex-1 text-left whitespace-nowrap">
-                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Theme Toggle */}
+              <button 
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className={cn(
+                  "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                  "h-9 w-9"
+                )}
+                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                title={theme === "dark" ? t('sidebar.lightMode') : t('sidebar.darkMode')}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Moon className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+              
+              {/* Language Switcher */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    className={cn(
+                      "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                      "h-9 w-9"
+                    )}
+                    aria-label="Select language"
+                    title={language === 'en' ? 'Русский' : 'English'}
+                  >
+                    <Languages className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-20">
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('en')}
+                    className={cn(
+                      "cursor-pointer",
+                      language === 'en' && "bg-accent"
+                    )}
+                  >
+                    <span className="flex items-center justify-between w-full">
+                      <span>EN</span>
+                      {language === 'en' && <span>✓</span>}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('ru')}
+                    className={cn(
+                      "cursor-pointer",
+                      language === 'ru' && "bg-accent"
+                    )}
+                  >
+                    <span className="flex items-center justify-between w-full">
+                      <span>RU</span>
+                      {language === 'ru' && <span>✓</span>}
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
       </div>

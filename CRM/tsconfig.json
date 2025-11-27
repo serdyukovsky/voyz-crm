@@ -1,41 +1,38 @@
 {
   "compilerOptions": {
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "target": "ES6",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    // Оптимизация: пропускаем проверку типов в node_modules (ускоряет компиляцию)
     "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noEmit": true,
     "jsx": "react-jsx",
+    // Оптимизация: отключаем strict в dev для ускорения (можно включить для production)
+    "strict": false,
+    // Оптимизация: отключаем проверку неиспользуемых переменных в dev
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    // Оптимизация: инкрементальная компиляция
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    // Оптимизация: кеширование компиляции
+    "tsBuildInfoFile": ".tsbuildinfo",
+    // Оптимизация: отключаем генерацию деклараций в dev
+    "declaration": false,
+    "declarationMap": false,
+    // Оптимизация: отключаем sourcemaps в dev
+    "sourceMap": false,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "components/**/*.ts", "components/**/*.tsx", "lib/**/*.ts", "hooks/**/*.ts", "types/**/*.ts", "vite-env.d.ts"],
+  "exclude": ["node_modules", "app", ".next", "dist", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"]
 }

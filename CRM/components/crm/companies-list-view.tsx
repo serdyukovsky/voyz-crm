@@ -1,7 +1,7 @@
 "use client"
 
 import { Company } from '@/lib/api/companies'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { Building2, Globe, Mail, Phone, Briefcase } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -206,4 +206,6 @@ export function CompaniesListView({
     </div>
   )
 }
+
+
 

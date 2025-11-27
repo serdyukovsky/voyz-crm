@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
 import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { PageSkeleton } from "@/components/shared/loading-skeleton"
+import { createDeal, getDeals, type Deal as APIDeal } from "@/lib/api/deals"
+import { getPipelines, createPipeline, createStage } from "@/lib/api/pipelines"
+import { useToastNotification } from "@/hooks/use-toast-notification"
 
 const defaultFunnels: Funnel[] = [
   { id: "default", name: "Sales Pipeline" },
@@ -182,8 +185,9 @@ export default function DealsPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isFunnelDropdownOpen, setIsFunnelDropdownOpen] = useState(false)
-  const [funnels, setFunnels] = useState<Funnel[]>(defaultFunnels)
-  const [currentFunnelId, setCurrentFunnelId] = useState("default")
+  const [funnels, setFunnels] = useState<Funnel[]>([])
+  const [pipelinesLoading, setPipelinesLoading] = useState(true)
+  const [currentFunnelId, setCurrentFunnelId] = useState<string>("")
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [deals, setDeals] = useState<Deal[]>(demoDeals)
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
@@ -222,21 +226,186 @@ export default function DealsPage() {
     },
   ])
 
-  const currentFunnel = funnels.find(f => f.id === currentFunnelId) || funnels[0]
+  // Load pipelines from API
+  useEffect(() => {
+    const loadPipelines = async () => {
+      // Check if user is authenticated
+      if (typeof window === 'undefined') return
+      
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        console.warn('No access token found, redirecting to login')
+        router.push('/login')
+        return
+      }
 
-  const handleAddFunnel = (name: string) => {
-    const newFunnel: Funnel = {
-      id: `funnel-${Date.now()}`,
-      name,
+      try {
+        setPipelinesLoading(true)
+        const pipelines = await getPipelines()
+        
+        // Convert Pipeline[] to Funnel[]
+        const funnelsList: Funnel[] = pipelines.map(p => ({
+          id: p.id,
+          name: p.name,
+        }))
+        
+        setFunnels(funnelsList)
+        
+        // Set default pipeline or first one
+        if (funnelsList.length > 0) {
+          const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
+          if (defaultPipeline) {
+            setCurrentFunnelId(defaultPipeline.id)
+          }
+        } else {
+          console.log('No pipelines found, but user is authenticated')
+        }
+      } catch (error) {
+        console.error('Failed to load pipelines:', error)
+        // Check if it's an auth error
+        if (error instanceof Error && (error.message === 'UNAUTHORIZED' || error.message.includes('401'))) {
+          console.warn('Authentication failed, redirecting to login')
+          // Token already cleared in API function
+          router.push('/login')
+          return
+        }
+        // Fallback to empty array on error
+        setFunnels([])
+      } finally {
+        setPipelinesLoading(false)
+      }
     }
-    setFunnels([...funnels, newFunnel])
+    
+    loadPipelines()
+  }, [router])
+
+  const currentFunnel = funnels.find(f => f.id === currentFunnelId) || funnels[0] || null
+
+  const handleAddFunnel = async (name: string) => {
+    if (!name.trim()) {
+      showError('Pipeline name required', 'Please enter a pipeline name')
+      return
+    }
+
+    try {
+      console.log('Creating pipeline:', name.trim())
+      const newPipeline = await createPipeline({
+        name: name.trim(),
+        isDefault: false, // Don't set as default automatically
+      })
+
+      console.log('Pipeline created:', newPipeline)
+      console.log('Pipeline ID:', newPipeline.id)
+      console.log('Pipeline name:', newPipeline.name)
+
+      // Create default stages for the new pipeline
+      const defaultStagesToCreate = [
+        { name: 'New', color: '#6B8AFF', order: 0, isDefault: true },
+        { name: 'In Progress', color: '#F59E0B', order: 1, isDefault: false },
+        { name: 'Negotiation', color: '#8B5CF6', order: 2, isDefault: false },
+        { name: 'Closed Won', color: '#10B981', order: 3, isDefault: false, isClosed: true },
+        { name: 'Closed Lost', color: '#EF4444', order: 4, isDefault: false, isClosed: true },
+      ]
+
+      console.log('Creating default stages for pipeline:', newPipeline.id)
+      let stagesCreated = 0
+      for (const stageData of defaultStagesToCreate) {
+        try {
+          const createdStage = await createStage(newPipeline.id, stageData)
+          console.log('Stage created:', stageData.name, createdStage.id)
+          stagesCreated++
+        } catch (stageError) {
+          console.error(`Failed to create stage ${stageData.name}:`, stageError)
+          // Continue creating other stages even if one fails
+        }
+      }
+      console.log(`Created ${stagesCreated} out of ${defaultStagesToCreate.length} stages`)
+
+      showSuccess(`Pipeline "${newPipeline.name}" created successfully with ${stagesCreated} stages`)
+      
+      // Wait a bit more for stages to be fully created and indexed in DB
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Refresh pipelines list from API to get the pipeline with stages
+      console.log('Refreshing pipelines list to get created pipeline with stages...')
+      const pipelines = await getPipelines()
+      console.log('Refreshed pipelines:', pipelines.length)
+      
+      // Find the newly created pipeline
+      const createdPipeline = pipelines.find(p => p.id === newPipeline.id)
+      if (createdPipeline) {
+        console.log('Found created pipeline with stages:', createdPipeline.stages?.length || 0)
+      } else {
+        console.warn('Created pipeline not found in refreshed list, retrying...')
+        // Retry once more
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const retryPipelines = await getPipelines()
+        const retryPipeline = retryPipelines.find(p => p.id === newPipeline.id)
+        if (retryPipeline) {
+          console.log('Found pipeline on retry:', retryPipeline.stages?.length || 0, 'stages')
+        }
+      }
+      
+      // Update funnels list with all pipelines from API
+      const funnelsList: Funnel[] = pipelines.map(p => ({
+        id: p.id,
+        name: p.name,
+      }))
+      
+      console.log('Updating funnels list:', funnelsList.length, funnelsList)
+      setFunnels(funnelsList)
+      
+      // Select the newly created pipeline
+      console.log('Setting currentFunnelId to:', newPipeline.id)
+      setCurrentFunnelId(newPipeline.id)
+      
+      // Force Kanban board to refresh by changing key - this will make it reload pipelines
+      setKanbanRefreshKey(prev => {
+        const newKey = prev + 1
+        console.log('Kanban refresh key updated to:', newKey)
+        return newKey
+      })
+      
+      // Close settings modal if open
+      setIsSettingsOpen(false)
+      console.log('Settings modal closed')
+      
+      console.log('Pipeline creation completed successfully')
+    } catch (error) {
+      console.error('Failed to create pipeline:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', {
+        message: errorMessage,
+        error: error,
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      showError('Failed to create pipeline', errorMessage)
+      // Don't close modal on error so user can try again
+    }
   }
 
-  const handleDeleteFunnel = (funnelId: string) => {
-    if (funnelId === "default") return
-    setFunnels(funnels.filter(f => f.id !== funnelId))
-    if (currentFunnelId === funnelId) {
-      setCurrentFunnelId("default")
+  const handleDeleteFunnel = async (funnelId: string) => {
+    // Don't allow deleting non-existent pipelines
+    const funnel = funnels.find(f => f.id === funnelId)
+    if (!funnel) return
+    
+    try {
+      // TODO: Implement deletePipeline API call when backend supports it
+      // For now, just remove from local state
+      setFunnels(funnels.filter(f => f.id !== funnelId))
+      
+      // If deleting current pipeline, select default or first one
+      if (currentFunnelId === funnelId) {
+        const remainingPipelines = funnels.filter(f => f.id !== funnelId)
+        if (remainingPipelines.length > 0) {
+          setCurrentFunnelId(remainingPipelines[0].id)
+        } else {
+          setCurrentFunnelId("")
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete pipeline:', error)
+      showError('Failed to delete pipeline', error instanceof Error ? error.message : 'Unknown error')
     }
   }
 
@@ -261,28 +430,73 @@ export default function DealsPage() {
     setSelectedDeals([])
   }
 
-  const handleCreateNewDeal = () => {
-    // Current user (default assignee)
-    const currentUser = { name: "Current User", avatar: "CU" }
-    
-    const newDeal: Deal = {
-      id: `deal-${Date.now()}`,
-      title: "",
-      client: "",
-      amount: 0,
-      stage: "new",
-      assignedTo: currentUser,
-      updatedAt: new Date().toISOString(),
+  const { showSuccess, showError } = useToastNotification()
+  const [listDeals, setListDeals] = useState<APIDeal[]>([])
+  const [listLoading, setListLoading] = useState(false)
+  const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
+  const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0) // For forcing Kanban refresh
+
+  // Load deals for list view
+  useEffect(() => {
+    if (viewMode === 'list' && selectedPipelineForList) {
+      setListLoading(true)
+      getDeals({ pipelineId: selectedPipelineForList })
+        .then((deals) => {
+          setListDeals(deals)
+        })
+        .catch((error) => {
+          console.error('Failed to load deals for list:', error)
+          setListDeals([])
+        })
+        .finally(() => {
+          setListLoading(false)
+        })
     }
-    
-    // Save to sessionStorage for DealDetail to access
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem(`deal-${newDeal.id}`, JSON.stringify(newDeal))
-      sessionStorage.setItem(`deal-${newDeal.id}-isNew`, 'true')
+  }, [viewMode, selectedPipelineForList])
+
+  // Get default pipeline ID for list view
+  useEffect(() => {
+    if (viewMode === 'list' && !selectedPipelineForList) {
+      getPipelines()
+        .then((pipelines) => {
+          const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
+          if (defaultPipeline) {
+            setSelectedPipelineForList(defaultPipeline.id)
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to load pipelines for list:', error)
+        })
     }
-    
-    setDeals([...deals, newDeal])
-    router.push(`/deals/${newDeal.id}`)
+  }, [viewMode, selectedPipelineForList])
+
+  const handleCreateNewDeal = async () => {
+    try {
+      // Get default pipeline and first stage
+      const pipelines = await getPipelines()
+      const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
+      
+      if (!defaultPipeline || !defaultPipeline.stages || defaultPipeline.stages.length === 0) {
+        showError('No pipeline available', 'Please create a pipeline with stages first')
+        return
+      }
+
+      const firstStage = defaultPipeline.stages.sort((a, b) => a.order - b.order)[0]
+
+      // Create deal via API
+      const newDeal = await createDeal({
+        title: 'New Deal',
+        amount: 0,
+        pipelineId: defaultPipeline.id,
+        stageId: firstStage.id,
+      })
+
+      showSuccess('Deal created successfully')
+      router.push(`/deals/${newDeal.id}`)
+    } catch (error) {
+      console.error('Failed to create deal:', error)
+      showError('Failed to create deal', error instanceof Error ? error.message : 'Unknown error')
+    }
   }
 
   return (
@@ -304,9 +518,10 @@ export default function DealsPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsFunnelDropdownOpen(!isFunnelDropdownOpen)}
-                  className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={pipelinesLoading}
                 >
-                  {currentFunnel.name}
+                  {pipelinesLoading ? 'Loading...' : (currentFunnel?.name || 'No pipeline')}
                   <ChevronDown className="h-5 w-5" />
                 </button>
                 
@@ -317,22 +532,28 @@ export default function DealsPage() {
                       onClick={() => setIsFunnelDropdownOpen(false)}
                     />
                     <div className="absolute top-full left-0 mt-2 w-64 bg-popover border border-border/50 rounded-lg shadow-lg z-20 overflow-hidden">
-                      {funnels.map((funnel) => (
-                        <button
-                          key={funnel.id}
-                          onClick={() => handleSelectFunnel(funnel.id)}
-                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                            funnel.id === currentFunnelId
-                              ? "bg-primary/10 text-primary"
-                              : "text-foreground hover:bg-accent/50"
-                          }`}
-                        >
-                          {funnel.name}
-                          {funnel.id === currentFunnelId && (
-                            <span className="ml-2 text-xs text-muted-foreground">✓</span>
-                          )}
-                        </button>
-                      ))}
+                      {funnels.length === 0 ? (
+                        <div className="px-4 py-2.5 text-sm text-muted-foreground">
+                          No pipelines found
+                        </div>
+                      ) : (
+                        funnels.map((funnel) => (
+                          <button
+                            key={funnel.id}
+                            onClick={() => handleSelectFunnel(funnel.id)}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                              funnel.id === currentFunnelId
+                                ? "bg-primary/10 text-primary"
+                                : "text-foreground hover:bg-accent/50"
+                            }`}
+                          >
+                            {funnel.name}
+                            {funnel.id === currentFunnelId && (
+                              <span className="ml-2 text-xs text-muted-foreground">✓</span>
+                            )}
+                          </button>
+                        ))
+                      )}
                       <div className="border-t border-border/50">
                         <button
                           onClick={() => {
@@ -361,9 +582,10 @@ export default function DealsPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsFunnelDropdownOpen(!isFunnelDropdownOpen)}
-                  className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={pipelinesLoading}
                 >
-                  {currentFunnel.name}
+                  {pipelinesLoading ? 'Loading...' : (currentFunnel?.name || 'No pipeline')}
                   <ChevronDown className="h-5 w-5" />
                 </button>
               
@@ -374,22 +596,28 @@ export default function DealsPage() {
                     onClick={() => setIsFunnelDropdownOpen(false)}
                   />
                   <div className="absolute top-full left-0 mt-2 w-64 bg-popover border border-border/50 rounded-lg shadow-lg z-20 overflow-hidden">
-                    {funnels.map((funnel) => (
-                      <button
-                        key={funnel.id}
-                        onClick={() => handleSelectFunnel(funnel.id)}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                          funnel.id === currentFunnelId
-                            ? "bg-primary/10 text-primary"
-                            : "text-foreground hover:bg-accent/50"
-                        }`}
-                      >
-                        {funnel.name}
-                        {funnel.id === currentFunnelId && (
-                          <span className="ml-2 text-xs text-muted-foreground">✓</span>
-                        )}
-                      </button>
-                    ))}
+                    {funnels.length === 0 ? (
+                      <div className="px-4 py-2.5 text-sm text-muted-foreground">
+                        No pipelines found
+                      </div>
+                    ) : (
+                      funnels.map((funnel) => (
+                        <button
+                          key={funnel.id}
+                          onClick={() => handleSelectFunnel(funnel.id)}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                            funnel.id === currentFunnelId
+                              ? "bg-primary/10 text-primary"
+                              : "text-foreground hover:bg-accent/50"
+                          }`}
+                        >
+                          {funnel.name}
+                          {funnel.id === currentFunnelId && (
+                            <span className="ml-2 text-xs text-muted-foreground">✓</span>
+                          )}
+                        </button>
+                      ))
+                    )}
                     <div className="border-t border-border/50">
                       <button
                         onClick={() => {
@@ -481,19 +709,37 @@ export default function DealsPage() {
                   isEditMode={isEditMode}
                 />
               ) : (
-                <DealsKanbanBoard />
+                <DealsKanbanBoard 
+                  key={kanbanRefreshKey} 
+                  pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined} 
+                />
               )}
             </div>
           </div>
         ) : (
-          <DealsListView
-            deals={deals}
-            selectedDeals={selectedDeals}
-            onSelectDeals={setSelectedDeals}
-            onBulkDelete={handleBulkDelete}
-            onBulkChangeStage={handleBulkChangeStage}
-            stages={stages}
-          />
+          listLoading ? (
+            <PageSkeleton />
+          ) : (
+            <DealsListView
+              deals={listDeals.map(deal => ({
+                id: deal.id,
+                title: deal.title,
+                client: deal.contact?.fullName || deal.company?.name || 'No client',
+                amount: deal.amount || 0,
+                stage: deal.stage?.id || 'new',
+                assignedTo: deal.assignedTo ? {
+                  name: deal.assignedTo.name || 'Unknown',
+                  avatar: deal.assignedTo.avatar || deal.assignedTo.name?.substring(0, 2).toUpperCase() || 'U'
+                } : { name: 'Unassigned', avatar: 'U' },
+                updatedAt: deal.updatedAt || new Date().toISOString(),
+              }))}
+              selectedDeals={selectedDeals}
+              onSelectDeals={setSelectedDeals}
+              onBulkDelete={handleBulkDelete}
+              onBulkChangeStage={handleBulkChangeStage}
+              stages={stages}
+            />
+          )
           )}
         </div>
 

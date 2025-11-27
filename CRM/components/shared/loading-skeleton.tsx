@@ -152,3 +152,7 @@ export function DetailSkeleton() {
   )
 }
 
+
+
+
+

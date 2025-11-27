@@ -13,11 +13,30 @@ export class DealsService {
   ) {}
 
   async create(data: any, userId: string) {
+    // Ensure required fields have defaults
+    const dealData = {
+      title: data.title || 'New Deal',
+      amount: data.amount !== undefined && data.amount !== null ? Number(data.amount) : 0,
+      pipelineId: data.pipelineId,
+      stageId: data.stageId,
+      createdById: userId,
+      assignedToId: data.assignedToId || null,
+      contactId: data.contactId || null,
+      companyId: data.companyId || null,
+      description: data.description || null,
+      expectedCloseAt: data.expectedCloseAt || null,
+    };
+
+    // Validate required fields
+    if (!dealData.pipelineId) {
+      throw new Error('pipelineId is required');
+    }
+    if (!dealData.stageId) {
+      throw new Error('stageId is required');
+    }
+
     const deal = await this.prisma.deal.create({
-      data: {
-        ...data,
-        createdById: userId,
-      },
+      data: dealData,
       include: {
         stage: true,
         pipeline: true,
@@ -28,6 +47,7 @@ export class DealsService {
             company: true,
           },
         },
+        company: true,
       },
     });
 
@@ -43,12 +63,13 @@ export class DealsService {
     });
 
     // Emit WebSocket events
-    this.websocketGateway.emitDealUpdated(deal.id, deal);
+    const formattedDeal = await this.formatDealResponse(deal);
+    this.websocketGateway.emitDealUpdated(deal.id, formattedDeal);
     if (deal.contactId) {
-      this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, deal);
+      this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, formattedDeal);
     }
 
-    return this.formatDealResponse(deal);
+    return formattedDeal;
   }
 
   async findAll(filters?: {
@@ -90,7 +111,12 @@ export class DealsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    // Format deals with contact stats
+    // Always return an array, even if empty
+    // Format deals with contact stats and null-safe handling
+    if (deals.length === 0) {
+      return [];
+    }
+
     return Promise.all(deals.map((deal) => this.formatDealResponse(deal)));
   }
 
@@ -128,27 +154,39 @@ export class DealsService {
   }
 
   private async formatDealResponse(deal: any) {
-    const result: any = { ...deal };
+    const result: any = { 
+      ...deal,
+      // Ensure amount is always a number, default to 0 if null/undefined
+      amount: deal.amount ? Number(deal.amount) : 0,
+      // Ensure title is never null/undefined
+      title: deal.title || 'Untitled Deal',
+      // Ensure stageId exists
+      stageId: deal.stageId || deal.stage?.id || '',
+    };
 
     // Add contact with stats if contact exists
     if (deal.contact) {
       const contactStats = await this.getContactStats(deal.contact.id);
       result.contact = {
         id: deal.contact.id,
-        fullName: deal.contact.fullName,
-        email: deal.contact.email,
-        phone: deal.contact.phone,
-        position: deal.contact.position,
-        companyName: deal.contact.companyName,
-        company: deal.contact.company,
-        social: deal.contact.social as {
-          instagram?: string;
-          telegram?: string;
-          whatsapp?: string;
-          vk?: string;
-        },
+        fullName: deal.contact.fullName || 'Unknown Contact',
+        email: deal.contact.email || null,
+        phone: deal.contact.phone || null,
+        position: deal.contact.position || null,
+        companyName: deal.contact.companyName || null,
+        company: deal.contact.company || null,
+        social: (deal.contact.social && typeof deal.contact.social === 'object') 
+          ? deal.contact.social 
+          : ({} as {
+            instagram?: string;
+            telegram?: string;
+            whatsapp?: string;
+            vk?: string;
+          }),
         stats: contactStats,
       };
+    } else {
+      result.contact = null;
     }
 
     // Add company with stats if company exists
@@ -156,15 +194,41 @@ export class DealsService {
       const companyStats = await this.getCompanyStats(deal.company.id);
       result.company = {
         id: deal.company.id,
-        name: deal.company.name,
-        industry: deal.company.industry,
-        website: deal.company.website,
-        email: deal.company.email,
-        phone: deal.company.phone,
-        social: deal.company.social,
-        address: deal.company.address,
-        notes: deal.company.notes,
+        name: deal.company.name || 'Unknown Company',
+        industry: deal.company.industry || null,
+        website: deal.company.website || null,
+        email: deal.company.email || null,
+        phone: deal.company.phone || null,
+        social: (deal.company.social && typeof deal.company.social === 'object') 
+          ? deal.company.social 
+          : {},
+        address: deal.company.address || null,
+        notes: deal.company.notes || null,
         stats: companyStats,
+      };
+    } else {
+      result.company = null;
+    }
+
+    // Ensure assignedTo has proper structure
+    if (result.assignedTo) {
+      result.assignedTo = {
+        id: result.assignedTo.id,
+        name: result.assignedTo.name || result.assignedTo.fullName || 'Unknown User',
+        avatar: result.assignedTo.avatar || null,
+      };
+    } else {
+      result.assignedTo = null;
+    }
+
+    // Ensure stage exists
+    if (result.stage) {
+      result.stage = {
+        id: result.stage.id,
+        name: result.stage.name || 'Unknown Stage',
+        color: result.stage.color || '#6B7280',
+        order: result.stage.order || 0,
+        isClosed: result.stage.isClosed || false,
       };
     }
 

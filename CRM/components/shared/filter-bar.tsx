@@ -1,6 +1,6 @@
 "use client"
 
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,9 +25,10 @@ export function FilterBar({
   onFiltersChange,
   className,
 }: FilterBarProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const pathname = location.pathname
+  const [searchParams] = useSearchParams()
 
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [selectedTags, setSelectedTags] = useState<string[]>(
@@ -48,7 +49,7 @@ export function FilterBar({
     if (selectedStatuses.length > 0) params.set('statuses', selectedStatuses.join(','))
     if (selectedCompanies.length > 0) params.set('companies', selectedCompanies.join(','))
 
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    navigate(`${pathname}?${params.toString()}`, { replace: true })
     
     onFiltersChange?.({
       search: search ? [search] : [],
@@ -56,7 +57,7 @@ export function FilterBar({
       statuses: selectedStatuses,
       companies: selectedCompanies,
     })
-  }, [search, selectedTags, selectedStatuses, selectedCompanies, router, pathname, onFiltersChange])
+  }, [search, selectedTags, selectedStatuses, selectedCompanies, navigate, pathname, onFiltersChange])
 
   const clearAll = () => {
     setSearch('')
@@ -203,4 +204,6 @@ export function FilterBar({
     </div>
   )
 }
+
+
 

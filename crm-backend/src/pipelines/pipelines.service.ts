@@ -11,18 +11,53 @@ export class PipelinesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createPipelineDto: CreatePipelineDto) {
-    // If this is set as default, unset other defaults
-    if (createPipelineDto.isDefault) {
-      await this.prisma.pipeline.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+    try {
+      console.log('PipelinesService.create called with DTO:', createPipelineDto);
+      
+      // Validate required fields
+      if (!createPipelineDto.name || !createPipelineDto.name.trim()) {
+        console.error('Pipeline name validation failed:', createPipelineDto.name);
+        throw new BadRequestException('Pipeline name is required');
+      }
 
-    return this.prisma.pipeline.create({
-      data: createPipelineDto,
-      include: { stages: { orderBy: { order: 'asc' } } },
-    });
+      // If this is set as default, unset other defaults
+      if (createPipelineDto.isDefault) {
+        await this.prisma.pipeline.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      const pipelineData = {
+        name: createPipelineDto.name.trim(),
+        description: createPipelineDto.description?.trim() || null,
+        isDefault: createPipelineDto.isDefault || false,
+        isActive: true,
+        order: 0,
+      };
+
+      console.log('Creating pipeline with data:', pipelineData);
+
+      const pipeline = await this.prisma.pipeline.create({
+        data: pipelineData,
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
+
+      console.log('Pipeline created successfully:', pipeline.id, pipeline.name);
+      return pipeline;
+    } catch (error) {
+      console.error('Error creating pipeline:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Re-throw Prisma errors as-is for better debugging
+      if (error.code) {
+        console.error('Prisma error code:', error.code);
+        throw new BadRequestException(`Database error: ${error.message}`);
+      }
+      throw new BadRequestException(`Failed to create pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async findAll() {

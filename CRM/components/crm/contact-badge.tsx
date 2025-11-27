@@ -3,7 +3,7 @@
 import { Contact } from '@/types/contact'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 interface ContactBadgeProps {
@@ -42,4 +42,6 @@ export function ContactBadge({ contact, className, showDealsCount = true }: Cont
     </Link>
   )
 }
+
+
 

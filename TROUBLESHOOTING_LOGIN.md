@@ -123,3 +123,6 @@ curl -X POST http://localhost:3001/api/auth/login \
 - Удалите пользователя через Prisma Studio
 - Создайте заново: `npm run check:admin`
 
+
+
+

@@ -31,7 +31,7 @@ import {
   Building2,
   User
 } from 'lucide-react'
-import Link from "next/link"
+import { Link, useNavigate } from 'react-router-dom'
 import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
 import { getPipelines, type Pipeline, type Stage } from "@/lib/api/pipelines"
 import { getCompanies, type Company } from "@/lib/api/companies"
@@ -39,6 +39,7 @@ import { getContacts, type Contact } from "@/lib/api/contacts"
 import { CompanyBadge } from "@/components/shared/company-badge"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { cn } from "@/lib/utils"
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
 
 interface DealCardData {
@@ -67,6 +68,11 @@ interface DealCardData {
 interface DealsKanbanBoardProps {
   pipelineId?: string
   onDealClick?: (dealId: string) => void
+  showFilters?: boolean
+  filters?: FilterState
+  sort?: SortState
+  onFiltersChange?: (filters: FilterState) => void
+  onSortChange?: (sort: SortState) => void
 }
 
 interface FilterState {
@@ -132,6 +138,8 @@ function DealCard({
   availableContacts
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation()
@@ -139,6 +147,7 @@ function DealCard({
     onDragStart(deal)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', deal.id)
+    e.dataTransfer.setData('application/json', JSON.stringify({ dealId: deal.id, stageId: deal.stageId }))
   }
 
   const handleDragEnd = () => {
@@ -147,11 +156,14 @@ function DealCard({
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on dropdown or badges
-    if ((e.target as HTMLElement).closest('[data-no-navigate]')) {
+    // Don't navigate if clicking on dropdown, badges, or during drag
+    if (isDragging || (e.target as HTMLElement).closest('[data-no-navigate]')) {
       e.preventDefault()
       e.stopPropagation()
+      return
     }
+    // Navigate to deal detail page
+    navigate(`/deals/${deal.id}`)
   }
 
   return (
@@ -167,12 +179,12 @@ function DealCard({
     >
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
-          <Link 
-            href={`/deals/${deal.id}`}
-            className="font-medium text-sm line-clamp-2 flex-1 hover:text-primary transition-colors"
+          <div 
+            className="font-medium text-sm line-clamp-2 flex-1 hover:text-primary transition-colors cursor-pointer"
+            onClick={handleCardClick}
           >
             {deal.title}
-          </Link>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild data-no-navigate>
               <Button
@@ -190,11 +202,11 @@ function DealCard({
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onClick={() => onOpenInSidebar(deal.id)}>
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Open in sidebar
+                {t('dealCard.openInSidebar')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onReassignContact(deal.id)}>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Reassign contact
+                {t('dealCard.reassignContact')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
@@ -202,14 +214,14 @@ function DealCard({
                 className="text-green-600"
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Mark as Won
+                {t('dealCard.markAsWon')}
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => onMarkAsLost(deal.id)}
                 className="text-red-600"
               >
                 <XCircle className="mr-2 h-4 w-4" />
-                Mark as Lost
+                {t('dealCard.markAsLost')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -231,7 +243,7 @@ function DealCard({
         {deal.contact && (
           <div className="mb-2" data-no-navigate>
             <Link
-              href={`/contacts/${deal.contact.id}`}
+              to={`/contacts/${deal.contact.id}`}
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-accent/50 transition-colors text-xs"
               onClick={(e) => e.stopPropagation()}
             >
@@ -299,14 +311,20 @@ function KanbanColumn({
   onOpenInSidebar,
   availableContacts
 }: KanbanColumnProps) {
+  const { t } = useTranslation()
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    onDrop(stage.id)
+    e.stopPropagation()
+    const dealId = e.dataTransfer.getData('text/plain')
+    if (dealId) {
+      onDrop(stage.id)
+    }
   }
 
   return (
@@ -324,42 +342,48 @@ function KanbanColumn({
 
       <Card
         className={cn(
-          "h-[calc(100vh-300px)]",
+          "flex flex-col",
           isDraggedOver && "border-primary border-2"
         )}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <ScrollArea className="h-full">
-          <CardContent className="p-3">
-            {deals.length === 0 ? (
-              <div className="text-center text-sm text-muted-foreground py-8">
-                No deals
-              </div>
-            ) : (
-              deals.map((deal) => (
-                <DealCard
-                  key={deal.id}
-                  deal={deal}
-                  stage={stage}
-                  onDragStart={onDragStart}
-                  onDragEnd={onDragEnd}
-                  onMarkAsWon={onMarkAsWon}
-                  onMarkAsLost={onMarkAsLost}
-                  onReassignContact={onReassignContact}
-                  onOpenInSidebar={onOpenInSidebar}
-                  availableContacts={availableContacts}
-                />
-              ))
-            )}
-          </CardContent>
-        </ScrollArea>
+        <CardContent className="p-3">
+          {deals.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-8">
+              {t('dealCard.noDeals')}
+            </div>
+          ) : (
+            deals.map((deal) => (
+              <DealCard
+                key={deal.id}
+                deal={deal}
+                stage={stage}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onMarkAsWon={onMarkAsWon}
+                onMarkAsLost={onMarkAsLost}
+                onReassignContact={onReassignContact}
+                onOpenInSidebar={onOpenInSidebar}
+                availableContacts={availableContacts}
+              />
+            ))
+          )}
+        </CardContent>
       </Card>
     </div>
   )
 }
 
-export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardProps) {
+export function DealsKanbanBoard({ 
+  pipelineId, 
+  onDealClick,
+  showFilters: externalShowFilters,
+  filters: externalFilters,
+  sort: externalSort,
+  onFiltersChange: externalOnFiltersChange,
+  onSortChange: externalOnSortChange
+}: DealsKanbanBoardProps) {
   const { showSuccess, showError } = useToastNotification()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
@@ -368,9 +392,19 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [draggedDeal, setDraggedDeal] = useState<DealCardData | null>(null)
-  const [filters, setFilters] = useState<FilterState>({})
-  const [sort, setSort] = useState<SortState>({ field: 'updatedAt', direction: 'desc' })
-  const [showFilters, setShowFilters] = useState(false)
+  
+  // Use external state if provided, otherwise use internal state
+  const [internalFilters, setInternalFilters] = useState<FilterState>({})
+  const [internalSort, setInternalSort] = useState<SortState>({ field: 'updatedAt', direction: 'desc' })
+  const [internalShowFilters, setInternalShowFilters] = useState(false)
+  
+  const filters = externalFilters ?? internalFilters
+  const sort = externalSort ?? internalSort
+  const showFilters = externalShowFilters ?? internalShowFilters
+  const setFilters = externalOnFiltersChange ?? setInternalFilters
+  const setSort = externalOnSortChange ?? setInternalSort
+  const setShowFilters = externalShowFilters !== undefined ? () => {} : setInternalShowFilters
+  
   const socketRef = useRef<Socket | null>(null)
 
   const loadPipelines = async () => {
@@ -382,6 +416,7 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
       
       if (data.length === 0) {
         console.warn('No pipelines found')
+        setLoading(false) // Ensure loading is false if no pipelines
         return
       }
       
@@ -399,12 +434,22 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
         }
       }
     } catch (error) {
+      // Handle unauthorized error - redirect to login
+      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+        console.warn('Unauthorized - redirecting to login')
+        // Token already cleared in API function
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return
+      }
       // Only show error if it's not a network/empty response issue
       if (error instanceof Error && !error.message.includes('Network error') && !error.message.includes('Unauthorized')) {
         showError('Failed to load pipelines', error.message)
       } else {
         console.warn('Pipelines not available:', error instanceof Error ? error.message : 'Unknown error')
       }
+      setLoading(false) // Ensure loading is false on error
     }
   }
 
@@ -437,6 +482,7 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
     if (!selectedPipeline) {
       console.log('No pipeline selected, skipping deals load')
       setDeals([])
+      setLoading(false) // Ensure loading is false even if no pipeline
       return
     }
 
@@ -453,21 +499,29 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
       console.log('Loaded deals data:', dealsData)
       console.log('Loaded deals count:', Array.isArray(dealsData) ? dealsData.length : 'Not an array!')
       
-      if (!Array.isArray(dealsData)) {
-        console.error('Deals data is not an array:', typeof dealsData, dealsData)
-        setDeals([])
-        return
-      }
+      // Always ensure we have an array - even if empty
+      const safeDealsData = Array.isArray(dealsData) ? dealsData : []
       
-      const transformedDeals: DealCardData[] = dealsData.map((deal, index) => {
+      const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
         console.log(`Processing deal ${index}:`, deal.id, deal.title, deal.stage?.id)
         return {
           id: deal.id,
-          title: deal.title,
-          amount: deal.amount,
-          contact: deal.contact,
-          company: deal.company,
-          assignedTo: deal.assignedTo,
+          title: deal.title || 'Untitled Deal',
+          amount: deal.amount || 0,
+          contact: deal.contact ? {
+            id: deal.contact.id,
+            fullName: deal.contact.fullName || 'Unknown Contact',
+          } : undefined,
+          company: deal.company ? {
+            id: deal.company.id,
+            name: deal.company.name || 'Unknown Company',
+            industry: deal.company.industry,
+          } : undefined,
+          assignedTo: deal.assignedTo ? {
+            id: deal.assignedTo.id,
+            name: deal.assignedTo.name || 'Unknown User',
+            avatar: deal.assignedTo.avatar,
+          } : undefined,
           updatedAt: deal.updatedAt || new Date().toISOString(),
           stageId: deal.stage?.id || '',
           status: deal.status,
@@ -482,10 +536,11 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
         showError('Failed to load deals', error.message)
       } else {
         console.warn('Deals not available:', error instanceof Error ? error.message : 'Unknown error')
-        setDeals([]) // Set empty array on error
       }
+      // Always set empty array on error to show empty state instead of loading
+      setDeals([])
     } finally {
-      setLoading(false)
+      setLoading(false) // Always set loading to false
     }
   }, [selectedPipeline, filters.companyId, filters.contactId, filters.assignedUserId, showError])
 
@@ -494,6 +549,37 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
     loadCompanies()
     loadContacts()
   }, [])
+
+  // Reload pipelines when pipelineId prop changes (e.g., after creating a new pipeline)
+  useEffect(() => {
+    if (pipelineId) {
+      console.log('PipelineId prop changed, reloading pipelines:', pipelineId)
+      loadPipelines()
+    }
+  }, [pipelineId])
+
+  // Handle pipelineId prop changes - reload pipelines if pipeline not found
+  useEffect(() => {
+    if (!pipelineId) return
+
+    // If pipelines list is empty or doesn't contain the requested pipeline, reload
+    if (pipelines.length === 0 || !pipelines.find(p => p.id === pipelineId)) {
+      console.log('DealsKanbanBoard: Pipeline not in list, reloading pipelines for:', pipelineId)
+      loadPipelines()
+      return
+    }
+
+    // Find and set the pipeline
+    const pipeline = pipelines.find(p => p.id === pipelineId)
+    if (pipeline) {
+      if (pipeline.id !== selectedPipeline?.id) {
+        console.log('DealsKanbanBoard: Setting pipeline from prop:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
+        setSelectedPipeline(pipeline)
+      }
+    } else {
+      console.warn('DealsKanbanBoard: Pipeline not found in list after reload:', pipelineId)
+    }
+  }, [pipelineId, pipelines, selectedPipeline?.id])
 
   // Track selectedPipeline changes
   useEffect(() => {
@@ -517,7 +603,7 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
     const token = localStorage.getItem('access_token')
     if (!token) return
 
-    const socket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001/realtime', {
+    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3001/realtime', {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
@@ -698,6 +784,17 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
 
   const hasActiveFilters = Object.keys(filters).length > 0
 
+  // Get unique assigned users from deals - MUST be called before any conditional returns
+  const assignedUsers = useMemo(() => {
+    const users = new Map<string, { id: string; name: string }>()
+    deals.forEach(deal => {
+      if (deal.assignedTo) {
+        users.set(deal.assignedTo.id, deal.assignedTo)
+      }
+    })
+    return Array.from(users.values())
+  }, [deals])
+
   if (loading && deals.length === 0) {
     return (
       <div className="flex gap-3 overflow-x-auto pb-4">
@@ -736,187 +833,15 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
 
   const stages = selectedPipeline.stages.sort((a, b) => a.order - b.order)
 
-  // Get unique assigned users from deals
-  const assignedUsers = useMemo(() => {
-    const users = new Map<string, { id: string; name: string }>()
-    deals.forEach(deal => {
-      if (deal.assignedTo) {
-        users.set(deal.assignedTo.id, deal.assignedTo)
-      }
-    })
-    return Array.from(users.values())
-  }, [deals])
+  // Don't show empty state - always show columns even if empty
+  // Empty state is handled within each KanbanColumn component
 
   return (
-    <div className="space-y-4">
-      {/* Filters and Sort Bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
-          {hasActiveFilters && (
-            <Badge variant="secondary" className="ml-2">
-              {Object.keys(filters).length}
-            </Badge>
-          )}
-        </Button>
-
-        <Select
-          value={`${sort.field}-${sort.direction}`}
-          onValueChange={(value) => {
-            const [field, direction] = value.split('-') as [SortField, SortDirection]
-            setSort({ field, direction })
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <ArrowUpDown className="mr-2 h-4 w-4" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="amount-desc">Amount: High to Low</SelectItem>
-            <SelectItem value="amount-asc">Amount: Low to High</SelectItem>
-            <SelectItem value="updatedAt-desc">Last Update: Newest</SelectItem>
-            <SelectItem value="updatedAt-asc">Last Update: Oldest</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            <X className="mr-2 h-4 w-4" />
-            Clear filters
-          </Button>
-        )}
-      </div>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <Card className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Company</label>
-              <Select
-                value={filters.companyId || ''}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, companyId: value || undefined }))}
-              >
-                <SelectTrigger>
-                  <Building2 className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All companies</SelectItem>
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Contact</label>
-              <Select
-                value={filters.contactId || ''}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, contactId: value || undefined }))}
-              >
-                <SelectTrigger>
-                  <User className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All contacts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All contacts</SelectItem>
-                  {contacts.map(contact => (
-                    <SelectItem key={contact.id} value={contact.id}>
-                      {contact.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Assigned To</label>
-              <Select
-                value={filters.assignedUserId || ''}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, assignedUserId: value || undefined }))}
-              >
-                <SelectTrigger>
-                  <User className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All users</SelectItem>
-                  {assignedUsers.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Amount Range</label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="Min"
-                  value={filters.amountMin || ''}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    amountMin: e.target.value ? Number(e.target.value) : undefined 
-                  }))}
-                  className="h-9"
-                />
-                <Input
-                  type="number"
-                  placeholder="Max"
-                  value={filters.amountMax || ''}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    amountMax: e.target.value ? Number(e.target.value) : undefined 
-                  }))}
-                  className="h-9"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Updated After</label>
-              <Input
-                type="date"
-                value={filters.updatedAfter || ''}
-                onChange={(e) => setFilters(prev => ({ 
-                  ...prev, 
-                  updatedAfter: e.target.value || undefined 
-                }))}
-                className="h-9"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-muted-foreground mb-2 block">Updated Before</label>
-              <Input
-                type="date"
-                value={filters.updatedBefore || ''}
-                onChange={(e) => setFilters(prev => ({ 
-                  ...prev, 
-                  updatedBefore: e.target.value || undefined 
-                }))}
-                className="h-9"
-              />
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Kanban Board */}
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {stages.map((stage) => {
+    <div className="flex flex-col h-full">
+      {/* Kanban Board - Scrollable */}
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto" style={{ width: '100%' }}>
+        <div className="flex gap-3 pb-4" style={{ minWidth: 'max-content' }}>
+          {stages.map((stage) => {
           const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
           const isDraggedOver = draggedDeal !== null && draggedDeal.stageId !== stage.id
 
@@ -936,7 +861,8 @@ export function DealsKanbanBoard({ pipelineId, onDealClick }: DealsKanbanBoardPr
               availableContacts={contacts}
             />
           )
-        })}
+          })}
+        </div>
       </div>
     </div>
   )

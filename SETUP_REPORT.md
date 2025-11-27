@@ -285,3 +285,5 @@ npm run create:admin:local
 **Версия NestJS**: 10.3.0  
 **Версия Prisma**: 5.22.0
 
+
+

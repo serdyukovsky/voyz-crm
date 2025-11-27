@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Building2, Globe, Mail, Phone, MapPin, Users, FileText, Edit, Trash2, Briefcase, CheckSquare, Contact, Clock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Building2, Globe, Mail, Phone, MapPin, Users, FileText, Edit, Trash2, Briefcase, CheckSquare, Contact as ContactIcon, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,7 +21,7 @@ import { useRealtimeCompany } from '@/hooks/use-realtime-company'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { ActivityTimeline } from '@/components/shared/activity-timeline'
 import { useActivity } from '@/hooks/use-activity'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 
 interface CompanyDetailProps {
   companyId: string
@@ -37,7 +37,7 @@ function formatCurrency(amount: number): string {
 }
 
 export function CompanyDetail({ companyId }: CompanyDetailProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
   const [company, setCompany] = useState<Company | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -132,7 +132,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
     try {
       await deleteCompany(companyId)
       showSuccess('Company deleted successfully')
-      router.push('/companies')
+      navigate('/companies')
     } catch (error) {
       console.error('Failed to delete company:', error)
       showError('Failed to delete company', 'Please try again')
@@ -151,7 +151,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.back()}
+            onClick={() => navigate(-1)}
             className="h-8 w-8 p-0"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -165,7 +165,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/companies/${companyId}/edit`)}
+            onClick={() => navigate(`/companies/${companyId}/edit`)}
           >
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -241,7 +241,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
               <Tabs defaultValue="contacts" className="w-full">
                 <TabsList className="mb-4">
                   <TabsTrigger value="contacts" className="flex items-center gap-2">
-                    <Contact className="h-4 w-4" />
+                    <ContactIcon className="h-4 w-4" />
                     Contacts ({contacts.length})
                   </TabsTrigger>
                   <TabsTrigger value="deals" className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
                             <TableRow
                               key={contact.id}
                               className="cursor-pointer hover:bg-accent/50"
-                              onClick={() => router.push(`/contacts/${contact.id}`)}
+                              onClick={() => navigate(`/contacts/${contact.id}`)}
                             >
                               <TableCell className="font-medium">{contact.fullName}</TableCell>
                               <TableCell>{contact.email || '—'}</TableCell>
@@ -321,7 +321,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
                             <TableRow
                               key={deal.id}
                               className="cursor-pointer hover:bg-accent/50"
-                              onClick={() => router.push(`/deals/${deal.id}`)}
+                              onClick={() => navigate(`/deals/${deal.id}`)}
                             >
                               <TableCell className="font-medium">{deal.title}</TableCell>
                               <TableCell>
@@ -389,7 +389,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
                             <TableRow
                               key={task.id}
                               className="cursor-pointer hover:bg-accent/50"
-                              onClick={() => router.push(`/tasks?taskId=${task.id}`)}
+                              onClick={() => navigate(`/tasks?taskId=${task.id}`)}
                             >
                               <TableCell className="font-medium">{task.title}</TableCell>
                               <TableCell>

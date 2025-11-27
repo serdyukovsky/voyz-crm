@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavigate } from 'react-router-dom'
 import {
   CommandDialog,
   CommandEmpty,
@@ -27,7 +27,7 @@ interface QuickSearchProps {
 }
 
 export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [contacts, setContacts] = useState<ContactType[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
@@ -90,13 +90,13 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
     
     switch (type) {
       case 'contact':
-        router.push(`/contacts/${id}`)
+        navigate(`/contacts/${id}`)
         break
       case 'deal':
-        router.push(`/deals/${id}`)
+        navigate(`/deals/${id}`)
         break
       case 'task':
-        router.push(`/tasks?taskId=${id}`)
+        navigate(`/tasks?taskId=${id}`)
         break
     }
   }
@@ -218,4 +218,6 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
     </CommandDialog>
   )
 }
+
+
 

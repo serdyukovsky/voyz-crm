@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import Link from "next/link"
-import { useRouter } from 'next/navigation'
+import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { TaskCard } from "./task-card"
 import { TaskDetailModal } from "./task-detail-modal"
 
@@ -17,7 +17,7 @@ interface DealDetailProps {
 }
 
 export function DealDetail({ dealId }: DealDetailProps) {
-  const router = useRouter()
+  const navigate = useNavigate()
   const [selectedStage, setSelectedStage] = useState("new")
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
@@ -293,7 +293,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
                     sessionStorage.removeItem(`deal-${dealId}-isNew`)
                   }
                 }
-                router.push('/deals')
+                navigate('/deals')
               }}
             >
               <ArrowLeft className="h-4 w-4" />
