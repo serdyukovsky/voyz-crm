@@ -1,0 +1,55 @@
+{
+  "name": "Node.js Backend + PostgreSQL Dev Container",
+  
+  // Use Docker Compose for multi-container setup
+  "dockerComposeFile": "./docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  // Forward ports for backend API, dev server, and PostgreSQL
+  "forwardPorts": [3000, 5173, 5432],
+  "portsAttributes": {
+    "3000": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "Dev Server (Vite)",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL Database",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // Run commands after container is created
+  "postCreateCommand": "cd /workspace/crm-backend && npm install && npx prisma generate",
+
+  // VSCode/Cursor extensions to install in the container
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "prisma.prisma"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+
+  // Docker-in-Docker support for container management
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    }
+  },
+
+  // Set the default user for the container
+  "remoteUser": "vscode"
+}
+

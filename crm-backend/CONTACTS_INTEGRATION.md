@@ -257,3 +257,4 @@ npm run prisma:migrate dev --name add_contact_updated_in_deal_activity
 
 
 
+
