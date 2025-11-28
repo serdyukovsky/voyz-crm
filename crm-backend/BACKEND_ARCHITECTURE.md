@@ -137,7 +137,7 @@ See `prisma/schema.prisma` for complete schema definition.
 
 ## Deployment
 
-- Docker support
+- Local development support (GitHub Codespaces ready)
 - Environment-based configuration
 - Database migrations via Prisma
 - Health check endpoints

@@ -1,55 +1,60 @@
 {
-  "name": "Node.js Backend + PostgreSQL Dev Container",
+  "name": "CRM Backend Development",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
   
-  // Use Docker Compose for multi-container setup
-  "dockerComposeFile": "./docker-compose.yml",
-  "service": "app",
-  "workspaceFolder": "/workspace",
-
-  // Forward ports for backend API, dev server, and PostgreSQL
-  "forwardPorts": [3000, 5173, 5432],
-  "portsAttributes": {
-    "3000": {
-      "label": "Backend API",
-      "onAutoForward": "notify"
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
     },
-    "5173": {
-      "label": "Dev Server (Vite)",
-      "onAutoForward": "notify"
-    },
-    "5432": {
-      "label": "PostgreSQL Database",
-      "onAutoForward": "silent"
-    }
+    "ghcr.io/devcontainers/features/git:1": {}
   },
 
-  // Run commands after container is created
-  "postCreateCommand": "cd /workspace/crm-backend && npm install && npx prisma generate",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
 
-  // VSCode/Cursor extensions to install in the container
+  "postStartCommand": "sudo service postgresql start || true",
+
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-azuretools.vscode-docker",
+        "Prisma.prisma",
+        "ms-ossdata.vscode-postgresql",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "prisma.prisma"
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense"
       ],
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "zsh"
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true
       }
     }
   },
 
-  // Docker-in-Docker support for container management
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "moby": true
+  "remoteEnv": {
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/crm_db?schema=public",
+    "NODE_ENV": "development",
+    "PORT": "3001"
+  },
+
+  "forwardPorts": [3001, 5432],
+
+  "portsAttributes": {
+    "3001": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
     }
   },
 
-  // Set the default user for the container
-  "remoteUser": "vscode"
+  "remoteUser": "codespace"
 }
-

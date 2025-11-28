@@ -155,9 +155,13 @@ http://localhost:3001/api/docs
 
 ## Deployment
 
-### Docker
+### Local Development (GitHub Codespaces)
 ```bash
-docker-compose up -d
+# Start PostgreSQL
+sudo service postgresql start
+
+# Start development server
+npm run dev
 ```
 
 ### Production Build

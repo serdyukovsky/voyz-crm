@@ -50,8 +50,8 @@ async function createAdmin() {
       console.error('  1. PostgreSQL is running on localhost:5432');
       console.error('  2. DATABASE_URL is set in .env file');
       console.error('  3. Database exists and migrations are applied');
-      console.error('\nTo start PostgreSQL with Docker:');
-      console.error('  docker-compose up -d');
+      console.error('\nTo start PostgreSQL:');
+      console.error('  sudo service postgresql start');
       console.error('\nTo apply migrations:');
       console.error('  npm run prisma:migrate');
     } else {
