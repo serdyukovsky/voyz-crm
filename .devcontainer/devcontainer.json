@@ -1,16 +1,7 @@
 {
-  "name": "CRM Ubuntu Dev Environment",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "name": "CRM - Node 20 on Ubuntu",
+  "image": "node:20-bookworm",
   
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20"
-    },
-    "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "15"
-    }
-  },
-
   "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
@@ -44,8 +35,8 @@
     }
   },
 
-  "remoteUser": "vscode",
+  "remoteUser": "node",
   "remoteEnv": {
-    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/crm_db"
   }
 }
