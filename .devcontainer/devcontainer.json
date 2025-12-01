@@ -9,7 +9,7 @@
     "ghcr.io/devcontainers/features/sshd:1": {}
   },
 
-  "postCreateCommand": "cd crm-backend && npm install && npx prisma generate && npx prisma migrate deploy",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
     "vscode": {
