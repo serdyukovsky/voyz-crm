@@ -1,15 +1,12 @@
 {
   "name": "CRM Development Environment",
-  "image": "mcr.microsoft.com/devcontainers/universal:2-linux",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bookworm",
   
   "overrideCommand": false,
   
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20"
-    },
     "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "14",
+      "version": "15",
       "postgresqlUser": "vscode",
       "postgresqlPassword": "postgres",
       "postgresqlDb": "crm_db"

@@ -11,19 +11,24 @@ sudo apt-get install -y \
   postgresql-client \
   build-essential \
   libssl-dev \
+  openssl \
   curl \
   git
 
-# Setup PostgreSQL (if not already running)
-if ! pg_isready -h localhost -U vscode > /dev/null 2>&1; then
-  echo "📦 Setting up PostgreSQL..."
-  sudo service postgresql start || true
-  sleep 2
-fi
+# Wait for PostgreSQL to be ready (feature installs it)
+echo "⏳ Waiting for PostgreSQL..."
+for i in {1..30}; do
+  if pg_isready -h localhost -U vscode -d postgres > /dev/null 2>&1; then
+    echo "✅ PostgreSQL is ready!"
+    break
+  fi
+  echo "   Waiting... ($i/30)"
+  sleep 1
+done
 
-# Create database and user (if not exists)
-sudo -u postgres psql -c "CREATE USER vscode WITH SUPERUSER PASSWORD 'postgres';" 2>/dev/null || echo "User vscode already exists"
-sudo -u postgres psql -c "CREATE DATABASE crm_db OWNER vscode;" 2>/dev/null || echo "Database crm_db already exists"
+# Create database if not exists
+echo "🗄️  Setting up database..."
+psql -h localhost -U vscode -d postgres -c "CREATE DATABASE crm_db;" 2>/dev/null || echo "Database crm_db already exists"
 
 # Setup Backend
 echo "📦 Setting up backend..."
