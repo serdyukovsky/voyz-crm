@@ -3,10 +3,13 @@
   "image": "node:20-bookworm",
   
   "features": {
-    "ghcr.io/devcontainers/features/sshd:1": {}
+    "ghcr.io/devcontainers/features/sshd:1": {},
+    "ghcr.io/devcontainers/features/postgres:1": {
+      "version": "15"
+    }
   },
   
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postCreateCommand": "createdb crm_db 2>/dev/null || true && cd crm-backend && npm install && npx prisma generate && npx prisma migrate deploy",
 
   "customizations": {
     "vscode": {
