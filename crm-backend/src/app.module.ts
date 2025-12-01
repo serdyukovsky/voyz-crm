@@ -28,6 +28,8 @@ import { RbacGuard } from './common/guards/rbac.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env'],
+      expandVariables: true,
     }),
     CommonModule,
     AuthModule,

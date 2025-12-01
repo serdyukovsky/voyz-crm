@@ -1,60 +1,19 @@
 {
-  "name": "CRM Backend Development",
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20"
-    },
-    "ghcr.io/devcontainers/features/git:1": {}
+  "name": "CRM Backend - Node.js + Prisma + PostgreSQL",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-18",
+  "remoteUser": "vscode",
+    "forwardPorts": [3001, 5432],
+  "containerEnv": {
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/crm_db"
   },
-
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
-
-  "postStartCommand": "sudo service postgresql start || true",
-
+  "postCreateCommand": "sudo apt update && sudo apt install -y postgresql postgresql-client && sudo service postgresql start && sudo -u postgres psql -c \"CREATE DATABASE crm_db;\" 2>/dev/null || true && sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'postgres';\" 2>/dev/null || true && cd crm-backend && npm install && npx prisma generate",
   "customizations": {
     "vscode": {
       "extensions": [
         "Prisma.prisma",
-        "ms-ossdata.vscode-postgresql",
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "ms-vscode.vscode-typescript-next",
-        "bradlc.vscode-tailwindcss",
-        "formulahendry.auto-rename-tag",
-        "christian-kohler.path-intellisense"
-      ],
-      "settings": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.fixAll.eslint": "explicit"
-        },
-        "typescript.tsdk": "node_modules/typescript/lib",
-        "typescript.enablePromptUseWorkspaceTsdk": true
-      }
+        "esbenp.prettier-vscode"
+      ]
     }
-  },
-
-  "remoteEnv": {
-    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/crm_db?schema=public",
-    "NODE_ENV": "development",
-    "PORT": "3001"
-  },
-
-  "forwardPorts": [3001, 5432],
-
-  "portsAttributes": {
-    "3001": {
-      "label": "Backend API",
-      "onAutoForward": "notify"
-    },
-    "5432": {
-      "label": "PostgreSQL",
-      "onAutoForward": "silent"
-    }
-  },
-
-  "remoteUser": "codespace"
+  }
 }

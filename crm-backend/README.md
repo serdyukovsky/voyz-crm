@@ -50,11 +50,11 @@ sudo service postgresql start
 # Create database user (if needed)
 sudo -u postgres createuser -s postgres
 
-# Set password for postgres user (optional, default is usually empty)
+# Set password for postgres user
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
 
-# Create database (if needed)
-sudo -u postgres createdb postgres
+# Create database for CRM
+sudo -u postgres createdb crm_db
 ```
 
 #### 3. Install Dependencies
@@ -111,19 +111,26 @@ sudo apt install -y postgresql postgresql-client
 # 2. Start PostgreSQL
 sudo service postgresql start
 
-# 3. Install dependencies
+# 3. Setup Database
+sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+sudo -u postgres createdb crm_db
+
+# 4. Install dependencies
 npm install
 
-# 4. Generate Prisma Client
+# 5. Setup Environment
+cp .env.example .env
+
+# 6. Generate Prisma Client
 npx prisma generate
 
-# 5. Run migrations
+# 7. Run migrations
 npx prisma migrate dev
 
-# 6. Create admin user
+# 8. Create admin user (optional)
 npm run create:admin
 
-# 7. Start development server
+# 9. Start development server
 npm run dev
 ```
 
@@ -131,10 +138,10 @@ npm run dev
 
 ```bash
 # Connect via psql
-psql -U postgres -d postgres
+psql -U postgres -d crm_db
 
 # Or with password
-PGPASSWORD=postgres psql -U postgres -d postgres
+PGPASSWORD=postgres psql -U postgres -d crm_db
 ```
 
 ### Running Migrations
@@ -237,12 +244,14 @@ Events:
 ## Environment Variables
 
 ```env
-# Database (for Codespaces / Local)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres?schema=public"
+# Database (for GitHub Codespaces / Local PostgreSQL)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/crm_db"
 
 # Application
-JWT_SECRET="your-super-secret-jwt-key-change-in-production"
-JWT_EXPIRATION="7d"
+JWT_ACCESS_SECRET="your-super-secret-jwt-access-key-change-in-production"
+JWT_REFRESH_SECRET="your-super-secret-jwt-refresh-key-change-in-production"
+ACCESS_TOKEN_EXPIRES_IN="15m"
+REFRESH_TOKEN_EXPIRES_IN="30d"
 NODE_ENV="development"
 PORT=3001
 FRONTEND_URL="http://localhost:5173"
@@ -257,6 +266,10 @@ SMTP_FROM=""
 # File upload
 MAX_FILE_SIZE=10485760
 UPLOAD_PATH="./uploads"
+
+# VK Integration (optional)
+VK_CONFIRMATION_CODE=""
+VK_SECRET_KEY=""
 ```
 
 ## Available Scripts
