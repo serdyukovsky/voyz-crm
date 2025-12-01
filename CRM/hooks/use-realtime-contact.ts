@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { getWsUrl } from '@/lib/config'
 
 interface UseRealtimeContactOptions {
   contactId: string
@@ -22,7 +23,8 @@ export function useRealtimeContact({
     const token = localStorage.getItem('access_token')
     if (!token) return
 
-    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3001/realtime', {
+    const wsUrl = getWsUrl()
+    const socket = io(wsUrl, {
       auth: { token },
       transports: ['websocket'],
     })

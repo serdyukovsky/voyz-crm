@@ -1,0 +1,60 @@
+# Patch: Fix WebSocket URLs - Remove localhost fallbacks
+
+## Problem
+WebSocket connections use hardcoded fallback to `http://localhost:3001/realtime` which breaks in Codespaces.
+
+## Solution
+Remove localhost fallbacks and use environment variables only.
+
+## Files to modify:
+- CRM/components/crm/deals-kanban-board.tsx
+- CRM/hooks/use-realtime-contact.ts
+- CRM/hooks/use-realtime-company.ts
+- CRM/hooks/use-realtime-deal.ts
+
+## Changes:
+
+### Pattern 1: Socket.IO connections (deals-kanban-board.tsx, use-realtime-contact.ts, use-realtime-company.ts)
+
+**Before:**
+```typescript
+const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3001/realtime', {
+  auth: { token },
+  transports: ['websocket', 'polling'],
+})
+```
+
+**After:**
+```typescript
+const wsUrl = import.meta.env.VITE_WS_URL
+if (!wsUrl) {
+  console.error('VITE_WS_URL environment variable is not set. WebSocket connections will not work.')
+  return
+}
+
+const socket = io(wsUrl, {
+  auth: { token },
+  transports: ['websocket', 'polling'],
+})
+```
+
+### Pattern 2: use-realtime-deal.ts - Remove commented localhost code
+
+**Before:**
+```typescript
+// TODO: Connect to WebSocket when backend is ready
+// const ws = new WebSocket(`ws://localhost:3000/deals/${dealId}/realtime`)
+```
+
+**After:**
+```typescript
+// TODO: Connect to WebSocket when backend is ready
+// Use Socket.IO instead of raw WebSocket for consistency
+// const wsUrl = import.meta.env.VITE_WS_URL
+// if (!wsUrl) {
+//   console.error('VITE_WS_URL environment variable is not set')
+//   return
+// }
+// const socket = io(wsUrl, { auth: { token }, path: `/deals/${dealId}/realtime` })
+```
+

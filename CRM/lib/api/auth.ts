@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export interface LoginDto {
   email: string
@@ -25,6 +25,7 @@ export async function login(credentials: LoginDto): Promise<LoginResponse> {
       email: credentials.email.toLowerCase().trim(),
     }
     
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
@@ -59,7 +60,8 @@ export async function login(credentials: LoginDto): Promise<LoginResponse> {
     return response.json()
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('Cannot connect to server. Please make sure the backend is running on http://localhost:3001')
+      const apiUrl = getApiBaseUrl()
+      throw new Error(`Cannot connect to server at ${apiUrl}. Please check your VITE_API_URL configuration and ensure the backend is running.`)
     }
     throw error
   }

@@ -13,7 +13,26 @@ import { JwtService } from '@nestjs/jwt';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Allow GitHub Codespaces origins (https://*.app.github.dev)
+      if (origin.match(/^https:\/\/.*\.app\.github\.dev$/)) {
+        return callback(null, true);
+      }
+
+      // Allow local development origins
+      if (origin.match(/^http:\/\/localhost:(5173|3000)$/)) {
+        return callback(null, true);
+      }
+
+      // Reject all other origins
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
   },
   namespace: '/realtime',
 })

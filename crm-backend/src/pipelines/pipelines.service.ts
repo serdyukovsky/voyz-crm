@@ -39,7 +39,27 @@ export class PipelinesService {
       console.log('Creating pipeline with data:', pipelineData);
 
       const pipeline = await this.prisma.pipeline.create({
-        data: pipelineData,
+        data: {
+          ...pipelineData,
+          stages: {
+            create: [
+              {
+                name: 'Выиграно',
+                order: 9998,
+                color: '#10B981', // green
+                isDefault: false,
+                isClosed: true,
+              },
+              {
+                name: 'Проиграно',
+                order: 9999,
+                color: '#EF4444', // red
+                isDefault: false,
+                isClosed: true,
+              },
+            ],
+          },
+        },
         include: { stages: { orderBy: { order: 'asc' } } },
       });
 

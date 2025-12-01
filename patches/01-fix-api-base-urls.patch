@@ -1,0 +1,70 @@
+# Patch: Fix API Base URLs - Remove localhost fallbacks for Codespaces
+
+## Problem
+All API files use hardcoded fallback to `http://localhost:3001/api` which breaks in Codespaces environment.
+
+## Solution
+Remove localhost fallbacks and use environment variables only. Add better error messages.
+
+## Files to modify:
+- CRM/lib/api/deals.ts
+- CRM/lib/api/pipelines.ts
+- CRM/lib/api/tasks.ts
+- CRM/lib/api/stats.ts
+- CRM/lib/api/users.ts
+- CRM/lib/api/activities.ts
+- CRM/lib/api/emails.ts
+- CRM/lib/api/auth.ts
+- CRM/lib/api/contacts.ts
+- CRM/lib/api/companies.ts
+- CRM/hooks/use-deal.ts
+
+## Changes:
+
+### Pattern 1: API files (deals.ts, pipelines.ts, tasks.ts, stats.ts, users.ts, activities.ts, emails.ts, contacts.ts, companies.ts)
+
+**Before:**
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+```
+
+**After:**
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_URL
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_URL environment variable is not set. Please configure it in .env.local')
+}
+```
+
+### Pattern 2: auth.ts - Fix error message
+
+**Before:**
+```typescript
+if (error instanceof TypeError && error.message === 'Failed to fetch') {
+  throw new Error('Cannot connect to server. Please make sure the backend is running on http://localhost:3001')
+}
+```
+
+**After:**
+```typescript
+if (error instanceof TypeError && error.message === 'Failed to fetch') {
+  const apiUrl = import.meta.env.VITE_API_URL || 'backend server'
+  throw new Error(`Cannot connect to server at ${apiUrl}. Please check your VITE_API_URL configuration and ensure the backend is running.`)
+}
+```
+
+### Pattern 3: use-deal.ts - Fix hardcoded URLs
+
+**Before:**
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+```
+
+**After:**
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_URL
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_URL environment variable is not set. Please configure it in .env.local')
+}
+```
+

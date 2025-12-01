@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
+import { CorsPreflightInterceptor } from './common/interceptors/cors-preflight.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ContactsModule } from './contacts/contacts.module';
@@ -23,6 +24,7 @@ import { EmailsModule } from './emails/emails.module';
 import { StatsModule } from './stats/stats.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
+import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
 
 @Module({
   imports: [
@@ -53,6 +55,14 @@ import { RbacGuard } from './common/guards/rbac.guard';
     StatsModule,
   ],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CorsPreflightInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CorsPreflightGuard, // Must be first to handle OPTIONS
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

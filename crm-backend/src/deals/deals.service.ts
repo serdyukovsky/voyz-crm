@@ -13,30 +13,64 @@ export class DealsService {
   ) {}
 
   async create(data: any, userId: string) {
-    // Ensure required fields have defaults
-    const dealData = {
-      title: data.title || 'New Deal',
-      amount: data.amount !== undefined && data.amount !== null ? Number(data.amount) : 0,
-      pipelineId: data.pipelineId,
-      stageId: data.stageId,
-      createdById: userId,
-      assignedToId: data.assignedToId || null,
-      contactId: data.contactId || null,
-      companyId: data.companyId || null,
-      description: data.description || null,
-      expectedCloseAt: data.expectedCloseAt || null,
-    };
+    try {
+      console.log('DealsService.create called with:', { data, userId });
+      
+      // Ensure required fields have defaults
+      const dealData = {
+        title: data.title || 'New Deal',
+        amount: data.amount !== undefined && data.amount !== null ? Number(data.amount) : 0,
+        pipelineId: data.pipelineId,
+        stageId: data.stageId,
+        createdById: userId,
+        assignedToId: data.assignedToId || null,
+        contactId: data.contactId || null,
+        companyId: data.companyId || null,
+        description: data.description || null,
+        expectedCloseAt: data.expectedCloseAt || null,
+      };
 
-    // Validate required fields
-    if (!dealData.pipelineId) {
-      throw new Error('pipelineId is required');
-    }
-    if (!dealData.stageId) {
-      throw new Error('stageId is required');
-    }
+      console.log('DealsService.create - dealData:', dealData);
 
-    const deal = await this.prisma.deal.create({
-      data: dealData,
+      // Validate required fields
+      if (!dealData.pipelineId) {
+        console.error('DealsService.create - pipelineId is missing');
+        throw new Error('pipelineId is required');
+      }
+      if (!dealData.stageId) {
+        console.error('DealsService.create - stageId is missing');
+        throw new Error('stageId is required');
+      }
+
+      // Verify that stage exists and belongs to pipeline
+      const stage = await this.prisma.stage.findUnique({
+        where: { id: dealData.stageId },
+        include: { pipeline: true },
+      });
+
+      if (!stage) {
+        console.error('DealsService.create - stage not found:', dealData.stageId);
+        throw new Error(`Stage with id ${dealData.stageId} not found`);
+      }
+
+      if (stage.pipelineId !== dealData.pipelineId) {
+        console.error('DealsService.create - stage does not belong to pipeline:', {
+          stagePipelineId: stage.pipelineId,
+          dealPipelineId: dealData.pipelineId,
+        });
+        throw new Error(`Stage does not belong to the specified pipeline`);
+      }
+
+      // Generate unique deal number
+      const dealNumber = await this.generateDealNumber();
+
+      console.log('DealsService.create - generated deal number:', dealNumber);
+      console.log('DealsService.create - creating deal in database...');
+      const deal = await this.prisma.deal.create({
+      data: {
+        ...dealData,
+        number: dealNumber,
+      },
       include: {
         stage: true,
         pipeline: true,
@@ -51,25 +85,114 @@ export class DealsService {
       },
     });
 
-    // Create activity
-    await this.activityService.create({
-      type: ActivityType.DEAL_CREATED,
-      userId,
-      dealId: deal.id,
-      contactId: deal.contactId || undefined,
-      payload: {
-        dealTitle: deal.title,
-      },
-    });
+    console.log('DealsService.create - deal created successfully:', deal.id);
 
-    // Emit WebSocket events
-    const formattedDeal = await this.formatDealResponse(deal);
-    this.websocketGateway.emitDealUpdated(deal.id, formattedDeal);
-    if (deal.contactId) {
-      this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, formattedDeal);
+    // Create activity
+    try {
+      await this.activityService.create({
+        type: ActivityType.DEAL_CREATED,
+        userId,
+        dealId: deal.id,
+        contactId: deal.contactId || undefined,
+        payload: {
+          dealTitle: deal.title,
+        },
+      });
+      console.log('DealsService.create - activity created');
+    } catch (activityError) {
+      console.error('DealsService.create - failed to create activity:', activityError);
+      // Don't fail the deal creation if activity creation fails
     }
 
-    return formattedDeal;
+    // Format and return deal response
+    try {
+      const formattedDeal = await this.formatDealResponse(deal);
+      
+      // Emit WebSocket events (don't fail if this fails)
+      try {
+        this.websocketGateway.emitDealUpdated(deal.id, formattedDeal);
+        if (deal.contactId) {
+          this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, formattedDeal);
+        }
+        console.log('DealsService.create - WebSocket events emitted');
+      } catch (wsError) {
+        console.error('DealsService.create - failed to emit WebSocket events:', wsError);
+        // Don't fail the request if WebSocket fails
+      }
+      
+      console.log('DealsService.create - returning formatted deal');
+      return formattedDeal;
+    } catch (formatError) {
+      console.error('DealsService.create - failed to format deal:', formatError);
+      console.error('DealsService.create - format error stack:', formatError instanceof Error ? formatError.stack : 'No stack');
+      
+      // Return basic deal structure even if formatting fails
+      // Deal is already created, so we return success with basic data
+      const basicDeal = {
+        id: deal.id,
+        number: deal.number,
+        title: deal.title || 'Untitled Deal',
+        amount: deal.amount ? Number(deal.amount) : 0,
+        pipelineId: deal.pipelineId,
+        stageId: deal.stageId,
+        createdById: deal.createdById,
+        assignedToId: deal.assignedToId,
+        contactId: deal.contactId,
+        companyId: deal.companyId,
+        description: deal.description,
+        expectedCloseAt: deal.expectedCloseAt,
+        closedAt: deal.closedAt,
+        tags: deal.tags || [],
+        createdAt: deal.createdAt,
+        updatedAt: deal.updatedAt,
+        stage: deal.stage ? {
+          id: deal.stage.id,
+          name: deal.stage.name || 'Unknown Stage',
+          color: deal.stage.color || '#6B7280',
+          order: deal.stage.order || 0,
+          isClosed: deal.stage.isClosed || false,
+        } : null,
+        pipeline: deal.pipeline ? {
+          id: deal.pipeline.id,
+          name: deal.pipeline.name || 'Unknown Pipeline',
+        } : null,
+        contact: deal.contact ? {
+          id: deal.contact.id,
+          fullName: deal.contact.fullName || 'Unknown Contact',
+          email: deal.contact.email || null,
+          phone: deal.contact.phone || null,
+        } : null,
+        company: deal.company ? {
+          id: deal.company.id,
+          name: deal.company.name || 'Unknown Company',
+        } : null,
+        assignedTo: deal.assignedTo ? {
+          id: deal.assignedTo.id,
+          name: deal.assignedTo.name || deal.assignedTo.fullName || 'Unknown User',
+        } : null,
+        createdBy: deal.createdBy ? {
+          id: deal.createdBy.id,
+          name: deal.createdBy.name || deal.createdBy.fullName || 'Unknown User',
+        } : null,
+      };
+      
+      // Try to emit WebSocket with basic data
+      try {
+        this.websocketGateway.emitDealUpdated(deal.id, basicDeal);
+        if (deal.contactId) {
+          this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, basicDeal);
+        }
+      } catch (wsError) {
+        // Ignore WebSocket errors
+      }
+      
+      return basicDeal;
+    }
+    } catch (error) {
+      console.error('DealsService.create - error:', error);
+      console.error('DealsService.create - error stack:', error instanceof Error ? error.stack : 'No stack');
+      throw error;
+    }
   }
 
   async findAll(filters?: {
@@ -125,7 +248,13 @@ export class DealsService {
       where: { id },
       include: {
         stage: true,
-        pipeline: true,
+        pipeline: {
+          include: {
+            stages: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
         createdBy: true,
         assignedTo: true,
         contact: {
@@ -154,61 +283,99 @@ export class DealsService {
   }
 
   private async formatDealResponse(deal: any) {
-    const result: any = { 
-      ...deal,
-      // Ensure amount is always a number, default to 0 if null/undefined
-      amount: deal.amount ? Number(deal.amount) : 0,
-      // Ensure title is never null/undefined
-      title: deal.title || 'Untitled Deal',
-      // Ensure stageId exists
-      stageId: deal.stageId || deal.stage?.id || '',
-    };
-
-    // Add contact with stats if contact exists
-    if (deal.contact) {
-      const contactStats = await this.getContactStats(deal.contact.id);
-      result.contact = {
-        id: deal.contact.id,
-        fullName: deal.contact.fullName || 'Unknown Contact',
-        email: deal.contact.email || null,
-        phone: deal.contact.phone || null,
-        position: deal.contact.position || null,
-        companyName: deal.contact.companyName || null,
-        company: deal.contact.company || null,
-        social: (deal.contact.social && typeof deal.contact.social === 'object') 
-          ? deal.contact.social 
-          : ({} as {
-            instagram?: string;
-            telegram?: string;
-            whatsapp?: string;
-            vk?: string;
-          }),
-        stats: contactStats,
+    try {
+      const result: any = { 
+        ...deal,
+        // Ensure amount is always a number, default to 0 if null/undefined
+        amount: deal.amount ? Number(deal.amount) : 0,
+        // Ensure title is never null/undefined
+        title: deal.title || 'Untitled Deal',
+        // Ensure stageId exists
+        stageId: deal.stageId || deal.stage?.id || '',
       };
-    } else {
-      result.contact = null;
-    }
 
-    // Add company with stats if company exists
-    if (deal.company) {
-      const companyStats = await this.getCompanyStats(deal.company.id);
-      result.company = {
-        id: deal.company.id,
-        name: deal.company.name || 'Unknown Company',
-        industry: deal.company.industry || null,
-        website: deal.company.website || null,
-        email: deal.company.email || null,
-        phone: deal.company.phone || null,
-        social: (deal.company.social && typeof deal.company.social === 'object') 
-          ? deal.company.social 
-          : {},
-        address: deal.company.address || null,
-        notes: deal.company.notes || null,
-        stats: companyStats,
-      };
-    } else {
-      result.company = null;
-    }
+      // Add contact with stats if contact exists
+      if (deal.contact) {
+        try {
+          const contactStats = await this.getContactStats(deal.contact.id);
+          result.contact = {
+            id: deal.contact.id,
+            fullName: deal.contact.fullName || 'Unknown Contact',
+            email: deal.contact.email || null,
+            phone: deal.contact.phone || null,
+            position: deal.contact.position || null,
+            companyName: deal.contact.companyName || null,
+            company: deal.contact.company || null,
+            social: (deal.contact.social && typeof deal.contact.social === 'object') 
+              ? deal.contact.social 
+              : ({} as {
+                instagram?: string;
+                telegram?: string;
+                whatsapp?: string;
+                vk?: string;
+              }),
+            stats: contactStats,
+          };
+        } catch (contactError) {
+          console.error('formatDealResponse - failed to get contact stats:', contactError);
+          // Return contact without stats if stats fail
+          result.contact = {
+            id: deal.contact.id,
+            fullName: deal.contact.fullName || 'Unknown Contact',
+            email: deal.contact.email || null,
+            phone: deal.contact.phone || null,
+            position: deal.contact.position || null,
+            companyName: deal.contact.companyName || null,
+            company: deal.contact.company || null,
+            social: (deal.contact.social && typeof deal.contact.social === 'object') 
+              ? deal.contact.social 
+              : {},
+            stats: { dealsCount: 0, totalAmount: 0, closedDealsCount: 0, closedAmount: 0 },
+          };
+        }
+      } else {
+        result.contact = null;
+      }
+
+      // Add company with stats if company exists
+      if (deal.company) {
+        try {
+          const companyStats = await this.getCompanyStats(deal.company.id);
+          result.company = {
+            id: deal.company.id,
+            name: deal.company.name || 'Unknown Company',
+            industry: deal.company.industry || null,
+            website: deal.company.website || null,
+            email: deal.company.email || null,
+            phone: deal.company.phone || null,
+            social: (deal.company.social && typeof deal.company.social === 'object') 
+              ? deal.company.social 
+              : {},
+            address: deal.company.address || null,
+            notes: deal.company.notes || null,
+            stats: companyStats,
+          };
+        } catch (companyError) {
+          console.error('formatDealResponse - failed to get company stats:', companyError);
+          // Return company without stats if stats fail
+          result.company = {
+            id: deal.company.id,
+            name: deal.company.name || 'Unknown Company',
+            industry: deal.company.industry || null,
+            website: deal.company.website || null,
+            email: deal.company.email || null,
+            phone: deal.company.phone || null,
+            social: (deal.company.social && typeof deal.company.social === 'object') 
+              ? deal.company.social 
+              : {},
+            address: deal.company.address || null,
+            notes: deal.company.notes || null,
+            stats: { dealsCount: 0, totalAmount: 0, closedDealsCount: 0, closedAmount: 0 },
+          };
+        }
+      } else {
+        result.company = null;
+      }
 
     // Ensure assignedTo has proper structure
     if (result.assignedTo) {
@@ -221,18 +388,72 @@ export class DealsService {
       result.assignedTo = null;
     }
 
-    // Ensure stage exists
-    if (result.stage) {
-      result.stage = {
-        id: result.stage.id,
-        name: result.stage.name || 'Unknown Stage',
-        color: result.stage.color || '#6B7280',
-        order: result.stage.order || 0,
-        isClosed: result.stage.isClosed || false,
+      // Ensure stage exists
+      if (result.stage) {
+        result.stage = {
+          id: result.stage.id,
+          name: result.stage.name || 'Unknown Stage',
+          color: result.stage.color || '#6B7280',
+          order: result.stage.order || 0,
+          isClosed: result.stage.isClosed || false,
+        };
+      }
+
+      // Ensure pipeline includes stages
+      if (result.pipeline) {
+        result.pipeline = {
+          id: result.pipeline.id,
+          name: result.pipeline.name || 'Unknown Pipeline',
+          description: result.pipeline.description || null,
+          isDefault: result.pipeline.isDefault || false,
+          isActive: result.pipeline.isActive !== undefined ? result.pipeline.isActive : true,
+          order: result.pipeline.order || 0,
+          stages: result.pipeline.stages ? result.pipeline.stages.map((stage: any) => ({
+            id: stage.id,
+            name: stage.name || 'Unknown Stage',
+            order: stage.order || 0,
+            color: stage.color || '#6B7280',
+            isDefault: stage.isDefault || false,
+            isClosed: stage.isClosed || false,
+            createdAt: stage.createdAt || null,
+            updatedAt: stage.updatedAt || null,
+          })) : [],
+          createdAt: result.pipeline.createdAt || null,
+          updatedAt: result.pipeline.updatedAt || null,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('formatDealResponse - error:', error);
+      console.error('formatDealResponse - error stack:', error instanceof Error ? error.stack : 'No stack');
+      // Return basic deal structure even if formatting fails
+      return {
+        ...deal,
+        amount: deal.amount ? Number(deal.amount) : 0,
+        title: deal.title || 'Untitled Deal',
+        stageId: deal.stageId || deal.stage?.id || '',
+        contact: deal.contact ? {
+          id: deal.contact.id,
+          fullName: deal.contact.fullName || 'Unknown Contact',
+          email: deal.contact.email || null,
+          phone: deal.contact.phone || null,
+        } : null,
+        company: deal.company ? {
+          id: deal.company.id,
+          name: deal.company.name || 'Unknown Company',
+        } : null,
+        assignedTo: deal.assignedTo ? {
+          id: deal.assignedTo.id,
+          name: deal.assignedTo.name || deal.assignedTo.fullName || 'Unknown User',
+        } : null,
+        stage: deal.stage ? {
+          id: deal.stage.id,
+          name: deal.stage.name || 'Unknown Stage',
+          color: deal.stage.color || '#6B7280',
+        } : null,
       };
     }
-
-    return result;
   }
 
   private async getCompanyStats(companyId: string) {
@@ -318,13 +539,31 @@ export class DealsService {
 
     // Log activities for changes
     if (changes.stage) {
+      // Get stage names for better activity display
+      // Use the raw stageId from changes, not from formatted deal
+      const oldStageId = changes.stage.old;
+      const newStageId = changes.stage.new;
+      
+      const [oldStage, newStage] = await Promise.all([
+        oldStageId ? this.prisma.stage.findUnique({
+          where: { id: oldStageId },
+          select: { name: true },
+        }) : null,
+        newStageId ? this.prisma.stage.findUnique({
+          where: { id: newStageId },
+          select: { name: true },
+        }) : null,
+      ]);
+
       await this.activityService.create({
         type: ActivityType.STAGE_CHANGED,
         userId,
         dealId: deal.id,
         payload: {
-          fromStage: changes.stage.old,
-          toStage: changes.stage.new,
+          fromStage: oldStage?.name || oldStageId,
+          toStage: newStage?.name || newStageId,
+          fromStageId: oldStageId,
+          toStageId: newStageId,
         },
       });
 
@@ -382,6 +621,23 @@ export class DealsService {
       if (changes.company.old) {
         this.websocketGateway.emitCompanyDealUpdated(changes.company.old, deal.id, deal);
       }
+    }
+
+    // Log DEAL_UPDATED for general updates
+    const hasSignificantChanges = changes.stage || changes.contact || changes.company || changes.assignee || 
+      (data.amount !== undefined && oldDeal.amount !== data.amount) ||
+      (data.title !== undefined && oldDeal.title !== data.title);
+    
+    if (hasSignificantChanges) {
+      await this.activityService.create({
+        type: ActivityType.DEAL_UPDATED,
+        userId,
+        dealId: deal.id,
+        payload: {
+          changes: Object.keys(changes),
+          dealTitle: deal.title,
+        },
+      });
     }
 
     // Log CONTACT_UPDATED_IN_DEAL if contact info changed in deal context
@@ -529,6 +785,50 @@ export class DealsService {
     return this.prisma.deal.delete({
       where: { id },
     });
+  }
+
+  /**
+   * Generate a unique deal number
+   * Format: DEAL-YYYYMMDD-XXXXX (e.g., DEAL-20241201-00001)
+   */
+  private async generateDealNumber(): Promise<string> {
+    const date = new Date();
+    const datePrefix = `DEAL-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    
+    // Find the highest number for today
+    const todayDeals = await this.prisma.deal.findMany({
+      where: {
+        number: {
+          startsWith: datePrefix,
+        },
+      },
+      orderBy: {
+        number: 'desc',
+      },
+      take: 1,
+    });
+
+    let sequence = 1;
+    if (todayDeals.length > 0) {
+      // Extract sequence number from last deal number
+      const lastNumber = todayDeals[0].number;
+      const lastSequence = parseInt(lastNumber.split('-')[2] || '0', 10);
+      sequence = lastSequence + 1;
+    }
+
+    const dealNumber = `${datePrefix}-${String(sequence).padStart(5, '0')}`;
+    
+    // Double-check uniqueness (race condition protection)
+    const existing = await this.prisma.deal.findUnique({
+      where: { number: dealNumber },
+    });
+
+    if (existing) {
+      // If exists, try with timestamp + random
+      return `${datePrefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
+
+    return dealNumber;
   }
 }
 

@@ -1,0 +1,42 @@
+[
+  {
+    "endpoint": "/health",
+    "method": "GET",
+    "description": "Health check endpoint",
+    "status_code": 200,
+    "response_snippet": "{\"status\":\"ok\",\"timestamp\":\"2025-12-01T10:33:22.258Z\"}",
+    "elapsed_ms": 6
+  },
+  {
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "description": "Login endpoint",
+    "status_code": 200,
+    "response_snippet": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwic3ViIjoiNzU2N2E5YjgtMWVkNy00ZWZhLWI5ZjYtMzFkMzMxY2UxOTU3Iiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzY0NTg1MjAyLCJleH",
+    "elapsed_ms": 129
+  },
+  {
+    "endpoint": "/deals",
+    "method": "GET",
+    "description": "Get deals list",
+    "status_code": 200,
+    "response_snippet": "[{\"id\":\"79c46cb6-258c-4361-a818-61977dfa0b9c\",\"number\":\"DEAL-20251201-00003\",\"title\":\"test 3\",\"amount\":0,\"budget\":null,\"pipelineId\":\"dd94d142-f70e-4b82-ae89-ea1e64a0e735\",\"stageId\":\"87b9cc9d-0bbb-4043",
+    "elapsed_ms": 13
+  },
+  {
+    "endpoint": "/pipelines",
+    "method": "GET",
+    "description": "Get pipelines list",
+    "status_code": 200,
+    "response_snippet": "[{\"id\":\"dd94d142-f70e-4b82-ae89-ea1e64a0e735\",\"name\":\"test\",\"description\":null,\"isDefault\":false,\"isActive\":true,\"order\":0,\"createdAt\":\"2025-12-01T09:06:09.513Z\",\"updatedAt\":\"2025-12-01T09:06:09.513Z\"",
+    "elapsed_ms": 13
+  },
+  {
+    "endpoint": "/contacts",
+    "method": "GET",
+    "description": "Get contacts list",
+    "status_code": 200,
+    "response_snippet": "[]",
+    "elapsed_ms": 16
+  }
+]

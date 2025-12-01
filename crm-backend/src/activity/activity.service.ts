@@ -21,27 +21,138 @@ export class ActivityService {
   }
 
   async findByDeal(dealId: string) {
-    return this.prisma.activity.findMany({
+    const activities = await this.prisma.activity.findMany({
       where: { dealId },
-      include: { user: true },
-      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+        task: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
     });
+
+    // Transform activities to include computed 'name' field for user
+    return activities.map(activity => ({
+      ...activity,
+      user: {
+        ...activity.user,
+        name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
+      },
+    }));
   }
 
   async findByTask(taskId: string) {
-    return this.prisma.activity.findMany({
+    const activities = await this.prisma.activity.findMany({
       where: { taskId },
-      include: { user: true },
-      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+        task: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
     });
+
+    // Transform activities to include computed 'name' field for user
+    return activities.map(activity => ({
+      ...activity,
+      user: {
+        ...activity.user,
+        name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
+      },
+    }));
   }
 
   async findByContact(contactId: string) {
-    return this.prisma.activity.findMany({
+    const activities = await this.prisma.activity.findMany({
       where: { contactId },
-      include: { user: true },
-      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+        task: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
     });
+
+    // Transform activities to include computed 'name' field for user
+    return activities.map(activity => ({
+      ...activity,
+      user: {
+        ...activity.user,
+        name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
+      },
+    }));
   }
 
   async findAll(filters: {
@@ -92,13 +203,14 @@ export class ActivityService {
       }
     }
 
-    return this.prisma.activity.findMany({
+    const activities = await this.prisma.activity.findMany({
       where,
       include: {
         user: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             avatar: true,
           },
@@ -122,8 +234,17 @@ export class ActivityService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     });
+
+    // Transform activities to include computed 'name' field for user
+    return activities.map(activity => ({
+      ...activity,
+      user: {
+        ...activity.user,
+        name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
+      },
+    }));
   }
 }
 

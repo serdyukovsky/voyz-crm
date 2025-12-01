@@ -16,6 +16,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { 
   DollarSign, 
   GripVertical, 
@@ -34,15 +43,18 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
-import { getPipelines, type Pipeline, type Stage } from "@/lib/api/pipelines"
+import { getPipelines, createStage, type Pipeline, type Stage, type CreateStageDto } from "@/lib/api/pipelines"
 import { getCompanies, type Company } from "@/lib/api/companies"
 import { getContacts, type Contact } from "@/lib/api/contacts"
 import { CompanyBadge } from "@/components/shared/company-badge"
+import { DealDetail } from './deal-detail'
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { cn } from "@/lib/utils"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
+import { getWsUrl } from '@/lib/config'
 import { CreateDealModal } from './create-deal-modal'
+import { AddStageModal } from './add-stage-modal'
 
 interface DealCardData {
   id: string
@@ -159,14 +171,34 @@ function DealCard({
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
+    console.log('handleCardClick called', { 
+      isDragging, 
+      target: (e.target as HTMLElement).tagName,
+      closestNoNavigate: !!(e.target as HTMLElement).closest('[data-no-navigate]'),
+      dealId: deal.id
+    })
+    
     // Don't navigate if clicking on dropdown, badges, or during drag
-    if (isDragging || (e.target as HTMLElement).closest('[data-no-navigate]')) {
+    if (isDragging) {
+      console.log('Navigation prevented: isDragging')
       e.preventDefault()
       e.stopPropagation()
       return
     }
-    // Navigate to deal detail page
-    navigate(`/deals/${deal.id}`)
+    
+    const noNavigateElement = (e.target as HTMLElement).closest('[data-no-navigate]')
+    if (noNavigateElement) {
+      console.log('Navigation prevented: clicked on no-navigate element', noNavigateElement)
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    
+    // Open deal in modal instead of navigating
+    console.log('Opening deal in modal:', deal.id)
+    e.preventDefault()
+    e.stopPropagation()
+    onOpenInSidebar(deal.id)
   }
 
   return (
@@ -299,8 +331,18 @@ interface KanbanColumnProps {
   onReassignContact: (dealId: string) => void
   onOpenInSidebar: (dealId: string) => void
   onAddDeal?: (stageId: string) => void
+  onAddStage?: (afterStageId: string) => void
   availableContacts: Contact[]
   pipelineId: string
+}
+
+// Helper function to check if stage is "Won" or "Lost"
+function isWonOrLostStage(stageName: string): boolean {
+  const name = stageName.toLowerCase().trim()
+  return name === 'выиграно' || name === 'проиграно' || 
+         name === 'won' || name === 'lost' ||
+         name === 'closed-won' || name === 'closed-lost' ||
+         name === 'closed won' || name === 'closed lost'
 }
 
 function KanbanColumn({ 
@@ -315,6 +357,7 @@ function KanbanColumn({
   onReassignContact,
   onOpenInSidebar,
   onAddDeal,
+  onAddStage,
   availableContacts,
   pipelineId
 }: KanbanColumnProps) {
@@ -334,9 +377,20 @@ function KanbanColumn({
     }
   }
 
-  const handleAddDeal = () => {
-    if (onAddDeal) {
+  const handleAddDeal = (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    console.log('handleAddDeal called for stage:', stage.id, 'onAddDeal:', !!onAddDeal, 'onAddDeal type:', typeof onAddDeal)
+    if (!onAddDeal) {
+      console.error('onAddDeal callback is not provided! This should not happen.')
+      return
+    }
+    console.log('Calling onAddDeal with stage.id:', stage.id)
+    try {
       onAddDeal(stage.id)
+      console.log('onAddDeal called successfully')
+    } catch (error) {
+      console.error('Error calling onAddDeal:', error)
     }
   }
 
@@ -351,10 +405,25 @@ function KanbanColumn({
           className="w-3 h-3 rounded-full"
           style={{ backgroundColor: stage.color }}
         />
-        <CardTitle className="text-sm font-semibold">{stage.name}</CardTitle>
+        <CardTitle className="text-sm font-semibold flex-1">{stage.name}</CardTitle>
         <Badge variant="secondary" className="text-xs">
           {deals.length}
         </Badge>
+        {onAddStage && !isWonOrLostStage(stage.name) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 hover:bg-muted transition-colors"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onAddStage(stage.id)
+            }}
+            title="Добавить стадию после этой"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
 
       <Card
@@ -366,10 +435,15 @@ function KanbanColumn({
         onDrop={handleDrop}
       >
         <CardContent className="p-3">
-          {onAddDeal && !stage.isClosed && (
+          {!stage.isClosed && (
             <button
               className="w-full flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground transition-colors font-normal cursor-pointer"
-              onClick={handleAddDeal}
+              onClick={(e) => {
+                console.log('Button clicked! Stage:', stage.id, 'onAddDeal exists:', !!onAddDeal)
+                handleAddDeal(e)
+              }}
+              type="button"
+              data-testid="add-deal-button"
             >
               <Plus className="h-4 w-4" />
               {t('deals.addDeal') || 'Добавить сделку'}
@@ -421,6 +495,23 @@ export function DealsKanbanBoard({
   const [draggedDeal, setDraggedDeal] = useState<DealCardData | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
+  const [isAddStageModalOpen, setIsAddStageModalOpen] = useState(false)
+  const [afterStageId, setAfterStageId] = useState<string | null>(null)
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const scrollPositionRef = useRef<number>(0)
+  
+  // Debug: отслеживаем изменения состояния модального окна
+  useEffect(() => {
+    console.log('Modal state changed:', { isCreateModalOpen, selectedStageId, hasPipeline: !!selectedPipeline })
+  }, [isCreateModalOpen, selectedStageId, selectedPipeline])
+  
+  // Синхронизация: если selectedStageId установлен, но модальное окно закрыто - открываем его
+  useEffect(() => {
+    if (selectedStageId && !isCreateModalOpen && selectedPipeline) {
+      console.log('Auto-opening modal because selectedStageId is set but modal is closed')
+      setIsCreateModalOpen(true)
+    }
+  }, [selectedStageId, isCreateModalOpen, selectedPipeline])
   
   // Use external state if provided, otherwise use internal state
   const [internalFilters, setInternalFilters] = useState<FilterState>({})
@@ -434,13 +525,30 @@ export function DealsKanbanBoard({
   const setSort = externalOnSortChange ?? setInternalSort
   const setShowFilters = externalShowFilters !== undefined ? () => {} : setInternalShowFilters
   
+  // Internal handler for opening create deal modal
+  const handleOpenCreateModal = (stageId: string) => {
+    console.log('handleOpenCreateModal called with stageId:', stageId)
+    console.log('Current state - selectedStageId:', selectedStageId, 'isCreateModalOpen:', isCreateModalOpen)
+    setSelectedStageId(stageId)
+    setIsCreateModalOpen(true)
+    console.log('State updated - selectedStageId set to:', stageId, 'isCreateModalOpen set to: true')
+  }
+  
+  // Always use internal handler to open modal
+  // External onAddDeal is not used here - we always open the modal internally
+  const handleAddDealClick = (stageId: string) => {
+    console.log('handleAddDealClick called with stageId:', stageId)
+    console.log('Opening create deal modal for stage:', stageId)
+    handleOpenCreateModal(stageId)
+  }
+  
   const socketRef = useRef<Socket | null>(null)
 
   const loadPipelines = async () => {
     try {
       console.log('Loading pipelines...')
       const data = await getPipelines()
-      console.log('Loaded pipelines:', data.length, data)
+      console.log('Loaded pipelines:', data.length, 'pipelines')
       setPipelines(data)
       
       if (data.length === 0) {
@@ -525,8 +633,14 @@ export function DealsKanbanBoard({
         assignedToId: filters.assignedUserId,
       })
       
-      console.log('Loaded deals data:', dealsData)
       console.log('Loaded deals count:', Array.isArray(dealsData) ? dealsData.length : 'Not an array!')
+      if (Array.isArray(dealsData) && dealsData.length > 0) {
+        console.log('First deal sample:', {
+          id: dealsData[0].id,
+          title: dealsData[0].title,
+          amount: dealsData[0].amount,
+        })
+      }
       
       // Always ensure we have an array - even if empty
       const safeDealsData = Array.isArray(dealsData) ? dealsData : []
@@ -603,6 +717,26 @@ export function DealsKanbanBoard({
     if (pipeline) {
       if (pipeline.id !== selectedPipeline?.id) {
         console.log('DealsKanbanBoard: Setting pipeline from prop:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
+        console.log('DealsKanbanBoard: Pipeline stages:', pipeline.stages)
+        // Log pipeline without circular references
+        try {
+          const pipelineLog = {
+            id: pipeline.id,
+            name: pipeline.name,
+            description: pipeline.description,
+            isDefault: pipeline.isDefault,
+            isActive: pipeline.isActive,
+            stages: pipeline.stages?.map(s => ({
+              id: s.id,
+              name: s.name,
+              order: s.order,
+              color: s.color,
+            })) || [],
+          }
+          console.log('DealsKanbanBoard: Full pipeline object:', JSON.stringify(pipelineLog, null, 2))
+        } catch (e) {
+          console.log('DealsKanbanBoard: Pipeline (could not stringify):', pipeline.id, pipeline.name)
+        }
         setSelectedPipeline(pipeline)
       }
     } else {
@@ -623,7 +757,8 @@ export function DealsKanbanBoard({
     } else {
       console.log('No pipeline selected, not loading deals')
     }
-  }, [selectedPipeline, filters.companyId, filters.contactId, filters.assignedUserId, loadDeals])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPipeline?.id, filters.companyId, filters.contactId, filters.assignedUserId])
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -632,7 +767,8 @@ export function DealsKanbanBoard({
     const token = localStorage.getItem('access_token')
     if (!token) return
 
-    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:3001/realtime', {
+    const wsUrl = getWsUrl()
+    const socket = io(wsUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
@@ -800,10 +936,106 @@ export function DealsKanbanBoard({
   }
 
   const handleOpenInSidebar = (dealId: string) => {
-    if (onDealClick) {
-      onDealClick(dealId)
-    } else {
-      window.open(`/deals/${dealId}`, '_blank')
+    // Save current scroll position before opening modal
+    const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
+    if (kanbanContainer) {
+      scrollPositionRef.current = kanbanContainer.scrollLeft
+      console.log('Saved scroll position:', scrollPositionRef.current)
+    }
+    setSelectedDealId(dealId)
+  }
+
+  const handleCloseDealModal = () => {
+    setSelectedDealId(null)
+    // Restore scroll position after modal closes
+    // Use requestAnimationFrame to ensure DOM is updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
+        if (kanbanContainer) {
+          kanbanContainer.scrollLeft = scrollPositionRef.current
+          console.log('Restored scroll position:', scrollPositionRef.current)
+        }
+      }, 50)
+    })
+  }
+
+  const handleAddStage = (afterStageId: string) => {
+    console.log('handleAddStage called for afterStageId:', afterStageId)
+    setAfterStageId(afterStageId)
+    setIsAddStageModalOpen(true)
+  }
+
+  const handleSaveNewStage = async (name: string, color: string) => {
+    if (!selectedPipeline || !afterStageId) return
+
+    try {
+      // Find the stage after which the new stage should be inserted
+      const stages = selectedPipeline.stages.sort((a, b) => a.order - b.order)
+      const afterStageIndex = stages.findIndex(s => s.id === afterStageId)
+      
+      if (afterStageIndex === -1) {
+        showError('Stage not found', 'The selected stage was not found')
+        return
+      }
+
+      const afterStage = stages[afterStageIndex]
+      const newOrder = afterStage.order + 1
+
+      // Find all stages that need to be shifted (order >= newOrder)
+      const stagesToUpdate = stages.filter(s => s.order >= newOrder).sort((a, b) => b.order - a.order)
+
+      console.log('Creating new stage with data:', { 
+        name, 
+        color, 
+        order: newOrder, 
+        pipelineId: selectedPipeline.id,
+        afterStageId,
+        afterStageOrder: afterStage.order,
+        stagesToUpdate: stagesToUpdate.map(s => ({ id: s.id, name: s.name, order: s.order }))
+      })
+
+      // Update stages in reverse order (from highest to lowest) to avoid conflicts
+      const { updateStage } = await import('@/lib/api/pipelines')
+      for (const stage of stagesToUpdate) {
+        try {
+          await updateStage(stage.id, { order: stage.order + 1 })
+          console.log(`Updated stage ${stage.name} order from ${stage.order} to ${stage.order + 1}`)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error(`Failed to update stage ${stage.id}:`, errorMessage)
+          
+          // If unauthorized, stop and redirect to login
+          if (errorMessage === 'UNAUTHORIZED') {
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login'
+            }
+            return
+          }
+          
+          // For other errors, continue with other stages
+        }
+      }
+
+      // Now create the new stage with the desired order
+      await createStage(selectedPipeline.id, { name, color, order: newOrder })
+      showSuccess('Stage created successfully')
+      setIsAddStageModalOpen(false)
+      setAfterStageId(null)
+      await loadPipelines() // Reload pipelines to get updated stages
+    } catch (error) {
+      console.error('Failed to create stage:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      
+      // If unauthorized, redirect to login
+      if (errorMessage === 'UNAUTHORIZED') {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return
+      }
+      
+      showError('Failed to create stage', errorMessage)
     }
   }
 
@@ -860,10 +1092,30 @@ export function DealsKanbanBoard({
     )
   }
 
-  const stages = selectedPipeline.stages.sort((a, b) => a.order - b.order)
+  // Ensure stages array exists and is sorted
+  const stages = (selectedPipeline.stages || []).sort((a, b) => a.order - b.order)
 
-  // Don't show empty state - always show columns even if empty
-  // Empty state is handled within each KanbanColumn component
+  // Show message if no stages
+  if (stages.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground mb-2">No stages in this pipeline</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          Please add stages to the pipeline in settings to view deals
+        </p>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.location.href = '/settings/pipelines'
+            }
+          }}
+        >
+          Go to Pipeline Settings
+        </Button>
+      </div>
+    )
+  }
 
   // Handle deal creation from modal
   const handleCreateDeal = async (dealData: {
@@ -897,7 +1149,8 @@ export function DealsKanbanBoard({
           })
           contactId = contact.id
         } catch (error) {
-          console.error('Failed to create contact:', error)
+          const errorMsg = error instanceof Error ? error.message : String(error)
+          console.error('Failed to create contact:', errorMsg)
           // Continue without contact
         }
       }
@@ -918,7 +1171,8 @@ export function DealsKanbanBoard({
             try {
               await updateContact(contactId, { companyId })
             } catch (error) {
-              console.error('Failed to update contact with company:', error)
+              const errorMsg = error instanceof Error ? error.message : String(error)
+              console.error('Failed to update contact with company:', errorMsg)
             }
           }
         } catch (error) {
@@ -929,6 +1183,15 @@ export function DealsKanbanBoard({
 
       // Create deal
       const { createDeal } = await import('@/lib/api/deals')
+      console.log('Creating deal with data:', {
+        title: dealData.title,
+        amount: dealData.amount,
+        pipelineId: selectedPipeline?.id,
+        stageId: dealData.stageId,
+        contactId: contactId || undefined,
+        companyId: companyId || undefined,
+      })
+      
       const newDeal = await createDeal({
         title: dealData.title,
         amount: dealData.amount,
@@ -938,16 +1201,69 @@ export function DealsKanbanBoard({
         companyId,
       })
 
-      showSuccess('Deal created successfully')
-      loadDeals() // Reload deals to show the new one
+      console.log('Deal created successfully:', newDeal?.id, newDeal?.title, newDeal?.amount)
       
-      // If onAddDeal callback is provided, call it (e.g., to navigate to deal detail)
-      if (onAddDeal) {
-        onAddDeal(newDeal.id)
+      // Save deal to sessionStorage for immediate access in detail page
+      if (typeof window !== 'undefined' && newDeal?.id) {
+        try {
+          // Create a clean object without circular references
+          const cleanDeal = {
+            id: newDeal.id,
+            number: newDeal.number,
+            title: newDeal.title,
+            amount: newDeal.amount,
+            pipelineId: newDeal.pipelineId,
+            stageId: newDeal.stageId,
+            contactId: newDeal.contactId,
+            companyId: newDeal.companyId,
+            assignedToId: newDeal.assignedToId,
+            createdById: newDeal.createdById,
+            description: newDeal.description,
+            expectedCloseAt: newDeal.expectedCloseAt,
+            tags: newDeal.tags || [],
+            createdAt: newDeal.createdAt,
+            updatedAt: newDeal.updatedAt,
+            stage: newDeal.stage ? {
+              id: newDeal.stage.id,
+              name: newDeal.stage.name,
+              color: newDeal.stage.color,
+              order: newDeal.stage.order,
+            } : null,
+            contact: newDeal.contact ? {
+              id: newDeal.contact.id,
+              fullName: newDeal.contact.fullName,
+              email: newDeal.contact.email,
+              phone: newDeal.contact.phone,
+            } : null,
+            company: newDeal.company ? {
+              id: newDeal.company.id,
+              name: newDeal.company.name,
+            } : null,
+          }
+          sessionStorage.setItem(`deal-${newDeal.id}`, JSON.stringify(cleanDeal))
+          sessionStorage.setItem(`deal-${newDeal.id}-isNew`, 'true')
+        } catch (e) {
+          console.error('Failed to save deal to sessionStorage:', e)
+        }
       }
+
+      showSuccess('Deal created successfully')
+      
+      // Close modal first
+      setIsCreateModalOpen(false)
+      setSelectedStageId(null)
+      
+      // Reload deals to show the new one
+      await loadDeals()
     } catch (error) {
-      console.error('Failed to create deal:', error)
-      showError('Failed to create deal', error instanceof Error ? error.message : 'Unknown error')
+      // Log error without circular references
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorStack = error instanceof Error ? error.stack : undefined
+      console.error('Failed to create deal:', errorMessage)
+      if (errorStack) {
+        console.error('Error stack:', errorStack)
+      }
+      showError('Failed to create deal', errorMessage)
     }
   }
 
@@ -961,7 +1277,11 @@ export function DealsKanbanBoard({
   return (
     <div className="flex flex-col h-full">
       {/* Kanban Board - Scrollable */}
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto" style={{ width: '100%' }}>
+      <div 
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-auto" 
+        style={{ width: '100%' }}
+        data-kanban-container
+      >
         <div className="flex gap-3 pb-4" style={{ minWidth: 'max-content' }}>
           {stages.map((stage) => {
           const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
@@ -980,10 +1300,8 @@ export function DealsKanbanBoard({
               onMarkAsLost={handleMarkAsLost}
               onReassignContact={handleReassignContact}
               onOpenInSidebar={handleOpenInSidebar}
-              onAddDeal={onAddDeal ? (stageId) => {
-                setSelectedStageId(stageId)
-                setIsCreateModalOpen(true)
-              } : undefined}
+              onAddDeal={handleAddDealClick}
+              onAddStage={handleAddStage}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
             />
@@ -997,6 +1315,7 @@ export function DealsKanbanBoard({
         <CreateDealModal
           isOpen={isCreateModalOpen}
           onClose={() => {
+            console.log('Closing modal, current state:', { isCreateModalOpen, selectedStageId })
             setIsCreateModalOpen(false)
             setSelectedStageId(null)
           }}
@@ -1006,6 +1325,56 @@ export function DealsKanbanBoard({
           dealsCount={selectedStageDealsCount}
           totalAmount={selectedStageTotalAmount}
         />
+      )}
+      
+      {/* Debug info - только в development */}
+      {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+        <div style={{ 
+          position: 'fixed', 
+          bottom: 10, 
+          right: 10, 
+          background: 'rgba(0,0,0,0.8)', 
+          color: 'white', 
+          padding: '8px', 
+          fontSize: '12px', 
+          zIndex: 9999, 
+          borderRadius: '4px',
+          fontFamily: 'monospace'
+        }}>
+          <div>Modal: {isCreateModalOpen ? 'OPEN' : 'CLOSED'}</div>
+          <div>Stage: {selectedStageId || 'NONE'}</div>
+          <div>Pipeline: {selectedPipeline?.id?.slice(0, 8) || 'NONE'}</div>
+        </div>
+      )}
+
+      {/* Add Stage Modal */}
+      {selectedPipeline && afterStageId && (
+        <AddStageModal
+          isOpen={isAddStageModalOpen}
+          onClose={() => {
+            setIsAddStageModalOpen(false)
+            setAfterStageId(null)
+          }}
+          onAdd={handleSaveNewStage}
+        />
+      )}
+
+      {/* Deal Detail Modal */}
+      {selectedDealId && (
+        <Dialog open={!!selectedDealId} onOpenChange={(open) => {
+          if (!open) {
+            handleCloseDealModal()
+          }
+        }}>
+          <DialogContent 
+            className="!max-w-[calc(100vw-240px)] !w-[calc(100vw-240px)] !h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] left-[240px]"
+            showCloseButton={false}
+          >
+            <div className="overflow-y-auto h-full w-full">
+              <DealDetail dealId={selectedDealId} onClose={handleCloseDealModal} />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

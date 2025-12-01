@@ -11,6 +11,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getContacts } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
+import { CreateTaskModal } from '@/components/crm/create-task-modal'
+import { createTask } from '@/lib/api/tasks'
+import { useToastNotification } from '@/hooks/use-toast-notification'
 
 export default function TasksPage() {
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
@@ -21,11 +24,55 @@ export default function TasksPage() {
   const [dateFilter, setDateFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
+  const { showSuccess, showError } = useToastNotification()
+
+  // Debug: log modal state changes
+  useEffect(() => {
+    console.log('TasksPage: isCreateTaskModalOpen changed to:', isCreateTaskModalOpen)
+  }, [isCreateTaskModalOpen])
+
+  // Check authentication on mount
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      console.warn('No access token found on tasks page, redirecting to login')
+      window.location.href = '/login'
+    }
+  }, [])
 
   const users = ["All Users", "Alex Chen", "Sarah Lee", "Mike Johnson"]
   const deals = ["All Deals", "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]
   const dateOptions = ["All Dates", "Today", "This Week", "Overdue", "Upcoming"]
   const statusOptions = ["All Status", "Completed", "Incomplete"]
+
+  const handleCreateTask = async (taskData: {
+    title: string
+    description?: string
+    status?: string
+    priority?: string
+    deadline?: string
+    dealId?: string
+    contactId?: string
+    assignedToId: string
+  }) => {
+    try {
+      await createTask(taskData)
+      showSuccess('Task created successfully')
+      setIsCreateTaskModalOpen(false)
+      // Reload page to refresh tasks list
+      window.location.reload()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage === 'UNAUTHORIZED') {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return
+      }
+      showError('Failed to create task', errorMessage)
+    }
+  }
 
   useEffect(() => {
     const loadContacts = async () => {
@@ -48,10 +95,31 @@ export default function TasksPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tasks</h1>
             <p className="text-sm text-muted-foreground">Manage and track all tasks</p>
           </div>
-          <Button size="sm">
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              alert('Button clicked!') // Simple test
+              console.log('Add Task button clicked, opening modal')
+              console.log('Current isCreateTaskModalOpen state:', isCreateTaskModalOpen)
+              const token = localStorage.getItem('access_token')
+              console.log('Token exists:', !!token)
+              if (!token) {
+                console.warn('No token found, redirecting to login')
+                window.location.href = '/login'
+                return
+              }
+              console.log('Token found, setting isCreateTaskModalOpen to true')
+              setIsCreateTaskModalOpen(true)
+              console.log('After setState, isCreateTaskModalOpen should be true')
+            }}
+            type="button"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
+            style={{ zIndex: 1000, position: 'relative' }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Task
-          </Button>
+          </button>
         </div>
 
         {/* Topbar with Tabs, Filters, and Search */}
@@ -173,6 +241,35 @@ export default function TasksPage() {
           <CalendarView />
         )}
       </div>
+
+      {/* Create Task Modal */}
+      {console.log('TasksPage render: isCreateTaskModalOpen =', isCreateTaskModalOpen)}
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={() => {
+          console.log('TasksPage: Closing modal')
+          setIsCreateTaskModalOpen(false)
+        }}
+        onSave={handleCreateTask}
+      />
+      
+      {/* Debug info - only in development */}
+      {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+        <div style={{
+          position: 'fixed',
+          bottom: 10,
+          right: 10,
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '8px',
+          fontSize: '12px',
+          zIndex: 9999,
+          borderRadius: '4px',
+          fontFamily: 'monospace'
+        }}>
+          <div>Modal Open: {isCreateTaskModalOpen ? 'YES' : 'NO'}</div>
+        </div>
+      )}
     </CRMLayout>
   )
 }

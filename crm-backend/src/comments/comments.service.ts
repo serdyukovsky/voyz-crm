@@ -37,6 +37,8 @@ export class CommentsService {
       contactId: comment.contactId || undefined,
       payload: {
         commentId: comment.id,
+        content: comment.content,
+        commentType: comment.type,
       },
     });
 

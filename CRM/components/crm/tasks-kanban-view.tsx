@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TaskCard } from "@/components/crm/task-card"
 import { AddTaskStageModal } from "@/components/crm/add-task-stage-modal"
 import { Button } from "@/components/ui/button"
 import { Plus } from 'lucide-react'
+import { getTasks } from '@/lib/api/tasks'
 
 interface Task {
   id: string
@@ -37,15 +38,6 @@ const defaultStages: Stage[] = [
   { id: "done", name: "Done", color: "#10b981", isDefault: true },
 ]
 
-const initialTasks: Task[] = [
-  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress", description: "Call the decision maker to discuss pricing and timeline", createdAt: "2024-03-10T10:00:00" },
-  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo", description: "Prepare and send detailed pricing proposal for TechStart", createdAt: "2024-03-11T14:00:00" },
-  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo", description: "Coordinate with client to schedule a product demonstration", createdAt: "2024-03-12T09:00:00" },
-  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done", description: "Review contract terms and conditions with legal team", createdAt: "2024-03-09T11:00:00" },
-  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog", description: "Discuss technical requirements and integration details", createdAt: "2024-03-13T16:00:00" },
-  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress", description: "Prepare final presentation and present to the client", createdAt: "2024-03-14T08:00:00" },
-]
-
 interface TasksKanbanViewProps {
   searchQuery: string
   userFilter: string
@@ -56,10 +48,64 @@ interface TasksKanbanViewProps {
 }
 
 export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksKanbanViewProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [insertAfterStageId, setInsertAfterStageId] = useState<string | null>(null)
+
+  // Load tasks from API
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        setLoading(true)
+        const tasksData = await getTasks({
+          status: statusFilter || undefined,
+        })
+        
+        // Transform API tasks to component format
+        const transformedTasks: Task[] = tasksData.map((task: any) => {
+          // Map API status to component status
+          let status = 'todo'
+          if (task.status === 'BACKLOG') status = 'backlog'
+          else if (task.status === 'TODO') status = 'todo'
+          else if (task.status === 'IN_PROGRESS') status = 'in_progress'
+          else if (task.status === 'DONE') status = 'done'
+          else if (task.status) status = task.status.toLowerCase()
+          
+          return {
+            id: task.id,
+            title: task.title,
+            dealId: task.deal?.id || null,
+            dealName: task.deal?.title || null,
+            contactId: task.contact?.id || null,
+            contactName: task.contact?.fullName || null,
+            dueDate: task.deadline || '',
+            assignee: task.assignedTo?.name || 'Unassigned',
+            completed: task.status === 'DONE',
+            priority: (task.priority?.toLowerCase() || 'medium') as "low" | "medium" | "high",
+            status,
+            description: task.description,
+            createdAt: task.createdAt,
+            result: task.result,
+          }
+        })
+        
+        setTasks(transformedTasks)
+      } catch (error) {
+        console.error('Failed to load tasks:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        // If unauthorized, redirect will be handled by API function
+        if (errorMessage !== 'UNAUTHORIZED') {
+          setTasks([])
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadTasks()
+  }, [statusFilter])
 
   const filteredTasks = tasks.filter(task => {
     // Search filter

@@ -8,6 +8,8 @@ import {
   Delete,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { DealsService } from './deals.service';
@@ -25,11 +27,35 @@ export class DealsController {
   constructor(private readonly dealsService: DealsService) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a new deal' })
   @ApiResponse({ status: 201, description: 'Deal created' })
-  create(@Body() createDealDto: any, @CurrentUser() user: any) {
-    return this.dealsService.create(createDealDto, user.userId || user.id);
+  async create(@Body() createDealDto: any, @CurrentUser() user: any) {
+    try {
+      console.log('DealsController.create called with:', { createDealDto, userId: user.userId || user.id });
+      const result = await this.dealsService.create(createDealDto, user.userId || user.id);
+      console.log('DealsController.create - deal created successfully:', result?.id || 'no id', result?.title || 'no title');
+      // Log result without circular references
+      try {
+        const resultLog = {
+          id: result?.id,
+          number: result?.number,
+          title: result?.title,
+          amount: result?.amount,
+          pipelineId: result?.pipelineId,
+          stageId: result?.stageId,
+        }
+        console.log('DealsController.create - returning result:', JSON.stringify(resultLog, null, 2));
+      } catch (e) {
+        console.log('DealsController.create - result (could not stringify):', result?.id);
+      }
+      return result;
+    } catch (error) {
+      console.error('DealsController.create - error:', error);
+      console.error('DealsController.create - error stack:', error instanceof Error ? error.stack : 'No stack');
+      throw error;
+    }
   }
 
   @Get()

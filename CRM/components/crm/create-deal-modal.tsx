@@ -85,7 +85,8 @@ export function CreateDealModal({
       
       onClose()
     } catch (error) {
-      console.error('Failed to create deal:', error)
+      console.error('Failed to create deal:', error instanceof Error ? error.message : String(error))
+      // Error is already handled by parent component (handleCreateDeal)
     } finally {
       setLoading(false)
     }
