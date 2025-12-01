@@ -1,6 +1,6 @@
 {
   "name": "CRM Development Environment",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "image": "ubuntu:22.04",
   
   "overrideCommand": false,
   
