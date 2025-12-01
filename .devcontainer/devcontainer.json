@@ -1,15 +1,15 @@
 {
-  "name": "CRM - Node 20 on Ubuntu",
-  "image": "node:20-bookworm",
-  
-  "features": {
-    "ghcr.io/devcontainers/features/sshd:1": {},
-    "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "15"
-    }
+  "name": "CRM - Debian + Node + PostgreSQL",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
   },
   
-  "postCreateCommand": "createdb crm_db 2>/dev/null || true && cd crm-backend && npm install && npx prisma generate && npx prisma migrate deploy",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+
+  "postCreateCommand": "cd crm-backend && npm install && npx prisma generate && npx prisma migrate deploy",
 
   "customizations": {
     "vscode": {
@@ -44,6 +44,6 @@
 
   "remoteUser": "node",
   "remoteEnv": {
-    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/crm_db"
+    "DATABASE_URL": "postgresql://node:postgres@localhost:5432/crm_db?schema=public"
   }
 }

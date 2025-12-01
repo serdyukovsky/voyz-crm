@@ -1,47 +1,31 @@
-FROM ubuntu:22.04
+FROM node:20-bookworm
 
-# Prevent interactive prompts
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Install basic dependencies
+# Install sudo and PostgreSQL
 RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    gnupg \
-    ca-certificates \
     sudo \
-    wget \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 20.x
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest
-
-# Install PostgreSQL server and client
-RUN apt-get update && apt-get install -y \
     postgresql \
     postgresql-contrib \
     postgresql-client \
     libpq-dev \
+    build-essential \
+    git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Give node user sudo privileges
+RUN echo "node ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Configure PostgreSQL
 RUN service postgresql start && \
-    su - postgres -c "psql -c \"CREATE USER vscode WITH SUPERUSER PASSWORD 'postgres';\"" && \
-    su - postgres -c "psql -c \"CREATE DATABASE crm_db OWNER vscode;\"" || true
+    su - postgres -c "psql -c \"CREATE USER node WITH SUPERUSER PASSWORD 'postgres';\"" && \
+    su - postgres -c "psql -c \"CREATE DATABASE crm_db OWNER node;\"" || true
 
-# Create vscode user with sudo privileges
-RUN useradd -m -s /bin/bash vscode \
-    && echo "vscode ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Ensure PostgreSQL starts automatically
+RUN echo '#!/bin/bash\nservice postgresql start\nexec "$@"' > /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
 
-# Set working directory
-WORKDIR /workspaces/voyz-crm
+USER node
+WORKDIR /workspace
 
-# Switch to vscode user
-USER vscode
-
-# Verify installations
-RUN node --version && npm --version
-
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["sleep", "infinity"]
