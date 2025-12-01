@@ -1,6 +1,9 @@
 {
   "name": "CRM Development Environment",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
   
   "overrideCommand": false,
   
