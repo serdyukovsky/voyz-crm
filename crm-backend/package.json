@@ -25,8 +25,10 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "create:admin": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/create-admin.ts",
     "create:admin:local": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/create-admin-bcrypt.ts",
+    "setup:admin": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/setup-admin.ts",
     "create:test-data": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/create-test-data.ts",
-    "check:admin": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/check-and-create-admin.ts"
+    "check:admin": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/check-and-create-admin.ts",
+    "add:won-lost-stages": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/add-won-lost-stages.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

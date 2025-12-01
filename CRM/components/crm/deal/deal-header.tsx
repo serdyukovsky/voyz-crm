@@ -18,7 +18,8 @@ import type { Deal } from '@/hooks/use-deal'
 interface DealHeaderProps {
   deal: Deal | null
   onTitleUpdate: (title: string) => void
-  onBack: () => void
+  onBack?: () => void
+  onClose?: () => void
   onArchive?: () => void
   onDelete?: () => void
   onDuplicate?: () => void
@@ -29,6 +30,7 @@ export function DealHeader({
   deal,
   onTitleUpdate,
   onBack,
+  onClose,
   onArchive,
   onDelete,
   onDuplicate,
@@ -54,14 +56,16 @@ export function DealHeader({
   return (
     <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/50 pl-6 pr-3 py-4">
       <div className="flex items-start gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 flex-shrink-0"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        {(onBack || onClose) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 flex-shrink-0"
+            onClick={onClose || onBack}
+          >
+            {onClose ? <X className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+          </Button>
+        )}
 
         <div className="flex-1 min-w-0">
           {isEditingTitle ? (

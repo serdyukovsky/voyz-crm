@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export interface Deal {
   id: string
@@ -60,6 +60,7 @@ export async function getDeals(params?: {
   if (params?.companyId) queryParams.append('companyId', params.companyId)
 
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
     console.log('Fetching deals from:', url)
     const response = await fetch(url, {
@@ -96,6 +97,7 @@ export async function getDeals(params?: {
 }
 
 export async function getDeal(id: string): Promise<Deal> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/${id}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -130,28 +132,71 @@ export async function createDeal(data: {
   }
 
   try {
+    // Clean data to remove any circular references or non-serializable values
+    const cleanData = {
+      title: String(data.title || ''),
+      amount: data.amount !== undefined ? Number(data.amount) : 0,
+      pipelineId: String(data.pipelineId || ''),
+      stageId: String(data.stageId || ''),
+      contactId: data.contactId ? String(data.contactId) : undefined,
+      companyId: data.companyId ? String(data.companyId) : undefined,
+      assignedToId: data.assignedToId ? String(data.assignedToId) : undefined,
+      description: data.description ? String(data.description) : undefined,
+    }
+    
+    console.log('API: Creating deal with clean data:', cleanData)
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/deals`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(cleanData),
     })
 
+    console.log('API: Deal creation response status:', response.status, response.statusText)
+
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error')
-      throw new Error(`Failed to create deal: ${response.status} ${errorText}`)
+      let errorMessage = 'Unknown error'
+      try {
+        const errorData = await response.json()
+        // Handle NestJS error format
+        if (errorData.message) {
+          if (Array.isArray(errorData.message)) {
+            errorMessage = errorData.message.join(', ')
+          } else {
+            errorMessage = errorData.message
+          }
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+      } catch {
+        // If JSON parsing fails, try text
+        const errorText = await response.text().catch(() => 'Unknown error')
+        errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`
+      }
+      console.error('API: Error response:', response.status, errorMessage)
+      throw new Error(`Failed to create deal: ${response.status} ${errorMessage}`)
     }
 
-    return response.json()
+    const result = await response.json()
+    console.log('API: Deal created successfully:', result?.id, result?.title, result?.amount)
+    return result
   } catch (error) {
-    console.error('Error creating deal:', error)
+    // Log error without circular references
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('API: Error creating deal:', errorMessage)
+    if (errorStack) {
+      console.error('API: Error stack:', errorStack)
+    }
     throw error
   }
 }
 
 export async function updateDeal(id: string, data: Partial<Deal> & { stageId?: string; assignedToId?: string }): Promise<Deal> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/${id}`, {
     method: 'PATCH',
     headers: {
@@ -174,6 +219,7 @@ export async function deleteDeal(id: string): Promise<void> {
     throw new Error('No access token found')
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/${id}`, {
     method: 'DELETE',
     headers: {

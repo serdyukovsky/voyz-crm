@@ -10,6 +10,7 @@ import { DealDetailModal } from "./deal-detail-modal"
 import { ContactBadge } from "./contact-badge"
 import { getContacts } from '@/lib/api/contacts'
 import type { Contact } from '@/lib/api/contacts'
+import { getTasks } from '@/lib/api/tasks'
 
 interface Task {
   id: string
@@ -28,14 +29,6 @@ interface Task {
   result?: string
 }
 
-const initialTasks: Task[] = [
-  { id: "1", title: "Follow up with decision maker", dealId: "1", dealName: "Acme Corp", dueDate: "2024-03-15", assignee: "Alex Chen", completed: false, priority: "high", status: "in_progress", description: "Call the decision maker to discuss pricing and timeline", createdAt: "2024-03-10T10:00:00" },
-  { id: "2", title: "Send pricing proposal", dealId: "2", dealName: "TechStart", dueDate: "2024-03-15", assignee: "Sarah Lee", completed: false, priority: "high", status: "todo", description: "Prepare and send detailed pricing proposal for TechStart", createdAt: "2024-03-11T14:00:00" },
-  { id: "3", title: "Schedule product demo", dealId: "3", dealName: "CloudFlow", dueDate: "2024-03-16", assignee: "Mike Johnson", completed: false, priority: "medium", status: "todo", description: "Coordinate with client to schedule a product demonstration", createdAt: "2024-03-12T09:00:00" },
-  { id: "4", title: "Contract review meeting", dealId: "4", dealName: "DataCo", dueDate: "2024-03-14", assignee: "Alex Chen", completed: true, priority: "medium", status: "done", description: "Review contract terms and conditions with legal team", createdAt: "2024-03-09T11:00:00" },
-  { id: "5", title: "Technical requirements call", dealId: "5", dealName: "DesignHub", dueDate: "2024-03-20", assignee: "Sarah Lee", completed: false, priority: "low", status: "backlog", description: "Discuss technical requirements and integration details", createdAt: "2024-03-13T16:00:00" },
-  { id: "6", title: "Final proposal presentation", dealId: "6", dealName: "InnovateLabs", dueDate: "2024-03-18", assignee: "Mike Johnson", completed: false, priority: "high", status: "in_progress", description: "Prepare final presentation and present to the client", createdAt: "2024-03-14T08:00:00" },
-]
 
 const priorityColors = {
   low: "bg-slate-500/10 text-slate-400 border-slate-500/20",
@@ -53,12 +46,56 @@ interface TasksListViewProps {
 }
 
 function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksListViewProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [contacts, setContacts] = useState<Contact[]>([])
+
+  // Load tasks from API
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        setLoading(true)
+        const tasksData = await getTasks({
+          status: statusFilter || undefined,
+        })
+        
+        // Transform API tasks to component format
+        const transformedTasks: Task[] = tasksData.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          dealId: task.deal?.id || null,
+          dealName: task.deal?.title || null,
+          contactId: task.contact?.id || null,
+          contactName: task.contact?.fullName || null,
+          dueDate: task.deadline || '',
+          assignee: task.assignedTo?.name || 'Unassigned',
+          completed: task.status === 'DONE',
+          priority: (task.priority?.toLowerCase() || 'medium') as "low" | "medium" | "high",
+          status: task.status?.toLowerCase() || 'todo',
+          description: task.description,
+          createdAt: task.createdAt,
+          result: task.result,
+        }))
+        
+        setTasks(transformedTasks)
+      } catch (error) {
+        console.error('Failed to load tasks:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        // If unauthorized, redirect will be handled by API function
+        if (errorMessage !== 'UNAUTHORIZED') {
+          setTasks([])
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadTasks()
+  }, [statusFilter])
 
   useEffect(() => {
     const loadContacts = async () => {

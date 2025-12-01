@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER'
 
@@ -35,13 +35,30 @@ export interface UpdateUserDto {
 }
 
 export async function getUsers(): Promise<User[]> {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    console.warn('No access token found for getUsers')
+    return []
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users`, {
     headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+      Authorization: `Bearer ${token}`,
     },
   })
 
   if (!response.ok) {
+    // Handle authentication errors without redirecting (let the caller handle it)
+    if (response.status === 401 || response.status === 403) {
+      console.warn('Unauthorized to fetch users')
+      // Don't redirect here - let the caller decide
+      throw new Error('UNAUTHORIZED')
+    }
     throw new Error('Failed to fetch users')
   }
 
@@ -49,6 +66,7 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getUser(id: string): Promise<User> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users/${id}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -63,6 +81,7 @@ export async function getUser(id: string): Promise<User> {
 }
 
 export async function createUser(data: CreateUserDto): Promise<User> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users`, {
     method: 'POST',
     headers: {
@@ -81,6 +100,7 @@ export async function createUser(data: CreateUserDto): Promise<User> {
 }
 
 export async function updateUser(id: string, data: UpdateUserDto): Promise<User> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users/${id}`, {
     method: 'PATCH',
     headers: {
@@ -99,6 +119,7 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
 }
 
 export async function deleteUser(id: string): Promise<void> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users/${id}`, {
     method: 'DELETE',
     headers: {

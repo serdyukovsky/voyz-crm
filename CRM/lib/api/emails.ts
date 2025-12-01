@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export interface SendEmailDto {
   to: string
@@ -17,6 +17,7 @@ export interface SendEmailResponse {
 }
 
 export async function sendEmail(data: SendEmailDto): Promise<SendEmailResponse> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/emails/send`, {
     method: 'POST',
     headers: {

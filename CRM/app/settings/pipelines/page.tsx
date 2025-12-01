@@ -52,9 +52,21 @@ export default function PipelinesPage() {
   const loadPipelines = async () => {
     try {
       setLoading(true)
+      console.log('Loading pipelines...')
       const data = await getPipelines()
+      console.log('Pipelines loaded:', data.length, 'pipelines')
+      // Log stages for each pipeline
+      data.forEach((pipeline, index) => {
+        console.log(`Pipeline ${index + 1} (${pipeline.name}):`, {
+          id: pipeline.id,
+          stagesCount: pipeline.stages?.length || 0,
+          stages: pipeline.stages || []
+        })
+      })
       setPipelines(data)
+      console.log('Pipelines state updated')
     } catch (error) {
+      console.error('Error loading pipelines:', error)
       showError('Failed to load pipelines', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)
@@ -62,14 +74,34 @@ export default function PipelinesPage() {
   }
 
   const handleCreatePipeline = async () => {
+    // Validate form
+    if (!pipelineForm.name || !pipelineForm.name.trim()) {
+      showError('Validation error', 'Pipeline name is required')
+      return
+    }
+
     try {
-      await createPipeline(pipelineForm)
-      showSuccess('Pipeline created successfully')
+      console.log('Creating pipeline with data:', pipelineForm)
+      const result = await createPipeline(pipelineForm)
+      console.log('Pipeline created successfully:', result)
+      console.log('Created pipeline stages:', result.stages?.length || 0, result.stages || [])
+      
+      // Close dialog and reset form first
       setIsPipelineDialogOpen(false)
       setPipelineForm({ name: '', description: '' })
-      loadPipelines()
+      
+      // Show success message
+      showSuccess('Pipeline created successfully')
+      
+      // Reload pipelines to show the new one with stages
+      console.log('Reloading pipelines after creation...')
+      await loadPipelines()
+      console.log('Pipelines reloaded, current count:', pipelines.length)
     } catch (error) {
-      showError('Failed to create pipeline', error instanceof Error ? error.message : 'Unknown error')
+      console.error('Error creating pipeline:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      showError('Failed to create pipeline', errorMessage)
+      // Don't close dialog on error so user can fix and retry
     }
   }
 
@@ -227,7 +259,7 @@ export default function PipelinesPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {pipeline.stages.length === 0 ? (
+                  {!pipeline.stages || pipeline.stages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No stages yet. Add your first stage to get started.</p>
                   ) : (
                     pipeline.stages
@@ -332,7 +364,10 @@ export default function PipelinesPage() {
               <Button variant="outline" onClick={() => setIsPipelineDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={editingPipeline ? handleUpdatePipeline : handleCreatePipeline}>
+              <Button 
+                onClick={editingPipeline ? handleUpdatePipeline : handleCreatePipeline}
+                disabled={!pipelineForm.name || !pipelineForm.name.trim()}
+              >
                 {editingPipeline ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>

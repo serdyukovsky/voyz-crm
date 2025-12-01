@@ -99,6 +99,63 @@ npm run dev
 The API will be available at `http://localhost:3001`
 Swagger documentation at `http://localhost:3001/api/docs`
 
+## Frontend Setup in Codespaces
+
+### CORS Configuration
+
+The backend is configured to accept requests from:
+- **GitHub Codespaces**: All origins matching `https://*.app.github.dev`
+- **Local Development**: `http://localhost:5173` and `http://localhost:3000`
+
+CORS is enabled with:
+- `credentials: true` - Allows cookies and authentication headers
+- `allowedHeaders: ['Content-Type', 'Authorization']`
+- `methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE']`
+
+### Frontend Environment Variables
+
+Create `CRM/.env.local` in the frontend directory:
+
+```env
+# For GitHub Codespaces
+VITE_API_URL="https://<your-codespace-name>-3001.app.github.dev/api"
+VITE_WS_URL="https://<your-codespace-name>-3001.app.github.dev/realtime"
+
+# For local development
+# VITE_API_URL="http://localhost:3001/api"
+# VITE_WS_URL="http://localhost:3001/realtime"
+```
+
+Replace `<your-codespace-name>` with your actual Codespace name (e.g., `obscure-spoon-966r594rg4hxj66`).
+
+### Finding Your Codespace URL
+
+1. In your Codespace, check the port forwarding:
+   ```bash
+   echo $CODESPACE_NAME
+   echo $GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN
+   ```
+
+2. Or check the port forwarding tab in VS Code/Cursor (usually shows `https://<name>-3001.app.github.dev`)
+
+3. The frontend URL will be `https://<name>-3000.app.github.dev` (port 3000)
+4. The backend API URL will be `https://<name>-3001.app.github.dev/api` (port 3001)
+
+### Testing CORS
+
+After setting up, test that CORS works:
+
+```bash
+# From frontend (should work)
+curl -H "Origin: https://your-codespace-3000.app.github.dev" \
+     -H "Access-Control-Request-Method: GET" \
+     -H "Access-Control-Request-Headers: Authorization" \
+     -X OPTIONS \
+     https://your-codespace-3001.app.github.dev/api/health
+```
+
+You should see CORS headers in the response.
+
 ## Running Backend in Codespaces
 
 ### Complete Setup Script

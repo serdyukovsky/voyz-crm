@@ -3,7 +3,7 @@ import { Contact, CreateContactDto, UpdateContactDto, Company, Task } from '@/ty
 // Re-export types for easier imports
 export type { Contact, CreateContactDto, UpdateContactDto, Company, Task }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 // Mock data for development
 const mockCompanies: Company[] = [
@@ -112,6 +112,7 @@ const mockContacts: Contact[] = [
 // Check if backend is available
 async function checkBackendAvailable(): Promise<boolean> {
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/health`, { method: 'GET' })
     return response.ok
   } catch {
@@ -179,8 +180,11 @@ export async function getContacts(params?: {
   // Real API call
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, returning mock contacts')
-    return mockContacts
+    console.warn('No access token found, redirecting to login')
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    return []
   }
 
   const queryParams = new URLSearchParams()
@@ -193,6 +197,7 @@ export async function getContacts(params?: {
     queryParams.append('hasClosedDeals', String(params.hasClosedDeals))
 
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/contacts?${queryParams.toString()}`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -200,14 +205,22 @@ export async function getContacts(params?: {
     })
 
     if (!response.ok) {
-      // If unauthorized, return mock data instead of throwing
+      // If unauthorized, redirect to login
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch contacts, returning mock data')
-        return mockContacts
+        console.warn('Unauthorized to fetch contacts, redirecting to login')
+        // Clear invalid token
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return []
       }
       const errorText = await response.text().catch(() => 'Unknown error')
       console.error(`Failed to fetch contacts: ${response.status} ${errorText}`)
-      return mockContacts // Return mock data instead of throwing
+      return [] // Return empty array instead of mock data
     }
 
     return response.json()
@@ -233,6 +246,7 @@ export async function getContact(id: string): Promise<Contact> {
     return contact
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -254,6 +268,7 @@ export async function getContactTasks(contactId: string): Promise<Task[]> {
     return []
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/tasks`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -298,6 +313,7 @@ export async function createContact(data: CreateContactDto): Promise<Contact> {
     return newContact
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/contacts`, {
     method: 'POST',
     headers: {
@@ -336,6 +352,7 @@ export async function updateContact(id: string, data: UpdateContactDto): Promise
     return updatedContact
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
     method: 'PATCH',
     headers: {
@@ -363,6 +380,7 @@ export async function deleteContact(id: string): Promise<void> {
     return
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
     method: 'DELETE',
     headers: {
@@ -382,6 +400,7 @@ export async function getCompanies(): Promise<Company[]> {
     return mockCompanies
   }
 
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/companies`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -397,6 +416,7 @@ export async function getCompanies(): Promise<Company[]> {
 
 // Deal contact linking
 export async function linkContactToDeal(dealId: string, contactId: string): Promise<void> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/${dealId}/link-contact`, {
     method: 'POST',
     headers: {
@@ -412,6 +432,7 @@ export async function linkContactToDeal(dealId: string, contactId: string): Prom
 }
 
 export async function unlinkContactFromDeal(dealId: string): Promise<void> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/${dealId}/unlink-contact`, {
     method: 'POST',
     headers: {

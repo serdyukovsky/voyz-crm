@@ -29,6 +29,7 @@ import type { Activity, ActivityType } from '@/lib/api/activities'
 interface ActivityTimelineProps {
   activities: Activity[]
   className?: string
+  pipelineStages?: Array<{ id: string; name: string }>
 }
 
 const activityIcons: Record<ActivityType, typeof Clock> = {
@@ -91,7 +92,7 @@ const activityColors: Record<ActivityType, string> = {
   LOGOUT: 'bg-gray-500/10 text-gray-600',
 }
 
-function formatActivityMessage(activity: Activity): string {
+function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: string; name: string }>): string {
   const payload = activity.payload || {}
   
   switch (activity.type) {
@@ -110,8 +111,26 @@ function formatActivityMessage(activity: Activity): string {
       }
       return `updated ${fieldName}`
     case 'STAGE_CHANGED':
-      const fromStage = payload.fromStage || payload.from
-      const toStage = payload.toStage || payload.to
+      let fromStage = payload.fromStage || payload.from
+      let toStage = payload.toStage || payload.to
+      
+      // If we have stage IDs but not names, try to get names from pipeline stages
+      if (pipelineStages && (!fromStage || fromStage.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
+        const fromStageId = payload.fromStageId || fromStage
+        const foundFromStage = pipelineStages.find(s => s.id === fromStageId)
+        if (foundFromStage) {
+          fromStage = foundFromStage.name
+        }
+      }
+      
+      if (pipelineStages && (!toStage || toStage.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
+        const toStageId = payload.toStageId || toStage
+        const foundToStage = pipelineStages.find(s => s.id === toStageId)
+        if (foundToStage) {
+          toStage = foundToStage.name
+        }
+      }
+      
       if (fromStage && toStage) {
         return `changed stage from "${fromStage}" → "${toStage}"`
       }
@@ -153,7 +172,8 @@ function formatActivityMessage(activity: Activity): string {
         ? `deleted task "${activity.task.title}"`
         : 'deleted a task'
     case 'COMMENT_ADDED':
-      return 'added a comment'
+      // Return simple message, content will be displayed separately
+      return 'commented'
     case 'FILE_UPLOADED':
       return payload.fileName
         ? `uploaded file "${payload.fileName}"`
@@ -186,9 +206,9 @@ function formatActivityMessage(activity: Activity): string {
   }
 }
 
-function ActivityItem({ activity, isLast }: { activity: Activity; isLast: boolean }) {
+function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity; isLast: boolean; pipelineStages?: Array<{ id: string; name: string }> }) {
   const Icon = activityIcons[activity.type] || Clock
-  const message = formatActivityMessage(activity)
+  const message = formatActivityMessage(activity, pipelineStages)
   const date = parseISO(activity.createdAt)
   const timeString = format(date, 'h:mm a')
 
@@ -224,7 +244,16 @@ function ActivityItem({ activity, isLast }: { activity: Activity; isLast: boolea
             <p className="text-sm text-foreground leading-relaxed">
               <span className="font-medium">{activity.user.name}</span>
               {' '}
-              {activity.type === 'STAGE_CHANGED' && message.includes('→') ? (
+              {activity.type === 'COMMENT_ADDED' ? (
+                <>
+                  <span className="text-muted-foreground">{message}</span>
+                  {activity.payload?.content && (
+                    <div className="mt-2 text-sm text-white whitespace-pre-wrap break-words">
+                      {activity.payload.content}
+                    </div>
+                  )}
+                </>
+              ) : activity.type === 'STAGE_CHANGED' && message.includes('→') ? (
                 <span className="text-muted-foreground">
                   {message.split('→').map((part, i, arr) => (
                     <React.Fragment key={i}>
@@ -268,7 +297,7 @@ function ActivityItem({ activity, isLast }: { activity: Activity; isLast: boolea
   )
 }
 
-export function ActivityTimeline({ activities, className }: ActivityTimelineProps) {
+export function ActivityTimeline({ activities, className, pipelineStages }: ActivityTimelineProps) {
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
 
   // Group activities by date
@@ -285,10 +314,10 @@ export function ActivityTimeline({ activities, className }: ActivityTimelineProp
       groups[dateKey].push(activity)
     })
 
-    // Sort activities within each group (newest first)
+    // Sort activities within each group (oldest first)
     Object.keys(groups).forEach(key => {
       groups[key].sort((a, b) => 
-        parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()
+        parseISO(a.createdAt).getTime() - parseISO(b.createdAt).getTime()
       )
     })
 
@@ -296,7 +325,7 @@ export function ActivityTimeline({ activities, className }: ActivityTimelineProp
   }, [activities])
 
   const sortedDates = Object.keys(groupedActivities).sort((a, b) => 
-    new Date(b).getTime() - new Date(a).getTime()
+    new Date(a).getTime() - new Date(b).getTime()
   )
 
   const toggleDate = (dateKey: string) => {
@@ -361,6 +390,7 @@ export function ActivityTimeline({ activities, className }: ActivityTimelineProp
                     key={activity.id}
                     activity={activity}
                     isLast={index === dateActivities.length - 1}
+                    pipelineStages={pipelineStages}
                   />
                 ))}
               </div>

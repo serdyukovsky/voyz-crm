@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export interface DealByStage {
   stageName: string
@@ -36,6 +36,7 @@ export interface GlobalStats {
 }
 
 export async function getGlobalStats(): Promise<GlobalStats> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/stats/global`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,

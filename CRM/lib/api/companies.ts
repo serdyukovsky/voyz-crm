@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 // Check if backend is available
 async function checkBackendAvailable(): Promise<boolean> {
@@ -68,6 +68,7 @@ export async function getCompanies(params?: {
   if (params?.industry) queryParams.append('industry', params.industry)
 
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/companies?${queryParams.toString()}`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -97,6 +98,7 @@ export async function getCompanies(params?: {
 }
 
 export async function getCompany(id: string): Promise<Company> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/companies/${id}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
@@ -124,6 +126,7 @@ export interface CreateCompanyDto {
 export interface UpdateCompanyDto extends Partial<CreateCompanyDto> {}
 
 export async function createCompany(data: CreateCompanyDto): Promise<Company> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/companies`, {
     method: 'POST',
     headers: {
@@ -141,6 +144,7 @@ export async function createCompany(data: CreateCompanyDto): Promise<Company> {
 }
 
 export async function updateCompany(id: string, data: UpdateCompanyDto): Promise<Company> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/companies/${id}`, {
     method: 'PATCH',
     headers: {
@@ -158,6 +162,7 @@ export async function updateCompany(id: string, data: UpdateCompanyDto): Promise
 }
 
 export async function deleteCompany(id: string): Promise<void> {
+  const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/companies/${id}`, {
     method: 'DELETE',
     headers: {

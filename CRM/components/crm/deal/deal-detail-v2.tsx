@@ -48,7 +48,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
 
   // Use hooks
-  const { deal, loading: dealLoading, updateDeal, updateField } = useDeal({ dealId })
+  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField } = useDeal({ dealId })
   const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
   const { activities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
@@ -195,10 +195,32 @@ export function DealDetail({ dealId }: DealDetailProps) {
     )
   }
 
+  if (dealError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <div className="text-destructive mb-2">Error loading deal</div>
+        <div className="text-sm text-muted-foreground">{dealError}</div>
+        <Button 
+          variant="outline" 
+          className="mt-4"
+          onClick={() => navigate('/deals')}
+        >
+          Back to Deals
+        </Button>
+      </div>
+    )
+  }
+
   if (!deal) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-muted-foreground">Deal not found</div>
+      <div className="flex flex-col items-center justify-center h-screen">
+        <div className="text-muted-foreground mb-4">Deal not found</div>
+        <Button 
+          variant="outline"
+          onClick={() => navigate('/deals')}
+        >
+          Back to Deals
+        </Button>
       </div>
     )
   }

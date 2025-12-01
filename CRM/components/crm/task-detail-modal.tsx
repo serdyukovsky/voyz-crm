@@ -110,14 +110,28 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
     setIsEditingTitle(true)
   }
 
+  // Helper function to safely parse date
+  const safeParseDate = (dateString: string | undefined | null): Date => {
+    if (!dateString) return new Date()
+    const date = new Date(dateString)
+    return isNaN(date.getTime()) ? new Date() : date
+  }
+
   const handleReschedule = (days: number | null, date?: Date) => {
     let newDate: Date
     if (date) {
       newDate = date
     } else if (days !== null) {
-      newDate = new Date(dueDate)
+      const currentDate = safeParseDate(dueDate)
+      newDate = new Date(currentDate)
       newDate.setDate(newDate.getDate() + days)
     } else {
+      return
+    }
+
+    // Validate date before formatting
+    if (isNaN(newDate.getTime())) {
+      console.error('Invalid date in handleReschedule:', newDate)
       return
     }
 
@@ -140,18 +154,17 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
     }
   }
 
-  const tomorrow = new Date(dueDate)
+  const dueDateObj = safeParseDate(dueDate)
+  const tomorrow = new Date(dueDateObj)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  const dayAfterTomorrow = new Date(dueDate)
+  const dayAfterTomorrow = new Date(dueDateObj)
   dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2)
 
-  const nextWeek = new Date(dueDate)
+  const nextWeek = new Date(dueDateObj)
   nextWeek.setDate(nextWeek.getDate() + 7)
 
-  const createdAt = task.createdAt 
-    ? new Date(task.createdAt)
-    : new Date()
+  const createdAt = safeParseDate(task.createdAt)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -297,7 +310,9 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Due Date:</span>
               <span className="text-sm font-medium">
-                {format(new Date(dueDate), "PPP")}
+                {dueDate && !isNaN(safeParseDate(dueDate).getTime()) 
+                  ? format(safeParseDate(dueDate), "PPP")
+                  : "Not set"}
               </span>
               <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal>
                 <DropdownMenu open={isRescheduleDropdownOpen} onOpenChange={setIsRescheduleDropdownOpen}>
@@ -353,7 +368,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate }: TaskDetailM
                 >
                   <Calendar
                     mode="single"
-                    selected={new Date(dueDate)}
+                    selected={safeParseDate(dueDate)}
                     onSelect={handleCustomDate}
                     initialFocus
                   />

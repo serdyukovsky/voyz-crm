@@ -24,11 +24,13 @@ export function useActivity({ entityType, entityId, filters }: UseActivityOption
     try {
       setLoading(true)
       setError(null)
+      console.log('Loading activities for:', { entityType, entityId, filters })
       const data = await getActivities({
         entityType,
         entityId,
         ...filters,
       })
+      console.log('Loaded activities:', data.length, 'activities', data)
       setActivities(data)
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load activities'))

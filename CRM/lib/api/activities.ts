@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '@/lib/config'
 
 export type ActivityType =
   | 'DEAL_CREATED'
@@ -75,16 +75,26 @@ export async function getActivities(filters?: ActivityFilters): Promise<Activity
   if (filters?.startDate) queryParams.append('startDate', filters.startDate)
   if (filters?.endDate) queryParams.append('endDate', filters.endDate)
 
-  const response = await fetch(`${API_BASE_URL}/activities?${queryParams.toString()}`, {
+  const API_BASE_URL = getApiBaseUrl()
+  const url = `${API_BASE_URL}/activities?${queryParams.toString()}`
+  console.log('Fetching activities from:', url)
+  
+  const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
     },
   })
 
+  console.log('Activities response status:', response.status, response.statusText)
+
   if (!response.ok) {
-    throw new Error('Failed to fetch activities')
+    const errorText = await response.text().catch(() => 'Unknown error')
+    console.error('Failed to fetch activities:', response.status, errorText)
+    throw new Error(`Failed to fetch activities: ${response.status} ${errorText}`)
   }
 
-  return response.json()
+  const data = await response.json()
+  console.log('Activities fetched successfully:', data.length, 'activities')
+  return data
 }
 

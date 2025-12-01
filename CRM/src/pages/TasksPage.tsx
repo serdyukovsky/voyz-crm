@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getContacts } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { CreateTaskModal } from '@/components/crm/create-task-modal'
+import { createTask } from '@/lib/api/tasks'
+import { useToastNotification } from '@/hooks/use-toast-notification'
 
 export default function TasksPage() {
   const { t } = useTranslation()
@@ -21,6 +24,9 @@ export default function TasksPage() {
   const [dateFilter, setDateFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
+  const [tasksRefreshKey, setTasksRefreshKey] = useState(0)
+  const { showSuccess, showError } = useToastNotification()
 
   const users = [t('tasks.allUsers'), "Alex Chen", "Sarah Lee", "Mike Johnson"]
   const deals = [t('tasks.allDeals'), "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]
@@ -39,6 +45,34 @@ export default function TasksPage() {
     loadContacts()
   }, [])
 
+  const handleCreateTask = async (taskData: {
+    title: string
+    description?: string
+    status?: string
+    priority?: string
+    deadline?: string
+    dealId?: string
+    contactId?: string
+    assignedToId: string
+  }) => {
+    try {
+      await createTask(taskData)
+      showSuccess('Task created successfully')
+      setIsCreateTaskModalOpen(false)
+      // Trigger tasks refresh by updating refresh key
+      setTasksRefreshKey(prev => prev + 1)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage === 'UNAUTHORIZED') {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return
+      }
+      showError('Failed to create task', errorMessage)
+    }
+  }
+
   return (
     <CRMLayout>
       <div className="min-h-[calc(100vh-3rem)] px-6 py-6">
@@ -47,7 +81,23 @@ export default function TasksPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t('tasks.title')}</h1>
             <p className="text-sm text-muted-foreground">{t('tasks.manageTasks')}</p>
           </div>
-          <Button size="sm">
+          <Button 
+            size="sm"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              console.log('Add Task button clicked, opening modal')
+              const token = localStorage.getItem('access_token')
+              if (!token) {
+                console.warn('No token found, redirecting to login')
+                window.location.href = '/login'
+                return
+              }
+              console.log('Token found, setting isCreateTaskModalOpen to true')
+              setIsCreateTaskModalOpen(true)
+            }}
+            type="button"
+          >
             <Plus className="mr-2 h-4 w-4" />
             {t('tasks.addTask')}
           </Button>
@@ -147,6 +197,7 @@ export default function TasksPage() {
 
         {view === "kanban" ? (
           <TasksKanbanView 
+            key={tasksRefreshKey}
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}
@@ -156,6 +207,7 @@ export default function TasksPage() {
           />
         ) : view === "list" ? (
           <TasksListView 
+            key={tasksRefreshKey}
             searchQuery={searchQuery}
             userFilter={userFilter}
             dealFilter={dealFilter}
@@ -167,6 +219,13 @@ export default function TasksPage() {
           <CalendarView />
         )}
       </div>
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={() => setIsCreateTaskModalOpen(false)}
+        onSave={handleCreateTask}
+      />
     </CRMLayout>
   )
 }

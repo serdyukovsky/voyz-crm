@@ -23,7 +23,10 @@ export function useRealtimeDeal({
 
   useEffect(() => {
     // TODO: Connect to WebSocket when backend is ready
-    // const ws = new WebSocket(`ws://localhost:3000/deals/${dealId}/realtime`)
+    // Use Socket.IO instead of raw WebSocket for consistency
+    // import { getWsUrl } from '@/lib/config'
+    // const wsUrl = getWsUrl()
+    // const socket = io(wsUrl, { auth: { token }, path: `/deals/${dealId}/realtime` })
     // 
     // ws.onmessage = (event) => {
     //   const data = JSON.parse(event.data)
