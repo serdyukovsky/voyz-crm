@@ -2,6 +2,10 @@
   "name": "CRM - Node 20 on Ubuntu",
   "image": "node:20-bookworm",
   
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+  
   "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
