@@ -1,20 +1,17 @@
 {
-  "name": "CRM Development Environment - Ubuntu 22.04",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
-  },
-  
-  "overrideCommand": false,
+  "name": "CRM Ubuntu Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
   
   "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
     "ghcr.io/devcontainers/features/postgres:1": {
-      "version": "15",
-      "postgresqlUser": "vscode",
-      "postgresqlPassword": "postgres",
-      "postgresqlDb": "crm_db"
+      "version": "15"
     }
   },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
 
   "customizations": {
     "vscode": {
@@ -30,8 +27,6 @@
       }
     }
   },
-
-  "postCreateCommand": "bash .devcontainer/setup.sh",
   
   "forwardPorts": [3000, 3001, 5432],
   "portsAttributes": {
@@ -49,5 +44,8 @@
     }
   },
 
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  "remoteEnv": {
+    "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/postgres"
+  }
 }
