@@ -74,7 +74,7 @@ export function DealSourcesPanel({ sources, onUpdateSource, onAddSource }: DealS
                   {source.type === "messenger" ? (
                     <Send className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <div className="h-4 w-4 rounded bg-green-500 flex items-center justify-center text-white text-[10px] font-bold">
+                    <div className="h-4 w-4 rounded bg-green-600 dark:bg-green-500 flex items-center justify-center text-white text-[10px] font-bold">
                       WZ
                     </div>
                   )}

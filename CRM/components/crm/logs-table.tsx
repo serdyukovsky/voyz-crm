@@ -1,43 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
-
-interface Log {
-  id: string
-  timestamp: string
-  user: string
-  action: string
-  entityType: 'deal' | 'task' | 'contact'
-  entityId: string
-  details: string
-}
-
-const logs: Log[] = [
-  { id: "1", timestamp: "2024-03-15 14:32:15", user: "Alex Chen", action: "Updated", entityType: "deal", entityId: "D-1043", details: "Changed stage from 'Negotiation' to 'Closed Won'. Updated amount to $45,000. Added note: 'Contract signed, payment scheduled.'" },
-  { id: "2", timestamp: "2024-03-15 13:15:42", user: "Sarah Lee", action: "Created", entityType: "contact", entityId: "C-2891", details: "Created new contact 'John Smith' with email john.smith@techcorp.com. Added to deal 'Enterprise License'. Set role as 'Decision Maker'." },
-  { id: "3", timestamp: "2024-03-15 11:48:33", user: "Mike Johnson", action: "Completed", entityType: "task", entityId: "T-5672", details: "Marked task 'Follow up with Acme Corp' as completed. Time spent: 45 minutes. Added follow-up task for next week." },
-  { id: "4", timestamp: "2024-03-15 10:22:18", user: "Alex Chen", action: "Sent", entityType: "deal", entityId: "D-1038", details: "Sent proposal email to client@techstart.io. Attached PDF proposal (2.4MB). CC'd sales manager. Scheduled follow-up reminder for 3 days." },
-  { id: "5", timestamp: "2024-03-14 16:55:29", user: "Sarah Lee", action: "Deleted", entityType: "contact", entityId: "C-2755", details: "Deleted contact 'Old Lead' due to duplicate entry. All associated activities merged with C-2890. Notified team members." },
-  { id: "6", timestamp: "2024-03-14 15:30:44", user: "Mike Johnson", action: "Created", entityType: "deal", entityId: "D-1045", details: "Created deal 'Platform Integration' valued at $120,000. Assigned to Alex Chen. Set stage to 'New'. Expected close date: Q2 2024." },
-  { id: "7", timestamp: "2024-03-14 14:12:08", user: "Alex Chen", action: "Updated", entityType: "task", entityId: "T-5668", details: "Updated task 'Review contract' due date from 2024-03-16 to 2024-03-20. Changed priority from Medium to High. Reassigned to Sarah Lee." },
-  { id: "8", timestamp: "2024-03-14 09:45:51", user: "Sarah Lee", action: "Logged", entityType: "deal", entityId: "D-1042", details: "Logged discovery call (duration: 45 min). Discussed requirements, pricing, and timeline. Next steps: Send proposal by EOW. Marked as promising opportunity." },
-]
+import { getLogs, type Log as ApiLog } from '@/lib/api/logs'
+import { format } from 'date-fns'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 const actionColors: Record<string, string> = {
-  Created: "bg-green-500/10 text-green-500 border-green-500/20",
-  Updated: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  Deleted: "bg-red-500/10 text-red-500 border-red-500/20",
-  Completed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-  Sent: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  Logged: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+  create: "bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 dark:border-green-500/20",
+  update: "bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/20",
+  delete: "bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 dark:border-red-500/20",
+  completed: "bg-purple-500/10 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 dark:border-purple-500/20",
+  sent: "bg-orange-500/10 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 dark:border-orange-500/20",
+  login: "bg-cyan-500/10 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 dark:border-cyan-500/20",
+  logout: "bg-gray-500/10 dark:bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20 dark:border-gray-500/20",
 }
 
 const entityColors: Record<string, string> = {
-  deal: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  task: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  contact: "bg-green-500/10 text-green-400 border-green-500/20",
+  deal: "bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/20",
+  task: "bg-purple-500/10 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 dark:border-purple-500/20",
+  contact: "bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 dark:border-green-500/20",
+  company: "bg-orange-500/10 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 dark:border-orange-500/20",
 }
 
 interface LogsTableProps {
@@ -45,23 +30,98 @@ interface LogsTableProps {
   actionFilter: string
   userFilter: string
   entityFilter: string
+  dateRange: string
 }
 
-export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter }: LogsTableProps) {
+export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter, dateRange }: LogsTableProps) {
+  const { t } = useTranslation()
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [logs, setLogs] = useState<ApiLog[]>([])
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    const loadLogs = async () => {
+      setLoading(true)
+      try {
+        const filters: any = {}
+        if (actionFilter !== 'all') filters.action = actionFilter
+        if (entityFilter !== 'all') filters.entity = entityFilter
+        if (userFilter !== 'all') filters.userId = userFilter
+
+        // Handle date range filter
+        if (dateRange !== 'all') {
+          const now = new Date()
+          let startDate: Date
+
+          switch (dateRange) {
+            case 'today':
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              filters.startDate = startDate.toISOString()
+              break
+            case 'yesterday':
+              startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+              const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+              filters.startDate = startDate.toISOString()
+              filters.endDate = endDate.toISOString()
+              break
+            case 'week':
+              startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+              filters.startDate = startDate.toISOString()
+              break
+            case 'month':
+              startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+              filters.startDate = startDate.toISOString()
+              break
+            case 'quarter':
+              startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+              filters.startDate = startDate.toISOString()
+              break
+          }
+        }
+
+        console.log('Loading logs with filters:', filters)
+        const data = await getLogs(filters)
+        console.log('Loaded logs:', data.length, 'items')
+        setLogs(data)
+      } catch (error) {
+        console.error('Failed to load logs:', error)
+        setLogs([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionFilter, userFilter, entityFilter, dateRange])
+
+  const formatTimestamp = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'dd.MM.yyyy HH:mm:ss')
+    } catch {
+      return dateString
+    }
+  }
+
+  const getUserName = (log: ApiLog) => {
+    if (log.user) {
+      return `${log.user.firstName} ${log.user.lastName}`.trim() || log.user.email
+    }
+    return 'System'
+  }
+
+  const getActionLabel = (action: string) => {
+    return action.charAt(0).toUpperCase() + action.slice(1)
+  }
+
+  // Client-side filtering only for search query (server handles other filters)
   const filteredLogs = logs.filter(log => {
-    const matchesSearch = searchQuery === '' || 
-      log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.entityId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase())
+    if (searchQuery === '') return true
     
-    const matchesAction = actionFilter === 'all' || log.action === actionFilter
-    const matchesUser = userFilter === 'all' || log.user === userFilter
-    const matchesEntity = entityFilter === 'all' || log.entityType === entityFilter
-
-    return matchesSearch && matchesAction && matchesUser && matchesEntity
+    return getUserName(log).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (log.entityId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.message.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
   const toggleRow = (id: string) => {
@@ -74,6 +134,18 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter 
     setExpandedRows(newExpanded)
   }
 
+  if (loading) {
+    return (
+      <div className="border border-border rounded-lg bg-card overflow-hidden">
+        <div className="p-4 space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="border border-border rounded-lg bg-card overflow-hidden">
       <div className="overflow-x-auto">
@@ -81,11 +153,11 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter 
           <thead>
             <tr className="border-b border-border bg-muted/30">
               <th className="w-8 py-3 px-4"></th>
-              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">Timestamp</th>
-              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">User</th>
-              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">Action</th>
-              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">Entity Type</th>
-              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">Entity ID</th>
+              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">{t('logs.timestamp')}</th>
+              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">{t('logs.user')}</th>
+              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">{t('logs.action')}</th>
+              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">{t('logs.entityType')}</th>
+              <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground">{t('logs.entityId')}</th>
             </tr>
           </thead>
           <tbody>
@@ -103,32 +175,67 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter 
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </td>
-                  <td className="py-3 px-4 text-muted-foreground text-xs font-mono">{log.timestamp}</td>
-                  <td className="py-3 px-4 text-foreground">{log.user}</td>
+                  <td className="py-3 px-4 text-muted-foreground text-xs font-mono">{formatTimestamp(log.createdAt)}</td>
+                  <td className="py-3 px-4 text-foreground">{getUserName(log)}</td>
                   <td className="py-3 px-4">
                     <Badge 
                       variant="outline" 
-                      className={`text-[10px] font-medium ${actionColors[log.action]}`}
+                      className={`text-[10px] font-medium ${actionColors[log.action.toLowerCase()] || actionColors.update}`}
                     >
-                      {log.action}
+                      {getActionLabel(log.action)}
                     </Badge>
                   </td>
                   <td className="py-3 px-4">
-                    <Badge 
-                      variant="outline" 
-                      className={`text-[10px] font-medium ${entityColors[log.entityType]}`}
-                    >
-                      {log.entityType}
-                    </Badge>
+                    {log.entity ? (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[10px] font-medium ${entityColors[log.entity.toLowerCase()] || entityColors.deal}`}
+                      >
+                        {log.entity}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
-                  <td className="py-3 px-4 text-foreground font-mono text-xs">{log.entityId}</td>
+                  <td className="py-3 px-4 text-foreground font-mono text-xs">{log.entityId || '—'}</td>
                 </tr>
                 {expandedRows.has(log.id) && (
                   <tr key={`${log.id}-details`} className="border-b border-border/50 bg-muted/20">
                     <td colSpan={6} className="py-4 px-4">
                       <div className="pl-8">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Details</p>
-                        <p className="text-sm text-foreground leading-relaxed">{log.details}</p>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">{t('logs.details')}</p>
+                        <p className="text-sm text-foreground leading-relaxed">{log.message}</p>
+                        {log.metadata && Object.keys(log.metadata).length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">{t('logs.metadata')}</p>
+                            <div className="text-xs bg-muted/50 p-2 rounded space-y-1">
+                              {Object.entries(log.metadata).map(([key, value]) => {
+                                // Format key to be more readable
+                                const formattedKey = key
+                                  .replace(/([A-Z])/g, ' $1')
+                                  .replace(/^./, str => str.toUpperCase())
+                                  .trim();
+                                
+                                // Format value based on type
+                                let formattedValue = value;
+                                if (value === null || value === undefined) {
+                                  formattedValue = '—';
+                                } else if (typeof value === 'object') {
+                                  formattedValue = JSON.stringify(value, null, 2);
+                                } else if (typeof value === 'boolean') {
+                                  formattedValue = value ? 'Да' : 'Нет';
+                                }
+                                
+                                return (
+                                  <div key={key} className="flex gap-2">
+                                    <span className="font-medium text-muted-foreground min-w-[120px]">{formattedKey}:</span>
+                                    <span className="text-foreground break-words">{String(formattedValue)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -137,9 +244,14 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter 
             ))}
           </tbody>
         </table>
-        {filteredLogs.length === 0 && (
+        {filteredLogs.length === 0 && !loading && (
           <div className="py-12 text-center text-muted-foreground text-sm">
-            No logs found matching your filters
+            {logs.length === 0 
+              ? t('logs.noLogsFound')
+              : searchQuery 
+                ? t('logs.noLogsMatchSearch')
+                : t('logs.noLogsFound')
+            }
           </div>
         )}
       </div>

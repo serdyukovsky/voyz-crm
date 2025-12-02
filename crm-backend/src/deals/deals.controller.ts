@@ -125,8 +125,8 @@ export class DealsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete deal' })
   @ApiResponse({ status: 200, description: 'Deal deleted' })
-  remove(@Param('id') id: string) {
-    return this.dealsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.dealsService.remove(id, user.userId || user.id);
   }
 }
 

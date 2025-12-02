@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/services/prisma.service';
 import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
+import { LoggingService } from '@/logging/logging.service';
 import { Deal, ActivityType } from '@prisma/client';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class DealsService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly websocketGateway: RealtimeGateway,
+    private readonly loggingService: LoggingService,
   ) {}
 
   async create(data: any, userId: string) {
@@ -102,6 +104,39 @@ export class DealsService {
     } catch (activityError) {
       console.error('DealsService.create - failed to create activity:', activityError);
       // Don't fail the deal creation if activity creation fails
+    }
+
+    // Log action
+    try {
+      // Get stage and pipeline names for metadata
+      const stage = await this.prisma.stage.findUnique({
+        where: { id: deal.stageId },
+        select: { name: true },
+      });
+      const pipeline = await this.prisma.pipeline.findUnique({
+        where: { id: deal.pipelineId },
+        select: { name: true },
+      });
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'create',
+        entity: 'deal',
+        entityId: deal.id,
+        userId,
+        message: `Deal "${deal.title}" created`,
+        metadata: {
+          dealTitle: deal.title,
+          dealNumber: deal.number,
+          amount: deal.amount,
+          stageId: deal.stageId,
+          stageName: stage?.name,
+          pipelineId: deal.pipelineId,
+          pipelineName: pipeline?.name,
+        },
+      });
+    } catch (logError) {
+      console.error('DealsService.create - failed to create log:', logError);
     }
 
     // Format and return deal response
@@ -687,6 +722,40 @@ export class DealsService {
       this.websocketGateway.emitCompanyDealUpdated(deal.companyId, deal.id, deal);
     }
 
+    // Log action
+    try {
+      const changeFields = Object.keys(changes);
+      // Get stage and pipeline names for metadata
+      const stage = await this.prisma.stage.findUnique({
+        where: { id: deal.stageId },
+        select: { name: true },
+      });
+      const pipeline = await this.prisma.pipeline.findUnique({
+        where: { id: deal.pipelineId },
+        select: { name: true },
+      });
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'update',
+        entity: 'deal',
+        entityId: deal.id,
+        userId,
+        message: `Deal "${deal.title}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
+        metadata: {
+          dealTitle: deal.title,
+          dealNumber: deal.number,
+          changes,
+          stageId: deal.stageId,
+          stageName: stage?.name,
+          pipelineId: deal.pipelineId,
+          pipelineName: pipeline?.name,
+        },
+      });
+    } catch (logError) {
+      console.error('DealsService.update - failed to create log:', logError);
+    }
+
     return this.formatDealResponse(deal);
   }
 
@@ -781,10 +850,33 @@ export class DealsService {
     return this.formatDealResponse(updatedDeal);
   }
 
-  async remove(id: string) {
-    return this.prisma.deal.delete({
+  async remove(id: string, userId: string) {
+    const deal = await this.findOne(id);
+    const dealTitle = deal.title || deal.number || id;
+    
+    await this.prisma.deal.delete({
       where: { id },
     });
+
+    // Log action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'delete',
+        entity: 'deal',
+        entityId: id,
+        userId,
+        message: `Deal "${dealTitle}" deleted`,
+        metadata: {
+          dealTitle: deal.title || dealTitle,
+          dealNumber: deal.number,
+        },
+      });
+    } catch (logError) {
+      console.error('DealsService.remove - failed to create log:', logError);
+    }
+
+    return { id };
   }
 
   /**

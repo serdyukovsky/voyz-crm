@@ -44,11 +44,33 @@ export class LoggingService {
       if (filters.endDate) where.createdAt.lte = filters.endDate;
     }
 
-    return this.prisma.log.findMany({
+    const logs = await this.prisma.log.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: 1000, // Limit to prevent huge queries
     });
+
+    // Fetch user information for logs that have userId
+    const userIds = [...new Set(logs.map(log => log.userId).filter(Boolean))];
+    const users = userIds.length > 0
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        })
+      : [];
+
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    // Map logs with user information
+    return logs.map(log => ({
+      ...log,
+      user: log.userId ? userMap.get(log.userId) || null : null,
+    }));
   }
 }
 

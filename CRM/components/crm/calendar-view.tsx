@@ -1,51 +1,115 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Link } from 'react-router-dom'
+import { useTranslation } from '@/lib/i18n/i18n-context'
+import { getTasks } from '@/lib/api/tasks'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isToday, parseISO } from 'date-fns'
 
 interface Task {
   id: string
   title: string
-  date: number
-  month: number
-  year: number
-  dealId: string
-  dealName: string
+  dueDate: string
+  dealId: string | null
+  dealName: string | null
   assignee: string
   completed: boolean
-  priority: "low" | "medium" | "high"
 }
 
-const initialTasks: Task[] = [
-  { id: "1", title: "Follow up with decision maker", date: 15, month: 3, year: 2024, dealId: "1", dealName: "Acme Corp", assignee: "Alex Chen", completed: false, priority: "high" },
-  { id: "2", title: "Send pricing proposal", date: 15, month: 3, year: 2024, dealId: "2", dealName: "TechStart", assignee: "Sarah Lee", completed: false, priority: "high" },
-  { id: "3", title: "Schedule demo", date: 16, month: 3, year: 2024, dealId: "3", dealName: "CloudFlow", assignee: "Mike Johnson", completed: false, priority: "medium" },
-  { id: "4", title: "Final presentation", date: 18, month: 3, year: 2024, dealId: "6", dealName: "InnovateLabs", assignee: "Mike Johnson", completed: false, priority: "high" },
-  { id: "5", title: "Technical call", date: 20, month: 3, year: 2024, dealId: "5", dealName: "DesignHub", assignee: "Sarah Lee", completed: false, priority: "low" },
-  { id: "6", title: "Contract review", date: 22, month: 3, year: 2024, dealId: "4", dealName: "DataCo", assignee: "Alex Chen", completed: false, priority: "medium" },
-]
-
-const priorityColors = {
-  low: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  medium: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  high: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-}
 
 export function CalendarView() {
-  const [currentMonth] = useState("March 2024")
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const { t } = useTranslation()
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   
-  const daysInMonth = 31
-  const startDay = 4 // March 2024 starts on Friday (4)
-
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  const blanks = Array.from({ length: startDay }, (_, i) => i)
+  // Load tasks from API
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        setLoading(true)
+        const tasksData = await getTasks()
+        
+        // Transform API tasks to component format
+        const transformedTasks: Task[] = tasksData.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          dueDate: task.deadline || '',
+          dealId: task.deal?.id || null,
+          dealName: task.deal?.title || null,
+          assignee: task.assignedTo?.name || t('tasks.unassigned'),
+          completed: task.status === 'DONE',
+        }))
+        
+        setTasks(transformedTasks)
+      } catch (error) {
+        console.error('Failed to load tasks:', error)
+        setTasks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadTasks()
+  }, [t])
+  
+  
+  // Week starts with Monday (0 = Monday, 6 = Sunday)
+  const weekDays = [
+    t('calendar.monday'),
+    t('calendar.tuesday'),
+    t('calendar.wednesday'),
+    t('calendar.thursday'),
+    t('calendar.friday'),
+    t('calendar.saturday'),
+    t('calendar.sunday'),
+  ]
+  
+  // Get month start and end dates
+  const monthStart = startOfMonth(currentDate)
+  const monthEnd = endOfMonth(currentDate)
+  
+  // Get all days in the month
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  
+  // Get the day of week for the first day (0 = Monday, 6 = Sunday)
+  // JavaScript getDay() returns 0 = Sunday, 1 = Monday, etc.
+  // We need to convert: 0 (Sun) -> 6, 1 (Mon) -> 0, 2 (Tue) -> 1, etc.
+  const firstDayOfWeek = (getDay(monthStart) + 6) % 7 // Convert to Monday = 0
+  
+  // Create calendar grid: blanks + month days
+  const blanks = Array.from({ length: firstDayOfWeek }, (_, i) => i)
+  
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentDate(prev => {
+      const newDate = new Date(prev)
+      if (direction === 'prev') {
+        newDate.setMonth(prev.getMonth() - 1)
+      } else {
+        newDate.setMonth(prev.getMonth() + 1)
+      }
+      return newDate
+    })
+  }
+  
+  // Get tasks for a specific date
+  const getTasksForDate = (date: Date): Task[] => {
+    return tasks.filter(task => {
+      if (!task.dueDate) return false
+      try {
+        const taskDate = parseISO(task.dueDate)
+        return isSameDay(taskDate, date) && !task.completed
+      } catch {
+        return false
+      }
+    })
+  }
 
   const toggleTask = (id: string) => {
     setTasks(tasks.map(task => 
@@ -56,16 +120,36 @@ export function CalendarView() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">{currentMonth}</h2>
+        <h2 className="text-lg font-semibold text-foreground">
+          {format(currentDate, 'MMMM yyyy', { locale: undefined })}
+        </h2>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => navigateMonth('prev')}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => navigateMonth('next')}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -73,45 +157,50 @@ export function CalendarView() {
 
       <Card className="border-border bg-card p-4">
         <div className="grid grid-cols-7 gap-2">
-          {/* Day headers */}
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          {/* Day headers - starting with Monday */}
+          {weekDays.map((day) => (
             <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
-              {day}
+              {day.substring(0, 3)}
             </div>
           ))}
           
-          {/* Blank cells */}
+          {/* Blank cells for days before month start */}
           {blanks.map((blank) => (
             <div key={`blank-${blank}`} className="aspect-square" />
           ))}
           
-          {/* Days */}
-          {days.map((day) => {
-            const dayTasks = tasks.filter(t => t.date === day && !t.completed)
-            const isToday = day === 15
+          {/* Month days */}
+          {monthDays.map((date) => {
+            const dayTasks = getTasksForDate(date)
+            const dayIsToday = isToday(date)
             
             return (
               <div
-                key={day}
+                key={date.toISOString()}
                 className={`aspect-square rounded-md border p-2 ${
-                  isToday ? "border-primary bg-primary/5" : "border-border bg-background"
+                  dayIsToday ? "border-primary bg-primary/5" : "border-border bg-background"
                 }`}
               >
                 <div className="flex h-full flex-col">
-                  <span className={`text-xs font-medium mb-1 ${isToday ? "text-primary" : "text-foreground"}`}>
-                    {day}
+                  <span className={`text-xs font-medium mb-1 ${dayIsToday ? "text-primary" : "text-foreground"}`}>
+                    {format(date, 'd')}
                   </span>
-                  <div className="space-y-1 overflow-hidden">
-                    {dayTasks.map((task) => (
+                  <div className="space-y-1 overflow-hidden flex-1">
+                    {dayTasks.slice(0, 3).map((task) => (
                       <button
                         key={task.id}
                         onClick={() => setSelectedTask(task)}
-                        className="w-full rounded px-1 py-0.5 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 transition-colors truncate text-left"
+                        className="w-full rounded px-1 py-0.5 text-[10px] hover:opacity-80 transition-colors truncate text-left border border-border bg-background"
                         title={task.title}
                       >
                         {task.title}
                       </button>
                     ))}
+                    {dayTasks.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground px-1">
+                        +{dayTasks.length - 3} {t('tasks.more')}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -135,7 +224,7 @@ export function CalendarView() {
                   checked={selectedTask.completed}
                   onCheckedChange={() => toggleTask(selectedTask.id)}
                   className="mt-1"
-                  aria-label={`Mark "${selectedTask.title}" as ${selectedTask.completed ? 'incomplete' : 'complete'}`}
+                  aria-label={`${t('tasks.markAs')} "${selectedTask.title}" ${selectedTask.completed ? t('tasks.incomplete') : t('tasks.completed')}`}
                 />
                 <div className="flex-1">
                   <h3 className={`text-base font-semibold ${selectedTask.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -154,51 +243,33 @@ export function CalendarView() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Deal</span>
-                <Link
-                  href={`/deals/${selectedTask.dealId}`}
-                  className="text-primary hover:underline"
-                  onClick={() => setSelectedTask(null)}
-                >
-                  {selectedTask.dealName}
-                </Link>
-              </div>
+              {selectedTask.dealId && selectedTask.dealName && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t('tasks.taskDeal')}</span>
+                  <Link
+                    to={`/deals/${selectedTask.dealId}`}
+                    className="text-primary hover:underline"
+                    onClick={() => setSelectedTask(null)}
+                  >
+                    {selectedTask.dealName}
+                  </Link>
+                </div>
+              )}
+
+              {selectedTask.dueDate && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t('tasks.taskDeadline')}</span>
+                  <span className="text-foreground">
+                    {format(parseISO(selectedTask.dueDate), 'PPP', { locale: undefined })}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Due Date</span>
-                <span className="text-foreground">
-                  {new Date(selectedTask.year, selectedTask.month - 1, selectedTask.date).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Assigned To</span>
+                <span className="text-muted-foreground">{t('tasks.assignedTo')}</span>
                 <span className="text-foreground">{selectedTask.assignee}</span>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Priority</span>
-                <Badge 
-                  variant="outline" 
-                  className={`text-[10px] ${priorityColors[selectedTask.priority]}`}
-                >
-                  {selectedTask.priority}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="pt-2 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1">
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" className="flex-1 text-red-400 hover:text-red-400">
-                Delete
-              </Button>
             </div>
           </Card>
         </div>

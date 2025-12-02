@@ -1,59 +1,61 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Target, TrendingUp, TrendingDown, Percent, CheckCircle2, Clock, DollarSign } from 'lucide-react'
-
-const metrics = [
-  {
-    label: "Total Deals",
-    value: "248",
-    change: "+12",
-    trend: "up" as const,
-    icon: Target,
-  },
-  {
-    label: "Won Deals",
-    value: "156",
-    change: "+8",
-    trend: "up" as const,
-    icon: TrendingUp,
-  },
-  {
-    label: "Lost Deals",
-    value: "34",
-    change: "-3",
-    trend: "down" as const,
-    icon: TrendingDown,
-  },
-  {
-    label: "Conversion %",
-    value: "62.9%",
-    change: "+2.1%",
-    trend: "up" as const,
-    icon: Percent,
-  },
-  {
-    label: "Active Tasks",
-    value: "89",
-    change: "+15",
-    trend: "up" as const,
-    icon: CheckCircle2,
-  },
-  {
-    label: "Avg Time per Stage",
-    value: "4.2d",
-    change: "-0.3d",
-    trend: "down" as const,
-    icon: Clock,
-  },
-  {
-    label: "Revenue This Month",
-    value: "$284k",
-    change: "+18%",
-    trend: "up" as const,
-    icon: DollarSign,
-  },
-]
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function MetricsGrid() {
+  const { t } = useTranslation()
+  
+  const metrics = [
+    {
+      label: t('dashboard.totalDeals'),
+      value: "248",
+      change: "+12",
+      trend: "up" as const,
+      icon: Target,
+    },
+    {
+      label: t('dashboard.wonDeals'),
+      value: "156",
+      change: "+8",
+      trend: "up" as const,
+      icon: TrendingUp,
+    },
+    {
+      label: t('dashboard.lostDeals'),
+      value: "34",
+      change: "-3",
+      trend: "down" as const,
+      icon: TrendingDown,
+    },
+    {
+      label: t('dashboard.conversionPercent'),
+      value: "62.9%",
+      change: "+2.1%",
+      trend: "up" as const,
+      icon: Percent,
+    },
+    {
+      label: t('dashboard.activeTasks'),
+      value: "89",
+      change: "+15",
+      trend: "up" as const,
+      icon: CheckCircle2,
+    },
+    {
+      label: t('dashboard.avgTimePerStage'),
+      value: "4.2d",
+      change: "-0.3d",
+      trend: "down" as const,
+      icon: Clock,
+    },
+    {
+      label: t('dashboard.revenueThisMonth'),
+      value: "$284k",
+      change: "+18%",
+      trend: "up" as const,
+      icon: DollarSign,
+    },
+  ]
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {metrics.map((metric) => {
@@ -75,10 +77,10 @@ export function MetricsGrid() {
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-1 text-xs">
-                <span className={isPositive ? "text-green-500" : "text-red-500"}>
+                <span className={isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                   {metric.change}
                 </span>
-                <span className="text-muted-foreground">vs last month</span>
+                <span className="text-muted-foreground">{t('dashboard.vsLastMonth')}</span>
               </div>
             </CardContent>
           </Card>

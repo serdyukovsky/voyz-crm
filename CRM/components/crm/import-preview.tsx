@@ -37,12 +37,12 @@ export function ImportPreview() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold">Import Preview</CardTitle>
             <div className="flex gap-2">
-              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+              <Badge variant="outline" className="bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 dark:border-green-500/20">
                 <CheckCircle2 className="mr-1 h-3 w-3" />
                 {validRows} valid
               </Badge>
               {errorRows > 0 && (
-                <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+                <Badge variant="outline" className="bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 dark:border-red-500/20">
                   <AlertCircle className="mr-1 h-3 w-3" />
                   {errorRows} errors
                 </Badge>
@@ -69,9 +69,9 @@ export function ImportPreview() {
                     <td className="py-2 text-foreground">{row.company}</td>
                     <td className="py-2">
                       {row.status === "valid" ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                       ) : (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                       )}
                     </td>
                   </tr>

@@ -88,3 +88,4 @@ echo "   1. Review the changes"
 echo "   2. Restart frontend dev server: cd CRM && npm run dev"
 echo "   3. Test the application in Codespace preview"
 
+

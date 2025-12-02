@@ -20,6 +20,7 @@ import { getTasks } from '@/lib/api/tasks'
 import type { Contact as ContactType } from '@/types/contact'
 import type { Deal } from '@/lib/api/deals'
 import type { Task } from '@/lib/api/tasks'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface QuickSearchProps {
   open?: boolean
@@ -27,6 +28,7 @@ interface QuickSearchProps {
 }
 
 export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [contacts, setContacts] = useState<ContactType[]>([])
@@ -104,17 +106,17 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder="Search contacts, deals, tasks..."
+        placeholder={t('common.searchPlaceholder')}
         value={search}
         onValueChange={setSearch}
       />
       <CommandList>
         <CommandEmpty>
-          {loading ? 'Searching...' : 'No results found.'}
+          {loading ? t('common.searching') : t('common.noResultsFound')}
         </CommandEmpty>
 
         {contacts.length > 0 && (
-          <CommandGroup heading="Contacts">
+          <CommandGroup heading={t('contacts.title')}>
             {contacts.map((contact) => {
               const initials = contact.fullName
                 .split(' ')
@@ -154,7 +156,7 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
         )}
 
         {deals.length > 0 && (
-          <CommandGroup heading="Deals">
+          <CommandGroup heading={t('deals.title')}>
             {deals.map((deal) => (
               <CommandItem
                 key={deal.id}
@@ -185,7 +187,7 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
         )}
 
         {tasks.length > 0 && (
-          <CommandGroup heading="Tasks">
+          <CommandGroup heading={t('tasks.title')}>
             {tasks.map((task) => (
               <CommandItem
                 key={task.id}

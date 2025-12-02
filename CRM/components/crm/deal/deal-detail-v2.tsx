@@ -388,6 +388,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
             tasks={tasks}
             onTaskCreate={handleTaskCreate}
             onTaskUpdate={handleTaskUpdate}
+            onTaskDelete={deleteTask}
             onTaskClick={(task) => {
               setSelectedTask(task)
               setIsTaskModalOpen(true)
@@ -443,6 +444,11 @@ export function DealDetail({ dealId }: DealDetailProps) {
             setSelectedTask(null)
           }}
           onUpdate={handleTaskUpdate}
+          onDelete={async (taskId: string) => {
+            await deleteTask(taskId)
+            setIsTaskModalOpen(false)
+            setSelectedTask(null)
+          }}
         />
       )}
     </div>

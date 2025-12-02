@@ -671,3 +671,4 @@ npm run test:cov         # Run tests with coverage
 - **Default Port:** 3001 (configurable via PORT env variable)
 - **CORS:** Configured for `http://localhost:3000` and `http://localhost:3001` by default
 
+

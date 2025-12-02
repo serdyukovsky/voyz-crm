@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { RoleGuard } from '@/components/shared/role-guard'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import type { Deal } from '@/hooks/use-deal'
 
 interface DealHeaderProps {
@@ -36,6 +37,7 @@ export function DealHeader({
   onDuplicate,
   isNewDeal = false
 }: DealHeaderProps) {
+  const { t } = useTranslation()
   const [isEditingTitle, setIsEditingTitle] = useState(isNewDeal)
   const [editedTitle, setEditedTitle] = useState(deal?.title || "")
 
@@ -104,7 +106,7 @@ export function DealHeader({
                 className="text-lg font-semibold text-foreground cursor-pointer hover:text-primary transition-colors"
                 onDoubleClick={() => setIsEditingTitle(true)}
               >
-                {deal.title || "Untitled Deal"}
+                {deal.title || t('deals.untitledDeal')}
               </h1>
             </div>
           )}
@@ -141,7 +143,7 @@ export function DealHeader({
             {onDuplicate && (
               <DropdownMenuItem onClick={onDuplicate}>
                 <Copy className="h-4 w-4 mr-2" />
-                Duplicate Deal
+                {t('deals.duplicateDeal')}
               </DropdownMenuItem>
             )}
             <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
@@ -150,7 +152,7 @@ export function DealHeader({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onArchive}>
                     <Archive className="h-4 w-4 mr-2" />
-                    Archive
+                    {t('deals.archive')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -164,7 +166,7 @@ export function DealHeader({
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    {t('common.delete')}
                   </DropdownMenuItem>
                 </>
               )}

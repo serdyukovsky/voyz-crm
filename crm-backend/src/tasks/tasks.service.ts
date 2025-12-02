@@ -47,6 +47,39 @@ export class TasksService {
       },
     });
 
+    // Log action
+    try {
+      // Get deal and contact names for metadata
+      const deal = task.dealId ? await this.prisma.deal.findUnique({
+        where: { id: task.dealId },
+        select: { title: true },
+      }) : null;
+      const contact = task.contactId ? await this.prisma.contact.findUnique({
+        where: { id: task.contactId },
+        select: { fullName: true },
+      }) : null;
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'create',
+        entity: 'task',
+        entityId: task.id,
+        userId,
+        message: `Task "${task.title}" created`,
+        metadata: {
+          taskTitle: task.title,
+          status: task.status,
+          priority: task.priority,
+          dealId: task.dealId,
+          dealTitle: deal?.title,
+          contactId: task.contactId,
+          contactName: contact?.fullName,
+        },
+      });
+    } catch (logError) {
+      console.error('TasksService.create - failed to create log:', logError);
+    }
+
     // Emit WebSocket events
     this.websocketGateway.emitTaskCreated(task.id, task);
     if (task.contactId) {
@@ -258,6 +291,40 @@ export class TasksService {
       });
     }
 
+    // Log action
+    try {
+      const changeFields = Object.keys(changes);
+      // Get deal and contact names for metadata
+      const deal = task.dealId ? await this.prisma.deal.findUnique({
+        where: { id: task.dealId },
+        select: { title: true },
+      }) : null;
+      const contact = task.contactId ? await this.prisma.contact.findUnique({
+        where: { id: task.contactId },
+        select: { fullName: true },
+      }) : null;
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'update',
+        entity: 'task',
+        entityId: task.id,
+        userId,
+        message: `Task "${task.title}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
+        metadata: {
+          taskTitle: task.title,
+          changes,
+          status: task.status,
+          dealId: task.dealId,
+          dealTitle: deal?.title,
+          contactId: task.contactId,
+          contactName: contact?.fullName,
+        },
+      });
+    } catch (logError) {
+      console.error('TasksService.update - failed to create log:', logError);
+    }
+
     // Emit WebSocket events
     this.websocketGateway.emitTaskUpdated(id, task);
     if (task.contactId) {
@@ -292,6 +359,23 @@ export class TasksService {
         taskTitle: task.title,
       },
     });
+
+    // Log action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'delete',
+        entity: 'task',
+        entityId: id,
+        userId,
+        message: `Task "${task.title}" deleted`,
+        metadata: {
+          taskTitle: task.title,
+        },
+      });
+    } catch (logError) {
+      console.error('TasksService.remove - failed to create log:', logError);
+    }
 
     // Emit WebSocket event
     this.websocketGateway.emitTaskDeleted(id, { dealId: task.dealId, contactId: task.contactId });

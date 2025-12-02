@@ -436,8 +436,8 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                                   <span
                                     className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
                                       deal.status === 'active'
-                                        ? 'bg-green-500/10 text-green-600 border border-green-500/20'
-                                        : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                                        ? 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 dark:border-green-500/20'
+                                        : 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20 dark:border-gray-500/20'
                                     }`}
                                   >
                                     {deal.status}
@@ -493,12 +493,12 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                                   <span
                                     className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
                                       task.status === 'done'
-                                        ? 'bg-green-500/10 text-green-600 border border-green-500/20'
+                                        ? 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 dark:border-green-500/20'
                                         : task.status === 'in_progress'
-                                        ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                                        ? 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 dark:border-blue-500/20'
                                         : task.status === 'overdue'
-                                        ? 'bg-red-500/10 text-red-600 border border-red-500/20'
-                                        : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                                        ? 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:border-red-500/20'
+                                        : 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20 dark:border-gray-500/20'
                                     }`}
                                   >
                                     {task.status.replace('_', ' ')}
@@ -509,10 +509,10 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                                     <span
                                       className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
                                         task.priority === 'high'
-                                          ? 'bg-red-500/10 text-red-600 border border-red-500/20'
+                                          ? 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:border-red-500/20'
                                           : task.priority === 'medium'
-                                          ? 'bg-yellow-500/10 text-yellow-600 border border-yellow-500/20'
-                                          : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                                          ? 'bg-yellow-500/10 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 dark:border-yellow-500/20'
+                                          : 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20 dark:border-gray-500/20'
                                       }`}
                                     >
                                       {task.priority}

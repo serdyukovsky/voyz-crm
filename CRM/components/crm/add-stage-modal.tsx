@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface AddStageModalProps {
   isOpen: boolean
@@ -24,6 +25,7 @@ const predefinedColors = [
 ]
 
 export function AddStageModal({ isOpen, onClose, onAdd }: AddStageModalProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState("")
   const [selectedColor, setSelectedColor] = useState(predefinedColors[0])
 
@@ -43,7 +45,7 @@ export function AddStageModal({ isOpen, onClose, onAdd }: AddStageModalProps) {
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-foreground">Add Custom Stage</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('pipeline.addCustomStage')}</h2>
           <Button
             variant="ghost"
             size="sm"
@@ -59,14 +61,14 @@ export function AddStageModal({ isOpen, onClose, onAdd }: AddStageModalProps) {
           {/* Stage Name */}
           <div className="space-y-2">
             <Label htmlFor="stage-name" className="text-sm font-medium text-foreground">
-              Stage Name
+              {t('pipeline.stageName')}
             </Label>
             <Input
               id="stage-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Proposal Sent"
+              placeholder={t('pipeline.stageNamePlaceholder')}
               className="bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
               autoFocus
             />
@@ -75,7 +77,7 @@ export function AddStageModal({ isOpen, onClose, onAdd }: AddStageModalProps) {
           {/* Color Picker */}
           <div className="space-y-2">
             <Label className="text-sm font-medium text-foreground">
-              Stage Color
+              {t('pipeline.stageColor')}
             </Label>
             <div className="flex gap-2 flex-wrap">
               {predefinedColors.map((color) => (
@@ -103,14 +105,14 @@ export function AddStageModal({ isOpen, onClose, onAdd }: AddStageModalProps) {
               onClick={onClose}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim()}
               className="flex-1"
             >
-              Add Stage
+              {t('pipeline.addStage')}
             </Button>
           </div>
         </form>

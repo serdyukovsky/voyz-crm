@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, User, Link as LinkIcon } from 'lucide-react'
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface Task {
   id: string
@@ -15,7 +16,6 @@ interface Task {
   dueDate: string
   assignee: string
   completed: boolean
-  priority: "low" | "medium" | "high"
   status: string
   description?: string
   createdAt?: string
@@ -24,16 +24,12 @@ interface Task {
 
 interface TaskCardProps {
   task: Task
-  onTaskUpdate?: (task: Task) => void
+  onTaskUpdate?: (task: Task, silent?: boolean) => void
+  onTaskDelete?: (taskId: string) => void
 }
 
-const priorityColors = {
-  low: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  medium: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  high: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-}
-
-export function TaskCard({ task, onTaskUpdate }: TaskCardProps) {
+export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
+  const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
 
@@ -55,8 +51,8 @@ export function TaskCard({ task, onTaskUpdate }: TaskCardProps) {
     setIsDealModalOpen(true)
   }
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    onTaskUpdate?.(updatedTask)
+  const handleTaskUpdate = async (updatedTask: Task) => {
+    await onTaskUpdate?.(updatedTask)
   }
 
   return (
@@ -101,14 +97,6 @@ export function TaskCard({ task, onTaskUpdate }: TaskCardProps) {
                 {getInitials(task.assignee)}
               </span>
             </div>
-
-            {/* Priority Badge */}
-            <Badge 
-              variant="outline" 
-              className={`text-[10px] ${priorityColors[task.priority]}`}
-            >
-              {task.priority}
-            </Badge>
           </div>
         </div>
       </Card>
@@ -118,6 +106,10 @@ export function TaskCard({ task, onTaskUpdate }: TaskCardProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onUpdate={handleTaskUpdate}
+        onDelete={onTaskDelete ? async (taskId: string) => {
+          await onTaskDelete(taskId)
+          setIsModalOpen(false)
+        } : undefined}
       />
 
       {/* Deal Detail Modal */}

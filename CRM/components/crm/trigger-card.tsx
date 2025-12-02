@@ -81,7 +81,7 @@ export function TriggerCard({ trigger, isEditMode, onUpdate, onDelete }: Trigger
       <Card className="p-3 border-green-500/20 bg-green-500/5">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+            <Badge variant="outline" className="bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 dark:border-green-500/20">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Редактирование триггера
             </Badge>
@@ -165,7 +165,7 @@ export function TriggerCard({ trigger, isEditMode, onUpdate, onDelete }: Trigger
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
               <span className="text-xs font-medium text-foreground">
                 {getTriggerTypeLabel(trigger.type)}
               </span>

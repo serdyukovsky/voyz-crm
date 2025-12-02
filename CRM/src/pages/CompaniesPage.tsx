@@ -47,9 +47,9 @@ export default function CompaniesPage() {
   useEffect(() => {
     if (error) {
       console.error('Error loading companies:', error)
-      showError('Failed to load companies', 'Please try again later')
+      showError(t('companies.loadError'), t('messages.pleaseTryAgainLater'))
     }
-  }, [error, showError])
+  }, [error, showError, t])
 
   const handleBulkDelete = async () => {
     if (!confirm(t('companies.deleteConfirm', { count: selectedCompanies.length }))) return
@@ -57,10 +57,10 @@ export default function CompaniesPage() {
     try {
       await Promise.all(selectedCompanies.map((id) => deleteCompanyMutation.mutateAsync(id)))
       setSelectedCompanies([])
-      showSuccess(`Deleted ${selectedCompanies.length} company(ies)`)
+      showSuccess(t('companies.deletedSuccess', { count: selectedCompanies.length }))
     } catch (error) {
       console.error('Failed to delete companies:', error)
-      showError('Failed to delete companies', 'Please try again')
+      showError(t('companies.deleteError'), t('messages.pleaseTryAgain'))
     }
   }
 

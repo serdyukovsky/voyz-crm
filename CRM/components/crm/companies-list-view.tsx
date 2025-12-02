@@ -7,6 +7,7 @@ import { Building2, Globe, Mail, Phone, Briefcase } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { CompanyBadge } from '@/components/shared/company-badge'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface CompaniesListViewProps {
   companies: Company[]
@@ -21,6 +22,7 @@ export function CompaniesListView({
   onSelectCompanies,
   onBulkDelete,
 }: CompaniesListViewProps) {
+  const { t } = useTranslation()
   const handleSelectAll = (checked: boolean) => {
     if (onSelectCompanies) {
       onSelectCompanies(checked ? companies.map((c) => c.id) : [])
@@ -46,14 +48,14 @@ export function CompaniesListView({
         <div className="mb-4 p-3 bg-surface border border-border/40 rounded-lg flex items-center justify-between">
           <span className="text-sm text-foreground">
             {selectedCompanies.length}{' '}
-            {selectedCompanies.length === 1 ? 'company' : 'companies'} selected
+            {selectedCompanies.length === 1 ? t('companies.company') : t('companies.companies')} {t('common.selected')}
           </span>
           <div className="flex gap-2">
             <button
               onClick={onBulkDelete}
-              className="px-3 py-1.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-md transition-colors border border-red-500/20"
+              className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors border border-red-500/20"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         </div>
@@ -67,32 +69,32 @@ export function CompaniesListView({
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={handleSelectAll}
-                  aria-label="Select all companies"
+                  aria-label={t('companies.selectAllCompanies')}
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Name
+                {t('companies.name')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Industry
+                {t('companies.industry')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Website
+                {t('companies.website')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Email
+                {t('companies.email')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Phone
+                {t('companies.phone')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Total Deals
+                {t('companies.totalDeals')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Active Deals
+                {t('companies.activeDeals')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Closed Deals
+                {t('companies.closedDeals')}
               </th>
             </tr>
           </thead>
@@ -102,7 +104,7 @@ export function CompaniesListView({
                 <td colSpan={9} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Building2 className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No companies found</p>
+                    <p className="text-sm text-muted-foreground">{t('companies.noCompaniesFound')}</p>
                   </div>
                 </td>
               </tr>
@@ -123,7 +125,7 @@ export function CompaniesListView({
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/companies/${company.id}`}
+                      to={`/companies/${company.id}`}
                       className="text-sm font-medium text-foreground hover:text-primary transition-colors"
                     >
                       {company.name}

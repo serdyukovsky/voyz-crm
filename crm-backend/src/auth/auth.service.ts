@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/common/services/prisma.service';
 import { UsersService } from '@/users/users.service';
+import { LoggingService } from '@/logging/logging.service';
 import * as argon2 from 'argon2';
 import { RegisterDto } from './dto/register.dto';
 import { UserRole } from '@prisma/client';
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwtRefreshService: JwtService, // Refresh token service
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
+    private readonly loggingService: LoggingService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -77,7 +79,7 @@ export class AuthService {
     };
   }
 
-  async login(user: any) {
+  async login(user: any, ipAddress?: string, userAgent?: string) {
     // Update last login
     await this.prisma.user.update({
       where: { id: user.id },
@@ -97,6 +99,20 @@ export class AuthService {
 
     // Generate refresh token (30 days)
     const refreshToken = await this.createRefreshToken(user.id);
+
+    // Log login action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'login',
+        userId: user.id,
+        message: `User ${user.email} logged in`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      console.error('Failed to log login action:', error);
+    }
 
     const { password: _, permissions: __, ...userResponse } = user;
 
@@ -228,7 +244,13 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string, refreshToken?: string) {
+  async logout(userId: string, refreshToken?: string, ipAddress?: string, userAgent?: string) {
+    // Get user info before logout for logging
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
     if (refreshToken) {
       // Delete specific refresh token
       await this.prisma.refreshToken.deleteMany({
@@ -240,6 +262,20 @@ export class AuthService {
     } else {
       // Delete all refresh tokens for user
       await this.invalidateUserRefreshTokens(userId);
+    }
+
+    // Log logout action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'logout',
+        userId: userId,
+        message: user ? `User ${user.email} logged out` : `User ${userId} logged out`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      console.error('Failed to log logout action:', error);
     }
 
     return { message: 'Logged out successfully' };

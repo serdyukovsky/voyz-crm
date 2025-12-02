@@ -13,6 +13,7 @@ import { ContactFilterDto } from './dto/contact-filter.dto';
 import { ContactResponseDto } from './dto/contact-response.dto';
 import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
+import { LoggingService } from '@/logging/logging.service';
 import { Contact, Prisma, ActivityType } from '@prisma/client';
 import {
   normalizePhone,
@@ -29,6 +30,7 @@ export class ContactsService {
     private readonly activityService: ActivityService,
     @Inject(forwardRef(() => RealtimeGateway))
     private readonly websocketGateway: RealtimeGateway,
+    private readonly loggingService: LoggingService,
   ) {}
 
   async create(createContactDto: CreateContactDto, userId: string): Promise<ContactResponseDto> {
@@ -104,6 +106,32 @@ export class ContactsService {
         contactName: contact.fullName,
       },
     });
+
+    // Log action
+    try {
+      // Get company name for metadata
+      const company = contact.companyId ? await this.prisma.company.findUnique({
+        where: { id: contact.companyId },
+        select: { name: true },
+      }) : null;
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'create',
+        entity: 'contact',
+        entityId: contact.id,
+        userId,
+        message: `Contact "${contact.fullName}" created`,
+        metadata: {
+          contactName: contact.fullName,
+          email: contact.email,
+          companyId: contact.companyId,
+          companyName: company?.name,
+        },
+      });
+    } catch (logError) {
+      console.error('ContactsService.create - failed to create log:', logError);
+    }
 
     // Emit WebSocket event
     this.websocketGateway.emitContactCreated(contact.id, contact);
@@ -345,6 +373,33 @@ export class ContactsService {
           newValue: change.new,
         },
       });
+    }
+
+    // Log action
+    try {
+      const changeFields = Object.keys(changes);
+      // Get company name for metadata
+      const company = contact.companyId ? await this.prisma.company.findUnique({
+        where: { id: contact.companyId },
+        select: { name: true },
+      }) : null;
+      
+      await this.loggingService.create({
+        level: 'info',
+        action: 'update',
+        entity: 'contact',
+        entityId: contact.id,
+        userId,
+        message: `Contact "${contact.fullName}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
+        metadata: {
+          contactName: contact.fullName,
+          changes,
+          companyId: contact.companyId,
+          companyName: company?.name,
+        },
+      });
+    } catch (logError) {
+      console.error('ContactsService.update - failed to create log:', logError);
     }
 
     // Emit WebSocket event
