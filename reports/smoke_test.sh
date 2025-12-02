@@ -172,3 +172,4 @@ if [ "$failures" -gt 0 ]; then
     jq -r '.[] | select(.status_code >= 400) | "  - \(.endpoint) (\(.method)): \(.status_code)"' "$RESULTS_FILE"
 fi
 
+

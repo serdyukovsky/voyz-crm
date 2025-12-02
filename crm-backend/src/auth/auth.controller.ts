@@ -62,7 +62,9 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.login(req.user);
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    const result = await this.authService.login(req.user, ipAddress, userAgent);
 
     // Set refresh token in HttpOnly cookie
     const refreshTokenExpiresIn = this.configService.get<string>(
@@ -198,7 +200,9 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken;
 
     // Delete refresh token from database
-    await this.authService.logout(user.userId || user.id, refreshToken);
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    await this.authService.logout(user.userId || user.id, refreshToken, ipAddress, userAgent);
 
     // Clear refresh token cookie
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';

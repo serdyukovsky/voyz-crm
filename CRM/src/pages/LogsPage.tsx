@@ -46,6 +46,7 @@ export default function LogsPage() {
           actionFilter={actionFilter}
           userFilter={userFilter}
           entityFilter={entityFilter}
+          dateRange={dateRange}
         />
       </div>
     </CRMLayout>

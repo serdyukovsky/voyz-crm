@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, MessageSquare, CheckCircle2, FileText, UserPlus } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 const activities = [
   {
@@ -10,7 +11,7 @@ const activities = [
     amount: "$124,500",
     time: "2 hours ago",
     icon: TrendingUp,
-    color: "text-green-500",
+    color: "text-green-600 dark:text-green-400",
   },
   {
     type: "deal_created",
@@ -29,7 +30,7 @@ const activities = [
     target: "Follow-up call with CloudFlow",
     time: "5 hours ago",
     icon: CheckCircle2,
-    color: "text-blue-500",
+    color: "text-blue-600 dark:text-blue-400",
   },
   {
     type: "comment",
@@ -38,7 +39,7 @@ const activities = [
     target: "Marketing Platform - BrandX",
     time: "6 hours ago",
     icon: MessageSquare,
-    color: "text-purple-500",
+    color: "text-purple-600 dark:text-purple-400",
   },
   {
     type: "deal_created",
@@ -57,16 +58,17 @@ const activities = [
     target: "John Smith - MegaTech Solutions",
     time: "1 day ago",
     icon: UserPlus,
-    color: "text-orange-500",
+    color: "text-orange-600 dark:text-orange-400",
   },
 ]
 
 export function RecentActivityCard() {
+  const { t } = useTranslation()
   return (
     <Card className="border-border/50 bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-foreground">Recent Activity</CardTitle>
-        <p className="text-xs text-muted-foreground">Latest updates from your team</p>
+        <CardTitle className="text-sm font-semibold text-foreground">{t('dashboard.recentActivity')}</CardTitle>
+        <p className="text-xs text-muted-foreground">{t('dashboard.latestUpdates')}</p>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

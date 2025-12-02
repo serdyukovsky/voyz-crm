@@ -10,6 +10,7 @@ interface DealTasksListProps {
   tasks: Task[]
   onTaskCreate: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
+  onTaskDelete?: (taskId: string) => Promise<void>
   onTaskClick?: (task: Task) => void
 }
 
@@ -17,6 +18,7 @@ export function DealTasksList({
   tasks,
   onTaskCreate,
   onTaskUpdate,
+  onTaskDelete,
   onTaskClick
 }: DealTasksListProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -57,7 +59,10 @@ export function DealTasksList({
               dealId: task.dealId || null,
               dealName: task.dealName || null
             } as any} 
-            onTaskUpdate={handleTaskUpdateWrapper as any} 
+            onTaskUpdate={handleTaskUpdateWrapper as any}
+            onTaskDelete={onTaskDelete ? async (taskId: string) => {
+              await onTaskDelete(taskId)
+            } : undefined}
           />
         </div>
       ))}
@@ -74,7 +79,10 @@ export function DealTasksList({
                     dealId: task.dealId || null,
                     dealName: task.dealName || null
                   } as any} 
-                  onTaskUpdate={handleTaskUpdateWrapper as any} 
+                  onTaskUpdate={handleTaskUpdateWrapper as any}
+                  onTaskDelete={onTaskDelete ? async (taskId: string) => {
+                    await onTaskDelete(taskId)
+                  } : undefined}
                 />
               </div>
             ))}
@@ -96,6 +104,11 @@ export function DealTasksList({
             setSelectedTask(null)
           }}
           onUpdate={handleTaskUpdateWrapper as any}
+          onDelete={onTaskDelete ? async (taskId: string) => {
+            await onTaskDelete(taskId)
+            setIsModalOpen(false)
+            setSelectedTask(null)
+          } : undefined}
         />
       )}
     </div>

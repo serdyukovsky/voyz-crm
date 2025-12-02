@@ -102,10 +102,10 @@ export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFo
 
       {validationErrors.length > 0 && (
         <div className="flex items-start gap-2 p-3 border border-red-500/20 bg-red-500/5 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-xs font-medium text-red-500 mb-1">Validation Errors:</p>
-            <ul className="text-xs text-red-500/80 space-y-1">
+            <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Validation Errors:</p>
+            <ul className="text-xs text-red-600/80 dark:text-red-400/80 space-y-1">
               {validationErrors.map((error, idx) => (
                 <li key={idx}>• {error}</li>
               ))}

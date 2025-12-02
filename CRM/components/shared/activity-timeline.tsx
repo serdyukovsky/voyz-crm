@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import type { Activity, ActivityType } from '@/lib/api/activities'
 
 interface ActivityTimelineProps {
@@ -63,53 +64,80 @@ const activityIcons: Record<ActivityType, typeof Clock> = {
 }
 
 const activityColors: Record<ActivityType, string> = {
-  DEAL_CREATED: 'bg-blue-500/10 text-blue-600',
-  DEAL_UPDATED: 'bg-gray-500/10 text-gray-600',
-  DEAL_DELETED: 'bg-red-500/10 text-red-600',
-  FIELD_UPDATED: 'bg-purple-500/10 text-purple-600',
-  STAGE_CHANGED: 'bg-orange-500/10 text-orange-600',
-  CONTACT_LINKED: 'bg-green-500/10 text-green-600',
-  CONTACT_UNLINKED: 'bg-red-500/10 text-red-600',
-  CONTACT_UPDATED_IN_DEAL: 'bg-blue-500/10 text-blue-600',
-  TASK_CREATED: 'bg-green-500/10 text-green-600',
-  TASK_UPDATED: 'bg-yellow-500/10 text-yellow-600',
-  TASK_COMPLETED: 'bg-green-500/10 text-green-600',
-  TASK_DELETED: 'bg-red-500/10 text-red-600',
-  COMMENT_ADDED: 'bg-blue-500/10 text-blue-600',
-  FILE_UPLOADED: 'bg-indigo-500/10 text-indigo-600',
-  FILE_DELETED: 'bg-red-500/10 text-red-600',
-  ASSIGNEE_CHANGED: 'bg-purple-500/10 text-purple-600',
-  TAG_ADDED: 'bg-pink-500/10 text-pink-600',
-  TAG_REMOVED: 'bg-pink-500/10 text-pink-600',
-  CONTACT_CREATED: 'bg-green-500/10 text-green-600',
-  CONTACT_UPDATED: 'bg-blue-500/10 text-blue-600',
-  CONTACT_DELETED: 'bg-red-500/10 text-red-600',
-  COMPANY_CREATED: 'bg-green-500/10 text-green-600',
-  COMPANY_UPDATED: 'bg-blue-500/10 text-blue-600',
-  COMPANY_DELETED: 'bg-red-500/10 text-red-600',
-  EMAIL_SENT: 'bg-blue-500/10 text-blue-600',
-  LOGIN: 'bg-gray-500/10 text-gray-600',
-  LOGOUT: 'bg-gray-500/10 text-gray-600',
+  DEAL_CREATED: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  DEAL_UPDATED: 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300',
+  DEAL_DELETED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  FIELD_UPDATED: 'bg-purple-500/10 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400',
+  STAGE_CHANGED: 'bg-orange-500/10 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400',
+  CONTACT_LINKED: 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400',
+  CONTACT_UNLINKED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  CONTACT_UPDATED_IN_DEAL: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  TASK_CREATED: 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400',
+  TASK_UPDATED: 'bg-yellow-500/10 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
+  TASK_COMPLETED: 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400',
+  TASK_DELETED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  COMMENT_ADDED: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  FILE_UPLOADED: 'bg-indigo-500/10 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+  FILE_DELETED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  ASSIGNEE_CHANGED: 'bg-purple-500/10 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400',
+  TAG_ADDED: 'bg-pink-500/10 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400',
+  TAG_REMOVED: 'bg-pink-500/10 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400',
+  CONTACT_CREATED: 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400',
+  CONTACT_UPDATED: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  CONTACT_DELETED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  COMPANY_CREATED: 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400',
+  COMPANY_UPDATED: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  COMPANY_DELETED: 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  EMAIL_SENT: 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  LOGIN: 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300',
+  LOGOUT: 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300',
 }
 
-function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: string; name: string }>): string {
+function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: string; name: string }>, t?: (key: string) => string): string | null {
   const payload = activity.payload || {}
+  const translate = t || ((key: string) => key)
   
   switch (activity.type) {
     case 'DEAL_CREATED':
-      return 'created this deal'
+      return translate('deals.createdThisDeal')
     case 'DEAL_UPDATED':
-      return 'updated this deal'
+      // Show detailed changes if available
+      const changes = payload.changes
+      if (Array.isArray(changes) && changes.length > 0) {
+        // Filter out changes that are already covered by specific events
+        const significantChanges = changes.filter(change => 
+          change !== 'stage' && change !== 'contact' && change !== 'assignee'
+        )
+        
+        if (significantChanges.length > 0) {
+          const changeLabels: Record<string, string> = {
+            amount: translate('deals.amount').toLowerCase(),
+            title: translate('deals.dealName').toLowerCase(),
+            company: translate('deals.company').toLowerCase(),
+            description: translate('tasks.taskDescription').toLowerCase(),
+            expectedCloseDate: translate('deals.expectedCloseDate').toLowerCase(),
+            probability: translate('deals.probability').toLowerCase(),
+          }
+          
+          const labels = significantChanges
+            .map(change => changeLabels[change] || change)
+            .join(', ')
+          
+          return `${translate('deals.updatedThisDeal')} ${labels}`
+        }
+      }
+      // If no significant changes or changes are already covered by other events, return null to hide
+      return null
     case 'DEAL_DELETED':
-      return 'deleted this deal'
+      return translate('deals.deletedThisDeal')
     case 'FIELD_UPDATED':
-      const fieldName = payload.fieldName || 'field'
+      const fieldName = payload.fieldName || translate('deals.fields')
       const oldValue = payload.oldValue
       const newValue = payload.newValue
       if (oldValue !== undefined && newValue !== undefined) {
-        return `updated ${fieldName} from "${oldValue}" to "${newValue}"`
+        return `${translate('deals.updatedThisDeal')} ${fieldName} ${translate('common.from')} "${oldValue}" ${translate('common.to')} "${newValue}"`
       }
-      return `updated ${fieldName}`
+      return `${translate('deals.updatedThisDeal')} ${fieldName}`
     case 'STAGE_CHANGED':
       let fromStage = payload.fromStage || payload.from
       let toStage = payload.toStage || payload.to
@@ -132,85 +160,91 @@ function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: 
       }
       
       if (fromStage && toStage) {
-        return `changed stage from "${fromStage}" → "${toStage}"`
+        return `${translate('deals.changedStage')} ${translate('common.from')} "${fromStage}" → "${toStage}"`
       }
-      return 'changed stage'
+      return translate('deals.changedStage')
     case 'CONTACT_LINKED':
       return activity.contact 
-        ? `linked contact "${activity.contact.fullName}"`
-        : 'linked a contact'
+        ? `${translate('deals.linkedContact')} "${activity.contact.fullName}"`
+        : translate('deals.linkedContact')
     case 'CONTACT_UNLINKED':
       return activity.contact
-        ? `unlinked contact "${activity.contact.fullName}"`
-        : 'unlinked a contact'
+        ? `${translate('deals.unlinkedContact')} "${activity.contact.fullName}"`
+        : translate('deals.unlinkedContact')
     case 'COMPANY_CREATED':
-      return 'created this company'
+      return translate('companies.createdThisCompany')
     case 'COMPANY_UPDATED':
-      return 'updated this company'
+      return translate('companies.updatedThisCompany')
     case 'COMPANY_DELETED':
-      return 'deleted this company'
+      return translate('companies.deletedThisCompany')
     case 'CONTACT_CREATED':
-      return 'created this contact'
+      return translate('contacts.createdThisContact')
     case 'CONTACT_UPDATED':
-      return 'updated this contact'
+      return translate('contacts.updatedThisContact')
     case 'CONTACT_DELETED':
-      return 'deleted this contact'
+      return translate('contacts.deletedThisContact')
     case 'TASK_CREATED':
       return activity.task
-        ? `created task "${activity.task.title}"`
-        : 'created a task'
+        ? `${translate('deals.createdTask')} "${activity.task.title}"`
+        : translate('deals.createdTask')
     case 'TASK_UPDATED':
       return activity.task
-        ? `updated task "${activity.task.title}"`
-        : 'updated a task'
+        ? `${translate('deals.updatedTask')} "${activity.task.title}"`
+        : translate('deals.updatedTask')
     case 'TASK_COMPLETED':
       return activity.task
-        ? `completed task "${activity.task.title}"`
-        : 'completed a task'
+        ? `${translate('deals.completedTask')} "${activity.task.title}"`
+        : translate('deals.completedTask')
     case 'TASK_DELETED':
       return activity.task
-        ? `deleted task "${activity.task.title}"`
-        : 'deleted a task'
+        ? `${translate('deals.deletedTask')} "${activity.task.title}"`
+        : translate('deals.deletedTask')
     case 'COMMENT_ADDED':
       // Return simple message, content will be displayed separately
-      return 'commented'
+      return translate('deals.commented')
     case 'FILE_UPLOADED':
       return payload.fileName
-        ? `uploaded file "${payload.fileName}"`
-        : 'uploaded a file'
+        ? `${translate('deals.uploadedFile')} "${payload.fileName}"`
+        : translate('deals.uploadedFile')
     case 'FILE_DELETED':
       return payload.fileName
-        ? `deleted file "${payload.fileName}"`
-        : 'deleted a file'
+        ? `${translate('deals.deletedFile')} "${payload.fileName}"`
+        : translate('deals.deletedFile')
     case 'ASSIGNEE_CHANGED':
       const fromUser = payload.fromUser || payload.from
       const toUser = payload.toUser || payload.to
       if (fromUser && toUser) {
-        return `reassigned from "${fromUser}" to "${toUser}"`
+        return `${translate('deals.reassigned')} ${translate('common.from')} "${fromUser}" ${translate('common.to')} "${toUser}"`
       }
-      return 'changed assignee'
+      return translate('deals.reassigned')
     case 'TAG_ADDED':
-      return payload.tag ? `added tag "${payload.tag}"` : 'added a tag'
+      return payload.tag ? `${translate('deals.addedTag')} "${payload.tag}"` : translate('deals.addedTag')
     case 'TAG_REMOVED':
-      return payload.tag ? `removed tag "${payload.tag}"` : 'removed a tag'
+      return payload.tag ? `${translate('deals.removedTag')} "${payload.tag}"` : translate('deals.removedTag')
     case 'EMAIL_SENT':
       return payload.to
-        ? `sent email to ${payload.to}${payload.subject ? `: "${payload.subject}"` : ''}`
-        : 'sent an email'
+        ? `${translate('deals.sentEmail')} ${payload.to}${payload.subject ? `: "${payload.subject}"` : ''}`
+        : translate('deals.sentEmail')
     case 'LOGIN':
-      return 'logged in'
+      return translate('auth.loggedIn')
     case 'LOGOUT':
-      return 'logged out'
+      return translate('auth.loggedOut')
     default:
-      return 'performed an action'
+      return translate('deals.performedAction')
   }
 }
 
 function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity; isLast: boolean; pipelineStages?: Array<{ id: string; name: string }> }) {
+  const { t } = useTranslation()
   const Icon = activityIcons[activity.type] || Clock
-  const message = formatActivityMessage(activity, pipelineStages)
+  const message = formatActivityMessage(activity, pipelineStages, t)
   const date = parseISO(activity.createdAt)
   const timeString = format(date, 'h:mm a')
+
+  // Hide DEAL_UPDATED events that don't have meaningful information
+  if (!message) {
+    return null
+  }
 
   return (
     <div className="flex gap-3 relative">
@@ -221,7 +255,7 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
       <div className="relative z-10 mt-0.5">
         <div className={cn(
           "rounded-full p-1.5",
-          activityColors[activity.type] || "bg-gray-500/10 text-gray-600"
+          activityColors[activity.type] || "bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300"
         )}>
           <Icon className="h-3 w-3" />
         </div>
@@ -244,11 +278,11 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
             <p className="text-sm text-foreground leading-relaxed">
               <span className="font-medium">{activity.user.name}</span>
               {' '}
-              {activity.type === 'COMMENT_ADDED' ? (
+                  {activity.type === 'COMMENT_ADDED' ? (
                 <>
                   <span className="text-muted-foreground">{message}</span>
                   {activity.payload?.content && (
-                    <div className="mt-2 text-sm text-white whitespace-pre-wrap break-words">
+                    <div className="mt-2 text-sm text-foreground bg-muted/50 rounded-md p-2 whitespace-pre-wrap break-words">
                       {activity.payload.content}
                     </div>
                   )}
@@ -298,6 +332,7 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
 }
 
 export function ActivityTimeline({ activities, className, pipelineStages }: ActivityTimelineProps) {
+  const { t } = useTranslation()
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
 
   // Group activities by date
@@ -343,7 +378,7 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
   if (activities.length === 0) {
     return (
       <div className={cn("py-12 text-center text-muted-foreground text-sm", className)}>
-        No activity yet
+        {t('deals.noActivity')}
       </div>
     )
   }
@@ -357,8 +392,8 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
         const isYesterdayDate = isYesterday(date)
 
         let dateLabel = format(date, 'MMMM d, yyyy')
-        if (isTodayDate) dateLabel = 'Today'
-        if (isYesterdayDate) dateLabel = 'Yesterday'
+        if (isTodayDate) dateLabel = t('deals.today')
+        if (isYesterdayDate) dateLabel = t('deals.yesterday')
 
         const isExpanded = expandedDates.has(dateKey) || sortedDates.length === 1
 
@@ -385,14 +420,19 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-4 pt-2">
-                {dateActivities.map((activity, index) => (
-                  <ActivityItem
-                    key={activity.id}
-                    activity={activity}
-                    isLast={index === dateActivities.length - 1}
-                    pipelineStages={pipelineStages}
-                  />
-                ))}
+                {dateActivities
+                  .filter(activity => {
+                    const message = formatActivityMessage(activity, pipelineStages, t)
+                    return message !== null
+                  })
+                  .map((activity, index, filteredActivities) => (
+                    <ActivityItem
+                      key={activity.id}
+                      activity={activity}
+                      isLast={index === filteredActivities.length - 1}
+                      pipelineStages={pipelineStages}
+                    />
+                  ))}
               </div>
             </CollapsibleContent>
           </Collapsible>

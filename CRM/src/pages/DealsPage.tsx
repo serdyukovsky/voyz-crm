@@ -189,6 +189,7 @@ const demoDeals: Deal[] = [
 ]
 
 export default function DealsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -273,16 +274,16 @@ export default function DealsPage() {
       if (updatedFunnels.length === 1) {
         setCurrentFunnelId(newPipeline.id)
       }
-      showSuccess('Pipeline created successfully')
+      showSuccess(t('pipeline.createdSuccess'))
     } catch (error) {
       console.error('Failed to create pipeline:', error)
-      showError('Failed to create pipeline', 'Please try again')
+      showError(t('pipeline.createError'), t('messages.pleaseTryAgain'))
     }
   }
 
   const handleAddFunnelOld = async (name: string) => {
     if (!name.trim()) {
-      showError('Pipeline name required', 'Please enter a pipeline name')
+      showError(t('pipeline.nameRequired'), t('pipeline.pleaseEnterName'))
       return
     }
 
@@ -316,7 +317,7 @@ export default function DealsPage() {
       }
       console.log(`Created ${stagesCreated} out of ${defaultStagesToCreate.length} stages`)
 
-      showSuccess(`Pipeline "${newPipeline.name}" created successfully with ${stagesCreated} stages`)
+      showSuccess(t('pipeline.createdWithStages', { name: newPipeline.name, count: stagesCreated }))
       
       await new Promise(resolve => setTimeout(resolve, 2000))
       
@@ -366,7 +367,7 @@ export default function DealsPage() {
         error: error,
         stack: error instanceof Error ? error.stack : undefined
       })
-      showError('Failed to create pipeline', errorMessage)
+      showError(t('pipeline.createError'), errorMessage)
     }
   }
 
@@ -473,13 +474,13 @@ export default function DealsPage() {
   const handleCreateNewDeal = async (stageId?: string) => {
     try {
       if (!currentFunnelId) {
-        showError('No pipeline selected', 'Please select or create a pipeline first.')
+        showError(t('deals.noPipelineSelected'), t('deals.selectOrCreatePipeline'))
         return
       }
       
       const currentFunnel = pipelines.find(p => p.id === currentFunnelId)
       if (!currentFunnel || !currentFunnel.stages || currentFunnel.stages.length === 0) {
-        showError('No pipeline available', 'Please create a pipeline with stages first')
+        showError(t('deals.noPipelineAvailable'), t('deals.createPipelineWithStages'))
         return
       }
 
@@ -487,18 +488,18 @@ export default function DealsPage() {
       const targetStageId = stageId || currentFunnel.stages.sort((a, b) => a.order - b.order)[0].id
 
       const newDeal = await createDealMutation.mutateAsync({
-        title: 'New Deal',
+        title: t('deals.newDeal'),
         amount: 0,
         pipelineId: currentFunnelId,
         stageId: targetStageId,
         status: 'open',
       })
 
-      showSuccess('Deal created successfully')
+      showSuccess(t('deals.dealCreatedSuccess'))
       navigate(`/deals/${newDeal.id}`)
     } catch (error) {
       console.error('Failed to create deal:', error)
-      showError('Failed to create deal', error instanceof Error ? error.message : 'Unknown error')
+      showError(t('deals.failedToCreateDeal'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
     }
   }
 
@@ -536,7 +537,7 @@ export default function DealsPage() {
                     <div className="absolute top-full left-0 mt-2 w-64 bg-popover border border-border/50 rounded-lg shadow-lg z-20 overflow-hidden">
                       {funnelsList.length === 0 ? (
                         <div className="px-4 py-2.5 text-sm text-muted-foreground">
-                          No pipelines found
+                          {t('pipeline.noPipelinesFound')}
                         </div>
                       ) : (
                         funnelsList.map((funnel) => (
@@ -565,7 +566,7 @@ export default function DealsPage() {
                           className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
                         >
                           <Plus className="h-4 w-4" />
-                          Добавить воронку
+                          {t('deals.addPipeline')}
                         </button>
                       </div>
                     </div>
@@ -575,7 +576,7 @@ export default function DealsPage() {
             </div>
             <Button size="sm" onClick={() => setIsEditMode(false)}>
               <CheckCircle2 className="mr-2 h-4 w-4" />
-              Сохранить
+              {t('common.save')}
             </Button>
             </div>
           ) : (
@@ -600,7 +601,7 @@ export default function DealsPage() {
                   <div className="absolute top-full left-0 mt-2 w-64 bg-popover border border-border/50 rounded-lg shadow-lg z-20 overflow-hidden">
                     {funnelsList.length === 0 ? (
                       <div className="px-4 py-2.5 text-sm text-muted-foreground">
-                        No pipelines found
+                        {t('pipeline.noPipelinesFound')}
                       </div>
                     ) : (
                       funnelsList.map((funnel) => (
@@ -629,14 +630,14 @@ export default function DealsPage() {
                         className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
-                        Добавить воронку
+                        {t('deals.addPipeline')}
                       </button>
                     </div>
                   </div>
                 </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">Manage your sales pipeline</p>
+            <p className="text-sm text-muted-foreground">{t('deals.managePipeline')}</p>
           </div>
           <div className="flex gap-2">
             <div className="flex border border-border/40 rounded-md overflow-hidden">
@@ -647,7 +648,7 @@ export default function DealsPage() {
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-surface/50"
                 }`}
-                aria-label="Kanban view"
+                aria-label={t('deals.kanbanView')}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
@@ -658,7 +659,7 @@ export default function DealsPage() {
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-surface/50"
                 }`}
-                aria-label="List view"
+                aria-label={t('deals.listView')}
               >
                 <List className="h-4 w-4" />
               </button>
@@ -667,17 +668,19 @@ export default function DealsPage() {
               variant="outline" 
               size="sm" 
               onClick={() => setIsEditMode(!isEditMode)}
+              className="text-xs"
             >
-              <Settings className="mr-2 h-4 w-4" />
-              Настройки
+              <Settings className="mr-2 h-4 w-4 shrink-0" />
+              {t('settings.title')}
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
+              className="text-xs"
             >
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
+              <Filter className="mr-2 h-4 w-4 shrink-0" />
+              {t('common.filters')}
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-2">
                   {Object.keys(filters).length}
@@ -691,26 +694,26 @@ export default function DealsPage() {
                 setSort({ field, direction })
               }}
             >
-              <SelectTrigger className="w-[180px]">
-                <ArrowUpDown className="mr-2 h-4 w-4" />
+              <SelectTrigger className="h-8 w-[180px] text-xs" size="sm">
+                <ArrowUpDown className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="amount-desc">Amount: High to Low</SelectItem>
-                <SelectItem value="amount-asc">Amount: Low to High</SelectItem>
-                <SelectItem value="updatedAt-desc">Last Update: Newest</SelectItem>
-                <SelectItem value="updatedAt-asc">Last Update: Oldest</SelectItem>
+                <SelectItem value="amount-desc">{t('deals.amount')}: {t('deals.highToLow')}</SelectItem>
+                <SelectItem value="amount-asc">{t('deals.amount')}: {t('deals.lowToHigh')}</SelectItem>
+                <SelectItem value="updatedAt-desc">{t('deals.lastUpdate')}: {t('deals.newest')}</SelectItem>
+                <SelectItem value="updatedAt-asc">{t('deals.lastUpdate')}: {t('deals.oldest')}</SelectItem>
               </SelectContent>
             </Select>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="mr-2 h-4 w-4" />
-                Clear filters
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
+                <X className="mr-2 h-4 w-4 shrink-0" />
+                {t('common.clearFilters')}
               </Button>
             )}
-              <Button size="sm" onClick={handleCreateNewDeal}>
-                <Plus className="mr-2 h-4 w-4" />
-                New Deal
+              <Button size="sm" onClick={handleCreateNewDeal} className="text-xs">
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
+                {t('deals.newDeal')}
               </Button>
             </div>
             </div>
@@ -723,17 +726,17 @@ export default function DealsPage() {
             <Card className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Company</label>
+                  <label className="text-xs text-muted-foreground mb-2 block">{t('deals.company')}</label>
                   <Select
                     value={filters.companyId || 'all'}
                     onValueChange={(value) => setFilters({ ...filters, companyId: value === 'all' ? undefined : value })}
                   >
-                    <SelectTrigger>
-                      <Building2 className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="All companies" />
+                    <SelectTrigger className="h-8 text-xs" size="sm">
+                      <Building2 className="mr-2 h-4 w-4 shrink-0" />
+                      <SelectValue placeholder={t('deals.allCompanies')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All companies</SelectItem>
+                      <SelectItem value="all">{t('deals.allCompanies')}</SelectItem>
                       {companies.map(company => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -744,17 +747,17 @@ export default function DealsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Contact</label>
+                  <label className="text-xs text-muted-foreground mb-2 block">{t('deals.contact')}</label>
                   <Select
                     value={filters.contactId || 'all'}
                     onValueChange={(value) => setFilters({ ...filters, contactId: value === 'all' ? undefined : value })}
                   >
-                    <SelectTrigger>
-                      <User className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="All contacts" />
+                    <SelectTrigger className="h-8 text-xs" size="sm">
+                      <User className="mr-2 h-4 w-4 shrink-0" />
+                      <SelectValue placeholder={t('deals.allContacts')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All contacts</SelectItem>
+                      <SelectItem value="all">{t('deals.allContacts')}</SelectItem>
                       {contacts.map(contact => (
                         <SelectItem key={contact.id} value={contact.id}>
                           {contact.fullName}
@@ -765,33 +768,33 @@ export default function DealsPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Amount Range</label>
+                  <label className="text-xs text-muted-foreground mb-2 block">{t('deals.amountRange')}</label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
-                      placeholder="Min"
+                      placeholder={t('common.min')}
                       value={filters.amountMin || ''}
                       onChange={(e) => setFilters({ 
                         ...filters, 
                         amountMin: e.target.value ? Number(e.target.value) : undefined 
                       })}
-                      className="h-9"
+                      className="h-8 text-xs"
                     />
                     <Input
                       type="number"
-                      placeholder="Max"
+                      placeholder={t('common.max')}
                       value={filters.amountMax || ''}
                       onChange={(e) => setFilters({ 
                         ...filters, 
                         amountMax: e.target.value ? Number(e.target.value) : undefined 
                       })}
-                      className="h-9"
+                      className="h-8 text-xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Updated After</label>
+                  <label className="text-xs text-muted-foreground mb-2 block">{t('deals.updatedAfter')}</label>
                   <Input
                     type="date"
                     value={filters.updatedAfter || ''}
@@ -799,12 +802,12 @@ export default function DealsPage() {
                       ...filters, 
                       updatedAfter: e.target.value || undefined 
                     })}
-                    className="h-9"
+                    className="h-8 text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Updated Before</label>
+                  <label className="text-xs text-muted-foreground mb-2 block">{t('deals.updatedBefore')}</label>
                   <Input
                     type="date"
                     value={filters.updatedBefore || ''}
@@ -812,7 +815,7 @@ export default function DealsPage() {
                       ...filters, 
                       updatedBefore: e.target.value || undefined 
                     })}
-                    className="h-9"
+                    className="h-8 text-xs"
                   />
                 </div>
               </div>
@@ -881,7 +884,19 @@ export default function DealsPage() {
               onSelectDeals={setSelectedDeals}
               onBulkDelete={handleBulkDelete}
               onBulkChangeStage={handleBulkChangeStage}
-              stages={stages}
+              stages={(() => {
+                // Convert API stages (with 'name') to component format (with 'label')
+                const currentPipeline = pipelines.find(p => p.id === selectedPipelineForList)
+                if (currentPipeline?.stages) {
+                  return currentPipeline.stages.map(s => ({
+                    id: s.id,
+                    label: s.name,
+                    color: s.color,
+                    isCustom: !s.isDefault
+                  }))
+                }
+                return stages
+              })()}
             />
           )
           )}

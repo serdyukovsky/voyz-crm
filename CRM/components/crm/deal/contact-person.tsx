@@ -21,6 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface ContactPersonProps {
   contact: Contact | null
@@ -37,6 +38,7 @@ export function ContactPerson({
   onContactsUpdate,
   isRequired = false,
 }: ContactPersonProps) {
+  const { t } = useTranslation()
   const [isSelectOpen, setIsSelectOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [companies, setCompanies] = useState<Company[]>([])
@@ -91,13 +93,13 @@ export function ContactPerson({
       setIsSelectOpen(false)
       
       toast({
-        title: 'Success',
-        description: 'Contact created successfully',
+        title: t('common.success'),
+        description: t('contacts.createdSuccess'),
       })
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to create contact',
+        title: t('common.error'),
+        description: t('contacts.createError'),
         variant: 'destructive',
       })
     }
@@ -133,9 +135,9 @@ export function ContactPerson({
         </PopoverTrigger>
         <PopoverContent className="w-[400px] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Search contacts..." />
+            <CommandInput placeholder={t('contacts.searchPlaceholder')} />
             <CommandList>
-              <CommandEmpty>No contacts found.</CommandEmpty>
+              <CommandEmpty>{t('contacts.noContactsFound')}</CommandEmpty>
               <CommandGroup>
                 <CommandItem
                   value="__create_new__"
@@ -143,7 +145,7 @@ export function ContactPerson({
                   className="text-primary"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  <span>Create new contact</span>
+                  <span>{t('contacts.createContact')}</span>
                 </CommandItem>
                 {!required && (
                   <CommandItem
@@ -153,7 +155,7 @@ export function ContactPerson({
                       setIsSelectOpen(false)
                     }}
                   >
-                    <span>None</span>
+                    <span>{t('tasks.none')}</span>
                   </CommandItem>
                 )}
                 {contacts.map((c) => (
@@ -185,9 +187,9 @@ export function ContactPerson({
     return (
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground mb-2 block">
-          Contact Person <span className="text-red-500">*</span>
+          {t('deals.contactPerson')} <span className="text-red-600 dark:text-red-400">*</span>
         </label>
-        {renderContactSelector("Select contact (required)", true)}
+        {renderContactSelector(t('deals.selectContactRequired'), true)}
       </div>
     )
   }
@@ -196,9 +198,9 @@ export function ContactPerson({
     return (
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground mb-2 block">
-          Contact Person
+          {t('deals.contactPerson')}
         </label>
-        {renderContactSelector("Select contact", false)}
+        {renderContactSelector(t('deals.selectContact'), false)}
       </div>
     )
   }
@@ -206,7 +208,7 @@ export function ContactPerson({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs text-muted-foreground">Contact Person</label>
+        <label className="text-xs text-muted-foreground">{t('deals.contactPerson')}</label>
         <div className="flex items-center gap-1">
           <Popover open={isSelectOpen} onOpenChange={setIsSelectOpen}>
             <PopoverTrigger asChild>
@@ -216,14 +218,14 @@ export function ContactPerson({
                 className="h-6 px-2 text-xs"
               >
                 <Edit2 className="h-3 w-3 mr-1" />
-                Change
+                {t('common.edit')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0" align="end">
               <Command>
-                <CommandInput placeholder="Search contacts..." />
+                <CommandInput placeholder={t('contacts.searchPlaceholder')} />
                 <CommandList>
-                  <CommandEmpty>No contacts found.</CommandEmpty>
+                  <CommandEmpty>{t('contacts.noContactsFound')}</CommandEmpty>
                   <CommandGroup>
                     <CommandItem
                       value="__create_new__"
@@ -231,7 +233,7 @@ export function ContactPerson({
                       className="text-primary"
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      <span>Create new contact</span>
+                      <span>{t('contacts.createContact')}</span>
                     </CommandItem>
                     {!isRequired && (
                       <CommandItem
@@ -241,7 +243,7 @@ export function ContactPerson({
                           setIsSelectOpen(false)
                         }}
                       >
-                        <span>None</span>
+                        <span>{t('tasks.none')}</span>
                       </CommandItem>
                     )}
                     {contacts.map((c) => (

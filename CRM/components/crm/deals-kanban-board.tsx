@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { 
-  DollarSign, 
   GripVertical, 
   MoreVertical, 
   CheckCircle2, 
@@ -246,14 +245,14 @@ function DealCard({
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => onMarkAsWon(deal.id)}
-                className="text-green-600"
+                className="text-green-600 dark:text-green-400"
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 {t('dealCard.markAsWon')}
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => onMarkAsLost(deal.id)}
-                className="text-red-600"
+                className="text-red-600 dark:text-red-400"
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 {t('dealCard.markAsLost')}
@@ -290,7 +289,6 @@ function DealCard({
 
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-1 text-sm font-semibold">
-            <DollarSign className="h-3 w-3" />
             {formatCurrency(deal.amount)}
           </div>
           <div className="text-xs text-muted-foreground">
@@ -485,6 +483,7 @@ export function DealsKanbanBoard({
   onSortChange: externalOnSortChange,
   onAddDeal
 }: DealsKanbanBoardProps) {
+  const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
@@ -883,7 +882,7 @@ export function DealsKanbanBoard({
 
     try {
       await updateDeal(draggedDeal.id, { stageId })
-      showSuccess('Deal moved successfully')
+      showSuccess(t('deals.dealMovedSuccess'))
       
       setDeals(prevDeals => prevDeals.map(deal =>
         deal.id === draggedDeal.id
@@ -891,7 +890,7 @@ export function DealsKanbanBoard({
           : deal
       ))
     } catch (error) {
-      showError('Failed to move deal', error instanceof Error ? error.message : 'Unknown error')
+      showError(t('deals.failedToMoveDeal'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
       loadDeals()
     } finally {
       setDraggedDeal(null)
@@ -904,13 +903,13 @@ export function DealsKanbanBoard({
       const closedWonStage = selectedPipeline?.stages.find(s => s.isClosed && s.name.toLowerCase().includes('won'))
       if (closedWonStage) {
         await updateDeal(dealId, { stageId: closedWonStage.id, status: 'closed' })
-        showSuccess('Deal marked as Won')
+        showSuccess(t('deals.dealMarkedAsWon'))
         loadDeals()
       } else {
-        showError('Closed-Won stage not found', 'Please configure your pipeline')
+        showError(t('deals.closedWonStageNotFound'), t('deals.configurePipeline'))
       }
     } catch (error) {
-      showError('Failed to mark deal as Won', error instanceof Error ? error.message : 'Unknown error')
+      showError(t('deals.failedToMarkAsWon'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
     }
   }
 
@@ -920,13 +919,13 @@ export function DealsKanbanBoard({
       const closedLostStage = selectedPipeline?.stages.find(s => s.isClosed && s.name.toLowerCase().includes('lost'))
       if (closedLostStage) {
         await updateDeal(dealId, { stageId: closedLostStage.id, status: 'closed' })
-        showSuccess('Deal marked as Lost')
+        showSuccess(t('deals.dealMarkedAsLost'))
         loadDeals()
       } else {
-        showError('Closed-Lost stage not found', 'Please configure your pipeline')
+        showError(t('deals.closedLostStageNotFound'), t('deals.configurePipeline'))
       }
     } catch (error) {
-      showError('Failed to mark deal as Lost', error instanceof Error ? error.message : 'Unknown error')
+      showError(t('deals.failedToMarkAsLost'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
     }
   }
 
@@ -1058,11 +1057,15 @@ export function DealsKanbanBoard({
 
   if (loading && deals.length === 0) {
     return (
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 animate-in fade-in-50 duration-300">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex-shrink-0 w-72">
-            <Skeleton className="h-6 w-32 mb-3" />
-            <Skeleton className="h-[calc(100vh-300px)] w-full" />
+            <Skeleton className="h-7 w-40 mb-4 rounded-lg" />
+            <div className="space-y-3 p-3 bg-card rounded-lg border shadow-sm min-h-[calc(100vh-300px)]">
+              {[1, 2, 3].map((j) => (
+                <Skeleton key={j} className="h-24 w-full rounded-md" />
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -1101,7 +1104,7 @@ export function DealsKanbanBoard({
       <div className="text-center py-12">
         <p className="text-muted-foreground mb-2">No stages in this pipeline</p>
         <p className="text-sm text-muted-foreground mb-4">
-          Please add stages to the pipeline in settings to view deals
+          {t('deals.addStagesToPipeline')}
         </p>
         <Button 
           variant="outline" 
@@ -1367,7 +1370,7 @@ export function DealsKanbanBoard({
           }
         }}>
           <DialogContent 
-            className="!max-w-[calc(100vw-240px)] !w-[calc(100vw-240px)] !h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] left-[240px]"
+            className="!max-w-[calc(100vw-240px)] !w-[calc(100vw-240px)] !h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] left-[240px] animate-in fade-in-0 zoom-in-95 duration-200"
             showCloseButton={false}
           >
             <div className="overflow-y-auto h-full w-full">

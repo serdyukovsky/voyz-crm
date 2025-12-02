@@ -5,6 +5,7 @@ import { MessageSquare, Send, Paperclip, User, Building2, X } from 'lucide-react
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface Comment {
   id: string
@@ -28,6 +29,7 @@ export function DealCommentsPanel({
   comments,
   onAddComment
 }: DealCommentsPanelProps) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<'comment' | 'internal_note' | 'client_message'>('comment')
   const [message, setMessage] = useState("")
   const [files, setFiles] = useState<File[]>([])
@@ -58,24 +60,33 @@ export function DealCommentsPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)}>
-        <TabsList className="grid w-full grid-cols-3 h-7">
-          <TabsTrigger value="comment" className="text-xs">
-            <MessageSquare className="h-3 w-3 mr-1" />
-            Comment
+        <TabsList className="grid w-full grid-cols-3 h-7 gap-0.5 p-0.5">
+          <TabsTrigger 
+            value="comment" 
+            className="text-xs flex items-center justify-center gap-1 px-1.5 py-0.5"
+          >
+            <MessageSquare className="h-3 w-3 flex-shrink-0" />
+            <span>{t('deals.comment')}</span>
           </TabsTrigger>
-          <TabsTrigger value="internal_note" className="text-xs">
-            <User className="h-3 w-3 mr-1" />
-            Internal Note
+          <TabsTrigger 
+            value="internal_note" 
+            className="text-xs flex items-center justify-center gap-1 px-1.5 py-0.5"
+          >
+            <User className="h-3 w-3 flex-shrink-0" />
+            <span>{t('deals.internalNote')}</span>
           </TabsTrigger>
-          <TabsTrigger value="client_message" className="text-xs">
-            <Building2 className="h-3 w-3 mr-1" />
-            Client Message
+          <TabsTrigger 
+            value="client_message" 
+            className="text-xs flex items-center justify-center gap-1 px-1.5 py-0.5"
+          >
+            <Building2 className="h-3 w-3 flex-shrink-0" />
+            <span>{t('deals.clientMessage')}</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="mt-2 space-y-2">
+        <TabsContent value={activeTab} className="mt-1 space-y-1.5">
           {/* Comment Input */}
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -104,10 +115,10 @@ export function DealCommentsPanel({
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
                 activeTab === 'comment' 
-                  ? 'Add a comment...' 
+                  ? t('deals.addComment')
                   : activeTab === 'internal_note'
-                  ? 'Add an internal note...'
-                  : 'Message to client...'
+                  ? t('deals.addInternalNote')
+                  : t('deals.messageToClient')
               }
               className="min-h-[60px] resize-none text-sm pr-20"
               onKeyDown={(e) => {

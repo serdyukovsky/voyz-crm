@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getUsers } from '@/lib/api/users'
 import { getDeals } from '@/lib/api/deals'
 import { getContacts } from '@/lib/api/contacts'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import type { User } from '@/lib/api/users'
 import type { Deal } from '@/lib/api/deals'
 import type { Contact } from '@/lib/api/contacts'
@@ -41,6 +42,7 @@ export function CreateTaskModal({
   onClose, 
   onSave
 }: CreateTaskModalProps) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState("TODO")
@@ -193,21 +195,21 @@ export function CreateTaskModal({
       {console.log('CreateTaskModal: Dialog content rendering, isOpen:', isOpen)}
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
+          <DialogTitle>{t('tasks.createNewTask')}</DialogTitle>
           <DialogDescription>
-            Add a new task to track your work
+            {t('tasks.addNewTask')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="title">{t('tasks.taskTitle')} *</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Task title"
+              placeholder={t('tasks.taskTitlePlaceholder')}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && e.ctrlKey) {
                   e.preventDefault()
@@ -220,58 +222,58 @@ export function CreateTaskModal({
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('tasks.taskDescription')}</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Task description"
+              placeholder={t('tasks.taskDescriptionPlaceholder')}
               rows={3}
             />
           </div>
 
           {/* Status */}
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="status">{t('tasks.taskStatus')}</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger id="status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="TODO">To Do</SelectItem>
-                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                <SelectItem value="DONE">Done</SelectItem>
-                <SelectItem value="BACKLOG">Backlog</SelectItem>
+                <SelectItem value="TODO">{t('tasks.statusTodo')}</SelectItem>
+                <SelectItem value="IN_PROGRESS">{t('tasks.statusInProgress')}</SelectItem>
+                <SelectItem value="DONE">{t('tasks.statusDone')}</SelectItem>
+                <SelectItem value="BACKLOG">{t('tasks.statusBacklog')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Priority */}
           <div className="space-y-2">
-            <Label htmlFor="priority">Priority</Label>
+            <Label htmlFor="priority">{t('tasks.taskPriority')}</Label>
             <Select value={priority} onValueChange={setPriority}>
               <SelectTrigger id="priority">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LOW">Low</SelectItem>
-                <SelectItem value="MEDIUM">Medium</SelectItem>
-                <SelectItem value="HIGH">High</SelectItem>
+                <SelectItem value="LOW">{t('tasks.priorityLow')}</SelectItem>
+                <SelectItem value="MEDIUM">{t('tasks.priorityMedium')}</SelectItem>
+                <SelectItem value="HIGH">{t('tasks.priorityHigh')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Assigned To */}
           <div className="space-y-2">
-            <Label htmlFor="assignedTo">Assigned To *</Label>
+            <Label htmlFor="assignedTo">{t('tasks.taskAssignedTo')} *</Label>
             {users.length === 0 ? (
               <div className="text-sm text-muted-foreground p-2 border rounded">
-                Loading users... Please log in if this persists.
+                {t('tasks.loadingUsers')}
               </div>
             ) : (
               <Select value={assignedToId} onValueChange={setAssignedToId}>
                 <SelectTrigger id="assignedTo">
-                  <SelectValue placeholder="Select user" />
+                  <SelectValue placeholder={t('tasks.selectUser')} />
                 </SelectTrigger>
                 <SelectContent>
                   {users.map((user) => (
@@ -286,13 +288,13 @@ export function CreateTaskModal({
 
           {/* Deal */}
           <div className="space-y-2">
-            <Label htmlFor="deal">Deal (optional)</Label>
+            <Label htmlFor="deal">{t('tasks.taskDeal')} ({t('common.optional')})</Label>
             <Select value={dealId || "none"} onValueChange={(value) => setDealId(value === "none" ? "" : value)}>
               <SelectTrigger id="deal">
-                <SelectValue placeholder="Select deal" />
+                <SelectValue placeholder={t('tasks.selectDeal')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t('tasks.none')}</SelectItem>
                 {deals.map((deal) => (
                   <SelectItem key={deal.id} value={deal.id}>
                     {deal.title}
@@ -304,13 +306,13 @@ export function CreateTaskModal({
 
           {/* Contact */}
           <div className="space-y-2">
-            <Label htmlFor="contact">Contact (optional)</Label>
+            <Label htmlFor="contact">{t('tasks.taskContact')} ({t('common.optional')})</Label>
             <Select value={contactId || "none"} onValueChange={(value) => setContactId(value === "none" ? "" : value)}>
               <SelectTrigger id="contact">
-                <SelectValue placeholder="Select contact" />
+                <SelectValue placeholder={t('tasks.selectContact')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="none">{t('tasks.none')}</SelectItem>
                 {contacts.map((contact) => (
                   <SelectItem key={contact.id} value={contact.id}>
                     {contact.fullName || contact.name}
@@ -322,7 +324,7 @@ export function CreateTaskModal({
 
           {/* Deadline */}
           <div className="space-y-2">
-            <Label htmlFor="deadline">Deadline</Label>
+            <Label htmlFor="deadline">{t('tasks.taskDeadline')}</Label>
             <Input
               id="deadline"
               type="datetime-local"
@@ -334,15 +336,15 @@ export function CreateTaskModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={!title.trim() || !assignedToId || loading || users.length === 0}>
-            {loading ? 'Creating...' : 'Create Task'}
+            {loading ? t('tasks.creating') : t('tasks.createTask')}
           </Button>
         </DialogFooter>
         {users.length === 0 && (
           <p className="text-xs text-muted-foreground px-6 pb-4">
-            Please wait for users to load, or log in if this persists.
+            {t('tasks.pleaseWaitUsers')}
           </p>
         )}
       </DialogContent>

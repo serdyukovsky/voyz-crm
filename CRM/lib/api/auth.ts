@@ -67,7 +67,31 @@ export async function login(credentials: LoginDto): Promise<LoginResponse> {
   }
 }
 
-export function logout() {
+export async function logout() {
+  // Try to call logout API before clearing tokens
+  try {
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      const API_BASE_URL = getApiBaseUrl()
+      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      
+      // Check if response is ok, but don't throw error if it fails
+      if (!response.ok) {
+        console.warn('Logout API call failed, but clearing tokens anyway')
+      }
+    }
+  } catch (error) {
+    // Ignore errors - we'll clear tokens anyway
+    console.warn('Logout API call error:', error)
+  }
+  
+  // Always clear tokens from localStorage
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('user')

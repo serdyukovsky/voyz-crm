@@ -375,3 +375,4 @@ Token is stored in `localStorage.getItem('access_token')` after successful login
    - Socket.IO is used for real-time updates in the Kanban board
    - Connection is established in `deals-kanban-board.tsx`
 
+

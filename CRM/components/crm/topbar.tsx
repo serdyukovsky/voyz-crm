@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Link } from 'react-router-dom'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface Notification {
   id: string
@@ -28,10 +29,17 @@ const initialNotifications: Notification[] = [
 ]
 
 export function Topbar() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const { logout } = await import('@/lib/api/auth')
+      await logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
     navigate("/login")
   }
 
@@ -56,9 +64,9 @@ export function Topbar() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input 
               type="search"
-              placeholder="Search deals, contacts, tasks..."
+              placeholder={t('common.searchPlaceholder')}
               className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-12 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-              aria-label="Search"
+              aria-label={t('common.search')}
             />
             <kbd className="pointer-events-none absolute right-2 top-1/2 flex h-5 -translate-y-1/2 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
               <Command className="h-3 w-3" />
@@ -75,7 +83,7 @@ export function Topbar() {
                 variant="ghost" 
                 size="icon" 
                 className="h-8 w-8 relative hover:bg-secondary/50"
-                aria-label={`Notifications (${notifications.length} unread)`}
+                aria-label={`${t('common.notifications')} (${notifications.length} ${t('common.unread')})`}
               >
                 <Bell className="h-4 w-4" />
                 {notifications.length > 0 && (
@@ -87,11 +95,11 @@ export function Topbar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('common.notifications')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {notifications.length === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                  No notifications
+                  {t('common.noNotifications')}
                 </div>
               ) : (
                 <>
@@ -111,7 +119,7 @@ export function Topbar() {
                           size="icon"
                           className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700"
                           onClick={(e) => handleRemoveNotification(notification.id, e)}
-                          aria-label="Close notification"
+                          aria-label={t('common.closeNotification')}
                         >
                           <X className="h-3.5 w-3.5" />
                         </Button>
@@ -127,7 +135,7 @@ export function Topbar() {
                           className="w-full justify-center text-xs text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-800"
                           onClick={handleClearAll}
                         >
-                          Clear all notifications
+                          {t('common.clearAllNotifications')}
                         </Button>
                       </div>
                     </>
@@ -159,17 +167,17 @@ export function Topbar() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/settings/profile">Profile</Link>
+                <Link to="/settings/profile">{t('settings.profile')}</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/settings/preferences">Settings</Link>
+                <Link to="/settings/preferences">{t('settings.title')}</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/settings/shortcuts">Keyboard shortcuts</Link>
+                <Link to="/settings/shortcuts">{t('settings.keyboardShortcuts')}</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
-                Log out
+                {t('settings.logOut')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

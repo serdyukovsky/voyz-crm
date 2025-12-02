@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { Instagram, MessageCircle, Phone, Users } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface ContactsListViewProps {
   contacts: Contact[]
@@ -19,6 +20,7 @@ export function ContactsListView({
   onSelectContacts,
   onBulkDelete,
 }: ContactsListViewProps) {
+  const { t } = useTranslation()
   const formatDate = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true })
   }
@@ -79,14 +81,14 @@ export function ContactsListView({
         <div className="mb-4 p-3 bg-surface border border-border/40 rounded-lg flex items-center justify-between">
           <span className="text-sm text-foreground">
             {selectedContacts.length}{' '}
-            {selectedContacts.length === 1 ? 'contact' : 'contacts'} selected
+            {selectedContacts.length === 1 ? t('contacts.contact') : t('contacts.contacts')} {t('common.selected')}
           </span>
           <div className="flex gap-2">
             <button
               onClick={onBulkDelete}
-              className="px-3 py-1.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-md transition-colors border border-red-500/20"
+              className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors border border-red-500/20"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         </div>
@@ -100,35 +102,35 @@ export function ContactsListView({
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={(checked) => handleSelectAll(checked === true)}
-                  aria-label="Select all contacts"
+                  aria-label={t('contacts.selectAllContacts')}
                 />
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Name
+                {t('contacts.name')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Email
+                {t('contacts.email')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Phone
+                {t('contacts.phone')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Company
+                {t('contacts.company')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Social
+                {t('contacts.social')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Total Deals
+                {t('contacts.totalDeals')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Active
+                {t('contacts.active')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Closed
+                {t('contacts.closed')}
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                Created
+                {t('contacts.created')}
               </th>
             </tr>
           </thead>
@@ -136,7 +138,7 @@ export function ContactsListView({
             {contacts.length === 0 ? (
               <tr>
                 <td colSpan={10} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  No contacts found
+                  {t('contacts.noContactsFound')}
                 </td>
               </tr>
             ) : (
@@ -151,7 +153,7 @@ export function ContactsListView({
                       onCheckedChange={(checked) =>
                         handleSelectContact(contact.id, checked === true)
                       }
-                      aria-label={`Select ${contact.fullName}`}
+                      aria-label={`${t('common.select')} ${contact.fullName}`}
                     />
                   </td>
                   <td className="px-4 py-3">

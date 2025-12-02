@@ -13,6 +13,7 @@ import { CompanyFilterDto } from './dto/company-filter.dto';
 import { CompanyResponseDto } from './dto/company-response.dto';
 import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
+import { LoggingService } from '@/logging/logging.service';
 import { Company, Prisma, ActivityType } from '@prisma/client';
 import {
   normalizePhone,
@@ -29,6 +30,7 @@ export class CompaniesService {
     private readonly activityService: ActivityService,
     @Inject(forwardRef(() => RealtimeGateway))
     private readonly websocketGateway: RealtimeGateway,
+    private readonly loggingService: LoggingService,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto, userId: string): Promise<CompanyResponseDto> {
@@ -81,6 +83,24 @@ export class CompaniesService {
         companyName: company.name,
       },
     });
+
+    // Log action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'create',
+        entity: 'company',
+        entityId: company.id,
+        userId,
+        message: `Company "${company.name}" created`,
+        metadata: {
+          companyName: company.name,
+          industry: company.industry,
+        },
+      });
+    } catch (logError) {
+      console.error('CompaniesService.create - failed to create log:', logError);
+    }
 
     // Emit WebSocket event
     this.websocketGateway.emitCompanyCreated(company.id, company);
@@ -291,6 +311,25 @@ export class CompaniesService {
       });
     }
 
+    // Log action
+    try {
+      const changeFields = Object.keys(changes);
+      await this.loggingService.create({
+        level: 'info',
+        action: 'update',
+        entity: 'company',
+        entityId: company.id,
+        userId,
+        message: `Company "${company.name}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
+        metadata: {
+          companyName: company.name,
+          changes,
+        },
+      });
+    } catch (logError) {
+      console.error('CompaniesService.update - failed to create log:', logError);
+    }
+
     // Emit WebSocket event
     this.websocketGateway.emitCompanyUpdated(id, company);
 
@@ -321,6 +360,23 @@ export class CompaniesService {
         companyName: company.name,
       },
     });
+
+    // Log action
+    try {
+      await this.loggingService.create({
+        level: 'info',
+        action: 'delete',
+        entity: 'company',
+        entityId: id,
+        userId,
+        message: `Company "${company.name}" deleted`,
+        metadata: {
+          companyName: company.name,
+        },
+      });
+    } catch (logError) {
+      console.error('CompaniesService.remove - failed to create log:', logError);
+    }
 
     // Emit WebSocket event
     this.websocketGateway.emitCompanyDeleted(id);

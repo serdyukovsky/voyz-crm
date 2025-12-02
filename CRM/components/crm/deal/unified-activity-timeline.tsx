@@ -35,6 +35,7 @@ interface UnifiedActivityTimelineProps {
   comments: Comment[]
   onTaskClick?: (task: Task) => void
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>
+  onTaskDelete?: (taskId: string) => Promise<void>
 }
 
 type FilterType = 'all' | 'activities' | 'tasks' | 'comments' | 'files' | 'changes'
@@ -57,7 +58,8 @@ export function UnifiedActivityTimeline({
   tasks,
   comments,
   onTaskClick,
-  onTaskUpdate
+  onTaskUpdate,
+  onTaskDelete
 }: UnifiedActivityTimelineProps) {
   const [selectedFilters, setSelectedFilters] = useState<FilterType[]>(['all'])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -225,6 +227,9 @@ export function UnifiedActivityTimeline({
                           onTaskUpdate={onTaskUpdate ? async (updatedTask: any) => {
                             await onTaskUpdate(task.id, updatedTask)
                           } : undefined}
+                          onTaskDelete={onTaskDelete ? async (taskId: string) => {
+                            await onTaskDelete(taskId)
+                          } : undefined}
                         />
                       </div>
                     </div>
@@ -368,6 +373,11 @@ export function UnifiedActivityTimeline({
           }}
           onUpdate={onTaskUpdate ? async (updatedTask: any) => {
             await onTaskUpdate(selectedTask.id, updatedTask)
+          } : undefined}
+          onDelete={onTaskDelete ? async (taskId: string) => {
+            await onTaskDelete(taskId)
+            setIsTaskModalOpen(false)
+            setSelectedTask(null)
           } : undefined}
         />
       )}

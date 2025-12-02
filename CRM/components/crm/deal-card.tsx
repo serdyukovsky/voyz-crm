@@ -2,7 +2,7 @@
 
 import { useState, memo, useCallback } from "react"
 import { Link } from 'react-router-dom'
-import { DollarSign, GripVertical } from 'lucide-react'
+import { GripVertical } from 'lucide-react'
 import type { Deal, Stage } from "./kanban-board"
 
 interface DealCardProps {
@@ -78,7 +78,6 @@ export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDra
 
         {/* Amount */}
         <div className="flex items-center gap-1.5 mb-3">
-          <DollarSign className="h-3.5 w-3.5 text-primary" />
           <span className="text-sm font-semibold text-foreground">
             ${deal.amount.toLocaleString('en-US')}
           </span>

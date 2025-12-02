@@ -4,7 +4,7 @@ import { TasksListView } from "@/components/crm/tasks-list-view"
 import { TasksKanbanView } from "@/components/crm/tasks-kanban-view"
 import { CalendarView } from "@/components/crm/calendar-view"
 import { Button } from "@/components/ui/button"
-import { Plus, Search, Filter } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getContacts } from '@/lib/api/contacts'
@@ -69,7 +69,7 @@ export default function TasksPage() {
         }
         return
       }
-      showError('Failed to create task', errorMessage)
+      showError(t('tasks.failedToCreateTask'), errorMessage)
     }
   }
 
@@ -103,55 +103,61 @@ export default function TasksPage() {
           </Button>
         </div>
 
-        <div className="space-y-4 mb-6">
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
           <Tabs value={view} onValueChange={(v) => setView(v as "list" | "kanban" | "calendar")}>
             <TabsList className="bg-secondary">
               <TabsTrigger value="kanban" className="text-xs">
-                Kanban
+                {t('tasks.kanban')}
               </TabsTrigger>
               <TabsTrigger value="list" className="text-xs">
-                List
+                {t('tasks.list')}
               </TabsTrigger>
               <TabsTrigger value="calendar" className="text-xs">
-                Calendar
+                {t('tasks.calendar')}
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Filter className="h-3 w-3" />
-              <span>Filters:</span>
-            </div>
-
-            <select
-              value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by user"
+            <Select 
+              value={userFilter || "all"} 
+              onValueChange={(value) => setUserFilter(value === "all" ? "" : value)}
             >
-              {users.map((user) => (
-                <option key={user} value={user === t('tasks.allUsers') ? "" : user}>{user}</option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
+                <SelectValue placeholder={t('tasks.filterByUser')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('tasks.allUsers')}</SelectItem>
+                {users.filter(user => user !== t('tasks.allUsers')).map((user) => (
+                  <SelectItem key={user} value={user}>{user}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
-              value={dealFilter}
-              onChange={(e) => setDealFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by deal"
+            <Select 
+              value={dealFilter || "all"} 
+              onValueChange={(value) => setDealFilter(value === "all" ? "" : value)}
             >
-              {deals.map((deal) => (
-                <option key={deal} value={deal === t('tasks.allDeals') ? "" : deal}>{deal}</option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
+                <SelectValue placeholder={t('tasks.filterByDeal')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('tasks.allDeals')}</SelectItem>
+                {deals.filter(deal => deal !== t('tasks.allDeals')).map((deal) => (
+                  <SelectItem key={deal} value={deal}>{deal}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <Select value={contactFilter || "all"} onValueChange={(value) => setContactFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="h-8 w-[180px]">
-              <SelectValue placeholder={t('deals.allContacts')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('deals.allContacts')}</SelectItem>
+            <Select 
+              value={contactFilter || "all"} 
+              onValueChange={(value) => setContactFilter(value === "all" ? "" : value)}
+            >
+              <SelectTrigger className="h-8 w-[180px] text-xs" size="sm">
+                <SelectValue placeholder={t('deals.allContacts')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('deals.allContacts')}</SelectItem>
                 {contacts.map((contact) => (
                   <SelectItem key={contact.id} value={contact.id}>
                     {contact.name}
@@ -160,38 +166,35 @@ export default function TasksPage() {
               </SelectContent>
             </Select>
 
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by date"
+            <Select 
+              value={dateFilter || "all"} 
+              onValueChange={(value) => setDateFilter(value === "all" ? "" : value.toLowerCase())}
             >
-              {dateOptions.map((option) => (
-                <option key={option} value={option === t('tasks.allDates') ? "" : option.toLowerCase()}>{option}</option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
+                <SelectValue placeholder={t('tasks.filterByDate')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('tasks.allDates')}</SelectItem>
+                {dateOptions.filter(option => option !== t('tasks.allDates')).map((option) => (
+                  <SelectItem key={option} value={option.toLowerCase()}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by status"
+            <Select 
+              value={statusFilter || "all"} 
+              onValueChange={(value) => setStatusFilter(value === "all" ? "" : value.toLowerCase())}
             >
-              {statusOptions.map((option) => (
-                <option key={option} value={option === t('tasks.allStatus') ? "" : option.toLowerCase()}>{option}</option>
-              ))}
-            </select>
-
-            <div className="ml-auto flex items-center gap-2 border border-border rounded-md px-3 h-8 bg-background">
-              <Search className="h-3 w-3 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder={t('tasks.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-xs bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-48"
-              />
-            </div>
+              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
+                <SelectValue placeholder={t('tasks.filterByStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('tasks.allStatus')}</SelectItem>
+                {statusOptions.filter(option => option !== t('tasks.allStatus')).map((option) => (
+                  <SelectItem key={option} value={option.toLowerCase()}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

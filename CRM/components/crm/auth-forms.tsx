@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
 import { login } from "@/lib/api/auth"
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function LoginForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -38,7 +40,7 @@ export function LoginForm() {
       navigate("/")
     } catch (err) {
       console.error('Login error:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please check your credentials.'
+      const errorMessage = err instanceof Error ? err.message : t('auth.loginFailed')
       setError(errorMessage)
       setIsLoading(false)
     }
@@ -46,13 +48,13 @@ export function LoginForm() {
 
   return (
     <Card className="w-full max-w-md border-border/40 bg-card shadow-none">
-      <CardHeader className="space-y-1 pb-4">
-        <CardTitle className="text-xl font-semibold text-foreground">Sign in</CardTitle>
+      <CardHeader className="space-y-1 pt-6 pb-4">
+        <CardTitle className="text-xl font-semibold text-foreground">{t('auth.signIn')}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          Enter your credentials to access your account
+          {t('auth.enterCredentials')}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <Alert variant="destructive" className="border-red-500/20 bg-red-500/10">
@@ -63,12 +65,12 @@ export function LoginForm() {
 
           <div className="space-y-2">
             <Label htmlFor="email" className="text-xs font-medium text-foreground">
-              Email
+              {t('auth.email')}
             </Label>
             <Input
               id="email"
               type="email"
-              placeholder="name@company.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-9 bg-background"
@@ -79,10 +81,10 @@ export function LoginForm() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password" className="text-xs font-medium text-foreground">
-                Password
+                {t('auth.password')}
               </Label>
               <a href="/forgot-password" className="text-xs text-primary hover:underline">
-                Forgot password?
+                {t('auth.forgotPassword')}
               </a>
             </div>
             <Input
@@ -101,13 +103,13 @@ export function LoginForm() {
             size="sm"
             disabled={isLoading}
           >
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? t('auth.signingIn') : t('auth.signIn')}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Don't have an account?{" "}
+            {t('auth.noAccount')}{" "}
             <a href="/register" className="text-primary hover:underline">
-              Create account
+              {t('auth.createAccount')}
             </a>
           </p>
         </form>
@@ -117,6 +119,7 @@ export function LoginForm() {
 }
 
 export function SignupForm() {
+  const { t } = useTranslation()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -131,39 +134,39 @@ export function SignupForm() {
 
     // Validation
     if (!name || !email || !password || !confirmPassword) {
-      setError("Please fill in all fields")
+      setError(t('auth.fillAllFields'))
       setIsLoading(false)
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match")
+      setError(t('auth.passwordsDoNotMatch'))
       setIsLoading(false)
       return
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters")
+      setError(t('auth.passwordMinLength'))
       setIsLoading(false)
       return
     }
 
     // Simulate API call
     setTimeout(() => {
-      setError("An account with this email already exists")
+      setError(t('auth.emailAlreadyExists'))
       setIsLoading(false)
     }, 1000)
   }
 
   return (
     <Card className="w-full max-w-md border-border/40 bg-card shadow-none">
-      <CardHeader className="space-y-1 pb-4">
-        <CardTitle className="text-xl font-semibold text-foreground">Create account</CardTitle>
+      <CardHeader className="space-y-1 pt-6 pb-4">
+        <CardTitle className="text-xl font-semibold text-foreground">{t('auth.createAccount')}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          Get started with your free account
+          {t('auth.getStarted')}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <Alert variant="destructive" className="border-red-500/20 bg-red-500/10">
@@ -174,12 +177,12 @@ export function SignupForm() {
 
           <div className="space-y-2">
             <Label htmlFor="name" className="text-xs font-medium text-foreground">
-              Full Name
+              {t('auth.fullName')}
             </Label>
             <Input
               id="name"
               type="text"
-              placeholder="Alex Chen"
+              placeholder={t('auth.fullNamePlaceholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-9 bg-background"
@@ -189,12 +192,12 @@ export function SignupForm() {
 
           <div className="space-y-2">
             <Label htmlFor="signup-email" className="text-xs font-medium text-foreground">
-              Email
+              {t('auth.email')}
             </Label>
             <Input
               id="signup-email"
               type="email"
-              placeholder="name@company.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-9 bg-background"
@@ -204,12 +207,12 @@ export function SignupForm() {
 
           <div className="space-y-2">
             <Label htmlFor="signup-password" className="text-xs font-medium text-foreground">
-              Password
+              {t('auth.password')}
             </Label>
             <Input
               id="signup-password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder={t('auth.passwordMinPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="h-9 bg-background"
@@ -219,12 +222,12 @@ export function SignupForm() {
 
           <div className="space-y-2">
             <Label htmlFor="confirm-password" className="text-xs font-medium text-foreground">
-              Confirm Password
+              {t('auth.confirmPassword')}
             </Label>
             <Input
               id="confirm-password"
               type="password"
-              placeholder="Re-enter password"
+              placeholder={t('auth.reenterPassword')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="h-9 bg-background"
@@ -238,13 +241,13 @@ export function SignupForm() {
             size="sm"
             disabled={isLoading}
           >
-            {isLoading ? "Creating account..." : "Create Account"}
+            {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Already have an account?{" "}
+            {t('auth.haveAccount')}{" "}
             <a href="/login" className="text-primary hover:underline">
-              Sign in
+              {t('auth.signIn')}
             </a>
           </p>
         </form>

@@ -26,6 +26,7 @@ import type { Task } from '@/hooks/use-deal-tasks'
 import type { Activity } from '@/hooks/use-deal-activity'
 import { CrossNavigation } from '@/components/shared/cross-navigation'
 import { DetailSkeleton } from '@/components/shared/loading-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { SendEmailModal } from '@/components/crm/send-email-modal'
 import { Mail } from 'lucide-react'
@@ -33,12 +34,14 @@ import { getPipeline, type Pipeline, type Stage } from '@/lib/api/pipelines'
 import { updateDeal as updateDealApi } from '@/lib/api/deals'
 import { getUsers, type User } from '@/lib/api/users'
 import { createComment, getDealComments, type Comment, type CommentType } from '@/lib/api/comments'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface DealDetailProps {
   dealId: string
 }
 
 export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: () => void }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
   const [selectedStage, setSelectedStage] = useState("new")
@@ -55,21 +58,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   // Use hooks
   const { deal, loading: dealLoading, error: dealError, updateDeal, updateField, refetch: refetchDeal } = useDeal({ dealId })
-
-  // Track initial load to prevent flickering
-  useEffect(() => {
-    if (!dealLoading && deal) {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setIsInitialLoad(false)
-      }, 50)
-      return () => clearTimeout(timer)
-    }
-  }, [dealLoading, deal])
   const { tasks, createTask, updateTask, deleteTask, refetch: refetchTasks } = useDealTasks({ dealId })
   const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useActivity({ entityType: 'deal', entityId: dealId })
@@ -234,7 +225,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       if (deal.assignedTo && deal.assignedTo.name) {
         setAssignedUser(deal.assignedTo.name)
       } else {
-        setAssignedUser('Unassigned')
+        setAssignedUser(t('tasks.unassigned'))
       }
     }
   }, [deal])
@@ -259,10 +250,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       // Reload activities to show the stage change activity (created by backend)
       await refetchActivities()
 
-      showSuccess('Stage updated successfully')
+      showSuccess(t('deals.stageUpdatedSuccess'))
     } catch (error) {
       console.error('Failed to update stage:', error)
-      showError('Failed to update stage', error instanceof Error ? error.message : 'Unknown error')
+      showError(t('deals.stageUpdateError'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
       // Revert local state on error
       setSelectedStage(oldStageId)
     }
@@ -291,6 +282,23 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     await refetchActivities()
   }
 
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+      await deleteTask(taskId)
+      
+      // Reload activities to show the task deletion activity (created by backend)
+      await refetchActivities()
+      
+      // Reload tasks to remove the deleted task
+      await refetchTasks()
+      
+      showSuccess(t('tasks.taskDeleted'))
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+      showError(t('tasks.deleteError'))
+    }
+  }
+
   const handleFileUpload = async (file: File) => {
     const uploadedFile = await uploadFile(file)
     
@@ -304,7 +312,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     files?: File[]
   ) => {
     if (!message.trim()) {
-      showError('Validation error', 'Comment message cannot be empty')
+      showError(t('common.error'), t('deals.commentEmptyError'))
       return
     }
 
@@ -357,8 +365,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     }
   }
 
-  // Show skeleton during initial load or while loading
-  if (dealLoading || isInitialLoad) {
+  // Show skeleton only while deal is loading (before we have any deal data)
+  if (dealLoading && !deal) {
     return <DetailSkeleton />
   }
 
@@ -418,7 +426,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     }
   }
 
-  const currentStage = stages.find(s => s.value === selectedStage) || (stages.length > 0 ? stages[0] : { value: selectedStage, label: 'Unknown Stage', color: '#6B7280' })
+  const currentStage = stages.find(s => s.value === selectedStage) || (stages.length > 0 ? stages[0] : { value: selectedStage, label: t('deals.unknownStage'), color: '#6B7280' })
   const currentUser = usersForDropdown.find(u => u.name === assignedUser || u.id === deal?.assignedTo?.id) || usersForDropdown[0] || { id: 'unassigned', name: 'Unassigned', email: '', avatar: undefined }
 
   // Transform API comments to format expected by DealCommentsPanel
@@ -440,9 +448,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   }))
 
   return (
-    <div className={`flex flex-col md:flex-row ${onClose ? 'h-full w-full' : 'h-[calc(100vh-3rem)]'} overflow-hidden transition-all duration-200`}>
-      {/* LEFT COLUMN: Deal Info */}
-      <div className="w-full md:w-80 flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth">
+    <div className={`flex flex-col md:flex-row ${onClose ? 'h-full w-full' : 'h-[calc(100vh-3rem)]'} overflow-hidden`}>
+      {/* LEFT COLUMN: Deal Info - Show immediately when deal is loaded */}
+      <div className="w-full md:w-80 flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth animate-in fade-in-0 duration-200">
         <DealHeader
           deal={deal}
           onTitleUpdate={handleTitleUpdate}
@@ -467,14 +475,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         <div className="px-6 py-4 space-y-4">
           {/* Stage */}
           <div>
-            <label className="text-xs text-muted-foreground mb-2 block">Stage</label>
+            <label className="text-xs text-muted-foreground mb-2 block">{t('deals.stage')}</label>
             {pipelineLoading ? (
               <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
-                <span className="text-sm text-muted-foreground">Loading stages...</span>
+                <span className="text-sm text-muted-foreground">{t('deals.loadingStages')}</span>
               </div>
             ) : stages.length === 0 ? (
               <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
-                <span className="text-sm text-muted-foreground">No stages available</span>
+                <span className="text-sm text-muted-foreground">{t('deals.noStagesAvailable')}</span>
               </div>
             ) : (
               <div className="relative stage-dropdown-container">
@@ -698,14 +706,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 className="w-full"
               >
                 <Mail className="mr-2 h-4 w-4" />
-                Send Email
+                {t('deals.sendEmail')}
               </Button>
             </div>
           )}
 
           {/* Budget */}
           <div>
-            <label className="text-xs text-muted-foreground mb-2 block">Budget</label>
+            <label className="text-xs text-muted-foreground mb-2 block">{t('deals.amount')}</label>
             <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-background/50 border border-border/50">
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
               <Input
@@ -726,7 +734,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
           {/* Tasks */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Tasks</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('deals.tasks')}</h3>
               <TaskQuickCreate 
                 onCreate={handleTaskCreate} 
                 dealId={dealId}
@@ -734,12 +742,13 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               />
             </div>
             {!tasks || tasks.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">No tasks yet</p>
+              <p className="text-xs text-muted-foreground py-2">{t('deals.noTasksYet')}</p>
             ) : (
               <DealTasksList
                 tasks={tasks || []}
                 onTaskCreate={handleTaskCreate}
                 onTaskUpdate={handleTaskUpdate}
+                onTaskDelete={handleTaskDelete}
                 onTaskClick={(task) => {
                   setSelectedTask(task)
                   setIsTaskModalOpen(true)
@@ -758,18 +767,28 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       </div>
 
       {/* RIGHT COLUMN: Unified Activity Timeline + Comments */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background hidden md:flex" style={{ minWidth: '640px' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background hidden md:flex animate-in fade-in-50 duration-200" style={{ minWidth: '640px' }}>
         <div className="flex-1 overflow-y-auto pl-6 pr-6 py-6 scroll-smooth">
           {/* Activity Timeline */}
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Activity</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-4">{t('deals.activity')}</h3>
             {activitiesLoading ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">Loading activities...</div>
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2.5">
+                      <Skeleton className="h-4 w-3/4 rounded-sm" />
+                      <Skeleton className="h-3 w-1/2 rounded-sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-                    <ActivityTimeline 
-                      activities={activities} 
-                      pipelineStages={pipeline?.stages?.map(s => ({ id: s.id, name: s.name }))}
-                    />
+              <ActivityTimeline 
+                activities={activities} 
+                pipelineStages={pipeline?.stages?.map(s => ({ id: s.id, name: s.name }))}
+              />
             )}
           </div>
         </div>
@@ -799,6 +818,11 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
           }}
           onUpdate={(updatedTask: any) => {
             handleTaskUpdate(selectedTask.id, updatedTask)
+          }}
+          onDelete={async (taskId: string) => {
+            await handleTaskDelete(taskId)
+            setIsTaskModalOpen(false)
+            setSelectedTask(null)
           }}
         />
       )}

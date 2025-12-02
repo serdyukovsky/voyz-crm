@@ -10,7 +10,9 @@ import { DealDetailModal } from "./deal-detail-modal"
 import { ContactBadge } from "./contact-badge"
 import { getContacts } from '@/lib/api/contacts'
 import type { Contact } from '@/lib/api/contacts'
-import { getTasks } from '@/lib/api/tasks'
+import { getTasks, deleteTask, updateTask } from '@/lib/api/tasks'
+import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useToastNotification } from '@/hooks/use-toast-notification'
 
 interface Task {
   id: string
@@ -22,19 +24,12 @@ interface Task {
   dueDate: string
   assignee: string
   completed: boolean
-  priority: "low" | "medium" | "high"
   status: string
   description?: string
   createdAt?: string
   result?: string
 }
 
-
-const priorityColors = {
-  low: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  medium: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  high: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-}
 
 interface TasksListViewProps {
   searchQuery: string
@@ -46,6 +41,8 @@ interface TasksListViewProps {
 }
 
 function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksListViewProps) {
+  const { t } = useTranslation()
+  const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -53,6 +50,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
   const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [contacts, setContacts] = useState<Contact[]>([])
+  
 
   // Load tasks from API
   useEffect(() => {
@@ -72,9 +70,8 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
           contactId: task.contact?.id || null,
           contactName: task.contact?.fullName || null,
           dueDate: task.deadline || '',
-          assignee: task.assignedTo?.name || 'Unassigned',
+          assignee: task.assignedTo?.name || t('tasks.unassigned'),
           completed: task.status === 'DONE',
-          priority: (task.priority?.toLowerCase() || 'medium') as "low" | "medium" | "high",
           status: task.status?.toLowerCase() || 'todo',
           description: task.description,
           createdAt: task.createdAt,
@@ -156,11 +153,70 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     setIsModalOpen(true)
   }
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    setTasks(tasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    ))
-    setSelectedTask(updatedTask)
+  const handleTaskUpdate = async (updatedTask: Task, silent: boolean = false) => {
+    try {
+      // Update via API
+      await updateTask(updatedTask.id, {
+        title: updatedTask.title,
+        description: updatedTask.description,
+        deadline: updatedTask.dueDate,
+        contactId: updatedTask.contactId || undefined,
+        assignedToId: updatedTask.assigneeId || undefined,
+        dealId: updatedTask.dealId || undefined,
+        status: updatedTask.status === 'DONE' ? 'DONE' : updatedTask.status?.toUpperCase() || 'TODO',
+        result: updatedTask.result,
+      })
+      
+      // Reload tasks to ensure they appear correctly
+      const tasksData = await getTasks({
+        status: statusFilter || undefined,
+      })
+      
+      const transformedTasks: Task[] = tasksData.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        dealId: task.deal?.id || null,
+        dealName: task.deal?.title || null,
+        contactId: task.contact?.id || null,
+        contactName: task.contact?.fullName || null,
+        dueDate: task.deadline || '',
+        assignee: task.assignedTo?.name || t('tasks.unassigned'),
+        completed: task.status === 'DONE',
+        status: task.status?.toLowerCase() || 'todo',
+        description: task.description,
+        createdAt: task.createdAt,
+        result: task.result,
+      }))
+      
+      setTasks(transformedTasks)
+      const updated = transformedTasks.find(t => t.id === updatedTask.id)
+      if (updated) {
+        setSelectedTask(updated)
+      }
+      
+      // Only show success message if not silent (i.e., not auto-save)
+      if (!silent) {
+        showSuccess(t('tasks.taskUpdated') || 'Task updated successfully')
+      }
+    } catch (error) {
+      console.error('Failed to update task:', error)
+      if (!silent) {
+        showError(t('tasks.taskUpdated') || 'Failed to update task')
+      }
+    }
+  }
+
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+      await deleteTask(taskId)
+      setTasks(tasks.filter(task => task.id !== taskId))
+      setIsModalOpen(false)
+      setSelectedTask(null)
+      showSuccess(t('tasks.taskDeleted'))
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+      showError(t('tasks.deleteError'))
+    }
   }
 
   const handleDealClick = (task: Task, e: React.MouseEvent) => {
@@ -177,14 +233,14 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
         <thead>
           <tr className="border-b border-border">
             <th className="w-8 p-3 text-left">
-              <span className="sr-only">Status</span>
+              <span className="sr-only">{t('tasks.taskStatus')}</span>
             </th>
-            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Title</th>
-            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Deal</th>
-            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Contact</th>
-            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Due Date</th>
-            <th className="p-3 text-left text-xs font-medium text-muted-foreground">Assigned</th>
-            <th className="w-20 p-3 text-left text-xs font-medium text-muted-foreground">Priority</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.taskTitle')}</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.taskDeal')}</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.taskContact')}</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.taskDeadline')}</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.assignedTo')}</th>
+            <th className="p-3 text-left text-xs font-medium text-muted-foreground">{t('tasks.completed') || 'Завершена'}</th>
           </tr>
         </thead>
         <tbody>
@@ -197,7 +253,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
                 <Checkbox 
                   checked={task.completed}
                   onCheckedChange={() => toggleTask(task.id)}
-                  aria-label={`Mark "${task.title}" as ${task.completed ? 'incomplete' : 'complete'}`}
+                  aria-label={`${t('tasks.markAs')} "${task.title}" ${task.completed ? t('tasks.incomplete') : t('tasks.completed')}`}
                 />
               </td>
               <td className="p-3">
@@ -247,12 +303,9 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
                 <span className="text-sm text-muted-foreground">{task.assignee}</span>
               </td>
               <td className="p-3">
-                <Badge 
-                  variant="outline" 
-                  className={`text-[10px] ${priorityColors[task.priority]}`}
-                >
-                  {task.priority}
-                </Badge>
+                <span className={`text-sm ${task.completed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                  {task.completed ? (t('tasks.completed') || 'Завершена') : (t('tasks.incomplete') || 'Не завершена')}
+                </span>
               </td>
             </tr>
           ))}
@@ -261,7 +314,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
 
       {filteredTasks.length === 0 && (
         <div className="p-12 text-center">
-          <p className="text-sm text-muted-foreground">No tasks found</p>
+          <p className="text-sm text-muted-foreground">{t('tasks.noTasksFound')}</p>
         </div>
       )}
 
@@ -271,6 +324,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onUpdate={handleTaskUpdate}
+          onDelete={handleTaskDelete}
         />
       )}
 

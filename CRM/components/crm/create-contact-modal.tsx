@@ -21,6 +21,7 @@ import {
 import { createContact, updateContact, CreateContactDto, Company } from '@/lib/api/contacts'
 import { Instagram, MessageCircle, Phone, Users } from 'lucide-react'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface CreateContactModalProps {
   isOpen: boolean
@@ -39,6 +40,7 @@ export function CreateContactModal({
   contactId,
   initialData,
 }: CreateContactModalProps) {
+  const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -105,19 +107,19 @@ export function CreateContactModal({
 
     // Validate URLs
     if (instagram && !validateUrl(instagram, 'instagram')) {
-      showError('Invalid Instagram URL', 'Please enter a valid Instagram URL')
+      showError(t('contacts.invalidInstagramUrl'), t('contacts.pleaseEnterValidInstagramUrl'))
       return
     }
     if (telegram && !validateUrl(telegram, 'telegram')) {
-      showError('Invalid Telegram URL or username', 'Please enter a valid Telegram username or URL')
+      showError(t('contacts.invalidTelegramUrl'), t('contacts.pleaseEnterValidTelegramUrl'))
       return
     }
     if (whatsapp && !validateUrl(whatsapp, 'whatsapp')) {
-      showError('Invalid WhatsApp URL or phone number', 'Please enter a valid WhatsApp phone number or URL')
+      showError(t('contacts.invalidWhatsAppUrl'), t('contacts.pleaseEnterValidWhatsAppUrl'))
       return
     }
     if (vk && !validateUrl(vk, 'vk')) {
-      showError('Invalid VK URL', 'Please enter a valid VK URL')
+      showError(t('contacts.invalidVkUrl'), t('contacts.pleaseEnterValidVkUrl'))
       return
     }
 
@@ -156,8 +158,8 @@ export function CreateContactModal({
     } catch (error: any) {
       console.error('Failed to save contact:', error)
       showError(
-        'Failed to save contact',
-        error?.message || 'Please try again.'
+        t('contacts.failedToSaveContact'),
+        error?.message || t('messages.pleaseTryAgain')
       )
     } finally {
       setLoading(false)
@@ -168,70 +170,70 @@ export function CreateContactModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{contactId ? 'Edit Contact' : 'Create Contact'}</DialogTitle>
+          <DialogTitle>{contactId ? t('contacts.editContact') : t('contacts.createContact')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Basic Information</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('contacts.basicInformation')}</h3>
 
             <div className="space-y-2">
               <Label htmlFor="contact-name">
-                Full Name <span className="text-red-500">*</span>
+                {t('contacts.fullName')} <span className="text-red-600 dark:text-red-400">*</span>
               </Label>
               <Input
                 id="contact-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter full name"
+                placeholder={t('contacts.enterFullName')}
                 autoFocus
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="contact-email">Email</Label>
+                <Label htmlFor="contact-email">{t('contacts.email')}</Label>
                 <Input
                   id="contact-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder={t('contacts.emailPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact-phone">Phone</Label>
+                <Label htmlFor="contact-phone">{t('contacts.phone')}</Label>
                 <Input
                   id="contact-phone"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder={t('contacts.phonePlaceholder')}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="contact-position">Position</Label>
+                <Label htmlFor="contact-position">{t('contacts.position')}</Label>
                 <Input
                   id="contact-position"
                   value={position}
                   onChange={(e) => setPosition(e.target.value)}
-                  placeholder="e.g., CEO, CTO"
+                  placeholder={t('contacts.positionPlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact-company">Company</Label>
+                <Label htmlFor="contact-company">{t('contacts.company')}</Label>
                 <Select value={companyId || "none"} onValueChange={(value) => setCompanyId(value === "none" ? "" : value)}>
                   <SelectTrigger id="contact-company">
-                    <SelectValue placeholder="Select company" />
+                    <SelectValue placeholder={t('contacts.selectCompany')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="none">{t('tasks.none')}</SelectItem>
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
@@ -243,22 +245,22 @@ export function CreateContactModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact-tags">Tags (comma-separated)</Label>
+              <Label htmlFor="contact-tags">{t('contacts.tags')}</Label>
               <Input
                 id="contact-tags"
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
-                placeholder="VIP, Enterprise, Technical"
+                placeholder={t('contacts.tagsPlaceholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact-notes">Notes</Label>
+              <Label htmlFor="contact-notes">{t('contacts.notes')}</Label>
               <Textarea
                 id="contact-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes about this contact..."
+                placeholder={t('contacts.notesPlaceholder')}
                 rows={3}
               />
             </div>
@@ -266,7 +268,7 @@ export function CreateContactModal({
 
           {/* Social Links */}
           <div className="space-y-4 pt-4 border-t border-border/40">
-            <h3 className="text-sm font-semibold text-foreground">Social Links</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('contacts.socialLinks')}</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -278,7 +280,7 @@ export function CreateContactModal({
                   id="contact-instagram"
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
-                  placeholder="https://instagram.com/username"
+                  placeholder={t('contacts.instagramPlaceholder')}
                 />
               </div>
 
@@ -291,7 +293,7 @@ export function CreateContactModal({
                   id="contact-telegram"
                   value={telegram}
                   onChange={(e) => setTelegram(e.target.value)}
-                  placeholder="@username or URL"
+                  placeholder={t('contacts.telegramPlaceholder')}
                 />
               </div>
 
@@ -304,7 +306,7 @@ export function CreateContactModal({
                   id="contact-whatsapp"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="+1234567890 or URL"
+                  placeholder={t('contacts.whatsappPlaceholder')}
                 />
               </div>
 
@@ -317,7 +319,7 @@ export function CreateContactModal({
                   id="contact-vk"
                   value={vk}
                   onChange={(e) => setVk(e.target.value)}
-                  placeholder="https://vk.com/username"
+                  placeholder={t('contacts.vkPlaceholder')}
                 />
               </div>
             </div>
@@ -325,10 +327,10 @@ export function CreateContactModal({
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={!fullName.trim() || loading}>
-              {loading ? 'Saving...' : contactId ? 'Update' : 'Create'}
+              {loading ? t('contacts.saving') : contactId ? t('common.edit') : t('common.create')}
             </Button>
           </div>
         </div>

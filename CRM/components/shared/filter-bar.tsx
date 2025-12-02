@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Search, X, Filter } from "lucide-react"
 import { MultiSelectFilter, MultiSelectOption } from "./multi-select-filter"
 import { useState, useEffect } from "react"
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface FilterBarProps {
   searchPlaceholder?: string
@@ -18,17 +19,20 @@ interface FilterBarProps {
 }
 
 export function FilterBar({
-  searchPlaceholder = "Search...",
+  searchPlaceholder,
   tagOptions = [],
   statusOptions = [],
   companyOptions = [],
   onFiltersChange,
   className,
 }: FilterBarProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const pathname = location.pathname
   const [searchParams] = useSearchParams()
+  
+  const defaultSearchPlaceholder = searchPlaceholder || t('common.searchPlaceholder')
 
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [selectedTags, setSelectedTags] = useState<string[]>(
@@ -73,7 +77,7 @@ export function FilterBar({
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Filter className="h-3 w-3" />
-          <span>Filters:</span>
+          <span>{t('common.filters')}:</span>
         </div>
 
         {/* Search */}
@@ -81,7 +85,7 @@ export function FilterBar({
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder={searchPlaceholder}
+            placeholder={defaultSearchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border-0 px-0 h-auto bg-transparent focus-visible:ring-0 text-sm"
@@ -104,8 +108,8 @@ export function FilterBar({
             options={tagOptions}
             selected={selectedTags}
             onSelectionChange={setSelectedTags}
-            placeholder="Tags"
-            searchPlaceholder="Search tags..."
+            placeholder={t('common.tags')}
+            searchPlaceholder={t('common.searchTags')}
           />
         )}
 
@@ -114,8 +118,8 @@ export function FilterBar({
             options={statusOptions}
             selected={selectedStatuses}
             onSelectionChange={setSelectedStatuses}
-            placeholder="Status"
-            searchPlaceholder="Search statuses..."
+            placeholder={t('common.status')}
+            searchPlaceholder={t('common.searchStatuses')}
           />
         )}
 
@@ -124,8 +128,8 @@ export function FilterBar({
             options={companyOptions}
             selected={selectedCompanies}
             onSelectionChange={setSelectedCompanies}
-            placeholder="Companies"
-            searchPlaceholder="Search companies..."
+            placeholder={t('companies.title')}
+            searchPlaceholder={t('common.searchCompanies')}
           />
         )}
 
@@ -138,7 +142,7 @@ export function FilterBar({
             className="h-9"
           >
             <X className="h-4 w-4 mr-1" />
-            Clear
+            {t('common.clear')}
           </Button>
         )}
       </div>
@@ -148,7 +152,7 @@ export function FilterBar({
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           {search && (
             <Badge variant="secondary" className="gap-1">
-              Search: {search}
+              {t('common.search')}: {search}
               <button
                 onClick={() => setSearch('')}
                 className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
@@ -161,7 +165,7 @@ export function FilterBar({
             const option = tagOptions.find((o) => o.value === tag)
             return (
               <Badge key={tag} variant="secondary" className="gap-1">
-                Tag: {option?.label || tag}
+                {t('common.tag')}: {option?.label || tag}
                 <button
                   onClick={() => setSelectedTags(selectedTags.filter((t) => t !== tag))}
                   className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
@@ -175,7 +179,7 @@ export function FilterBar({
             const option = statusOptions.find((o) => o.value === status)
             return (
               <Badge key={status} variant="secondary" className="gap-1">
-                Status: {option?.label || status}
+                {t('common.status')}: {option?.label || status}
                 <button
                   onClick={() => setSelectedStatuses(selectedStatuses.filter((s) => s !== status))}
                   className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
@@ -189,7 +193,7 @@ export function FilterBar({
             const option = companyOptions.find((o) => o.value === company)
             return (
               <Badge key={company} variant="secondary" className="gap-1">
-                Company: {option?.label || company}
+                {t('companies.company')}: {option?.label || company}
                 <button
                   onClick={() => setSelectedCompanies(selectedCompanies.filter((c) => c !== company))}
                   className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"

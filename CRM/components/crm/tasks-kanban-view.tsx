@@ -5,7 +5,9 @@ import { TaskCard } from "@/components/crm/task-card"
 import { AddTaskStageModal } from "@/components/crm/add-task-stage-modal"
 import { Button } from "@/components/ui/button"
 import { Plus } from 'lucide-react'
-import { getTasks } from '@/lib/api/tasks'
+import { getTasks, deleteTask, updateTask } from '@/lib/api/tasks'
+import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useToastNotification } from '@/hooks/use-toast-notification'
 
 interface Task {
   id: string
@@ -17,7 +19,6 @@ interface Task {
   dueDate: string
   assignee: string
   completed: boolean
-  priority: "low" | "medium" | "high"
   status: string
   description?: string
   createdAt?: string
@@ -31,11 +32,12 @@ interface Stage {
   isDefault: boolean
 }
 
-const defaultStages: Stage[] = [
-  { id: "backlog", name: "Backlog", color: "#64748b", isDefault: true },
-  { id: "todo", name: "To Do", color: "#3b82f6", isDefault: true },
-  { id: "in_progress", name: "In Progress", color: "#8b5cf6", isDefault: true },
-  { id: "done", name: "Done", color: "#10b981", isDefault: true },
+// Default stages will be translated in component
+const getDefaultStages = (t: (key: string) => string): Stage[] => [
+  { id: "backlog", name: t('tasks.statusBacklog'), color: "#64748b", isDefault: true },
+  { id: "todo", name: t('tasks.statusTodo'), color: "#3b82f6", isDefault: true },
+  { id: "in_progress", name: t('tasks.statusInProgress'), color: "#8b5cf6", isDefault: true },
+  { id: "done", name: t('tasks.statusDone'), color: "#10b981", isDefault: true },
 ]
 
 interface TasksKanbanViewProps {
@@ -48,64 +50,77 @@ interface TasksKanbanViewProps {
 }
 
 export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksKanbanViewProps) {
+  const { t } = useTranslation()
+  const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [stages, setStages] = useState<Stage[]>(defaultStages)
+  const [stages, setStages] = useState<Stage[]>(getDefaultStages(t))
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [insertAfterStageId, setInsertAfterStageId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Update stages when translation changes
+  useEffect(() => {
+    setStages(getDefaultStages(t))
+  }, [t])
 
   // Load tasks from API
-  useEffect(() => {
-    const loadTasks = async () => {
-      try {
-        setLoading(true)
-        const tasksData = await getTasks({
-          status: statusFilter || undefined,
-        })
+  const loadTasks = async () => {
+    try {
+      setLoading(true)
+      const tasksData = await getTasks({
+        status: statusFilter || undefined,
+      })
+      
+      // Transform API tasks to component format
+      const transformedTasks: Task[] = tasksData.map((task: any) => {
+        // Map API status to component status
+        let status = 'todo'
+        if (task.status === 'BACKLOG') status = 'backlog'
+        else if (task.status === 'TODO') status = 'todo'
+        else if (task.status === 'IN_PROGRESS') status = 'in_progress'
+        else if (task.status === 'DONE') status = 'done'
+        else if (task.status) status = task.status.toLowerCase()
         
-        // Transform API tasks to component format
-        const transformedTasks: Task[] = tasksData.map((task: any) => {
-          // Map API status to component status
-          let status = 'todo'
-          if (task.status === 'BACKLOG') status = 'backlog'
-          else if (task.status === 'TODO') status = 'todo'
-          else if (task.status === 'IN_PROGRESS') status = 'in_progress'
-          else if (task.status === 'DONE') status = 'done'
-          else if (task.status) status = task.status.toLowerCase()
-          
-          return {
-            id: task.id,
-            title: task.title,
-            dealId: task.deal?.id || null,
-            dealName: task.deal?.title || null,
-            contactId: task.contact?.id || null,
-            contactName: task.contact?.fullName || null,
-            dueDate: task.deadline || '',
-            assignee: task.assignedTo?.name || 'Unassigned',
-            completed: task.status === 'DONE',
-            priority: (task.priority?.toLowerCase() || 'medium') as "low" | "medium" | "high",
-            status,
-            description: task.description,
-            createdAt: task.createdAt,
-            result: task.result,
-          }
-        })
-        
-        setTasks(transformedTasks)
-      } catch (error) {
-        console.error('Failed to load tasks:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        // If unauthorized, redirect will be handled by API function
-        if (errorMessage !== 'UNAUTHORIZED') {
-          setTasks([])
+        const completed = task.status === 'DONE'
+        if (completed) {
+          console.log('Found completed task:', task.id, task.title, 'Status:', task.status)
         }
-      } finally {
-        setLoading(false)
+        
+        return {
+          id: task.id,
+          title: task.title,
+          dealId: task.deal?.id || null,
+          dealName: task.deal?.title || null,
+          contactId: task.contact?.id || null,
+          contactName: task.contact?.fullName || null,
+          dueDate: task.deadline || '',
+          assignee: task.assignedTo?.name || t('tasks.unassigned'),
+          completed,
+          status,
+          description: task.description,
+          createdAt: task.createdAt,
+          result: task.result,
+        }
+      })
+      
+      console.log('Tasks loaded:', transformedTasks.length, 'Completed:', transformedTasks.filter(t => t.completed).length)
+      setTasks(transformedTasks)
+    } catch (error) {
+      console.error('Failed to load tasks:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      // If unauthorized, redirect will be handled by API function
+      if (errorMessage !== 'UNAUTHORIZED') {
+        setTasks([])
       }
+    } finally {
+      setLoading(false)
     }
-    
+  }
+
+  useEffect(() => {
     loadTasks()
-  }, [statusFilter])
+  }, [statusFilter, refreshKey, t])
 
   const filteredTasks = tasks.filter(task => {
     // Search filter
@@ -168,17 +183,65 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
     setIsModalOpen(true)
   }
 
-  const handleTaskUpdate = (updatedTask: Task) => {
-    setTasks(tasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    ))
+  const handleTaskUpdate = async (updatedTask: Task, silent: boolean = false) => {
+    try {
+      // Update via API
+      const statusToSend = updatedTask.status === 'DONE' ? 'DONE' : updatedTask.status?.toUpperCase() || 'TODO'
+      console.log('Updating task:', updatedTask.id, 'Status:', statusToSend, 'Completed:', updatedTask.completed)
+      
+      await updateTask(updatedTask.id, {
+        title: updatedTask.title,
+        description: updatedTask.description,
+        deadline: updatedTask.dueDate,
+        contactId: updatedTask.contactId || undefined,
+        assignedToId: updatedTask.assigneeId || undefined,
+        dealId: updatedTask.dealId || undefined,
+        status: statusToSend,
+        result: updatedTask.result,
+      })
+      
+      console.log('Task updated in API, reloading tasks...')
+      // Reload tasks to ensure they appear in the correct stage
+      // This is especially important when status changes to DONE
+      // Add a small delay to ensure backend has processed the update
+      setTimeout(() => {
+        console.log('Refreshing tasks after update...')
+        setRefreshKey(prev => prev + 1)
+      }, 300)
+      
+      // Only show success message if not silent (i.e., not auto-save)
+      if (!silent) {
+        showSuccess(t('tasks.taskUpdated') || 'Task updated successfully')
+      }
+    } catch (error) {
+      console.error('Failed to update task:', error)
+      if (!silent) {
+        showError(t('tasks.taskUpdated') || 'Failed to update task')
+      }
+      throw error // Re-throw to let the modal handle it
+    }
+  }
+
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+      await deleteTask(taskId)
+      setTasks(tasks.filter(task => task.id !== taskId))
+      showSuccess(t('tasks.taskDeleted'))
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+      showError(t('tasks.deleteError'))
+    }
   }
 
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {stages.map((stage) => {
-          const stageTasks = filteredTasks.filter(t => t.status === stage.id)
+          // For "done" stage, show completed tasks (status DONE or completed=true)
+          // For other stages, filter by status
+          const stageTasks = stage.id === 'done' 
+            ? filteredTasks.filter(t => t.completed || t.status === 'done')
+            : filteredTasks.filter(t => t.status === stage.id && !t.completed)
           
           return (
             <div key={stage.id} className="flex-shrink-0 w-[280px]">
@@ -200,7 +263,7 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
                     size="icon"
                     className="h-6 w-6"
                     onClick={() => openAddStageModal(stage.id)}
-                    title="Add stage after this one"
+                    title={t('pipeline.addStageAfter')}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -209,7 +272,12 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
                 {/* Tasks */}
                 <div className="p-3 space-y-2 min-h-[200px]">
                   {stageTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} onTaskUpdate={handleTaskUpdate} />
+                    <TaskCard 
+                      key={task.id} 
+                      task={task} 
+                      onTaskUpdate={handleTaskUpdate}
+                      onTaskDelete={handleTaskDelete}
+                    />
                   ))}
                 </div>
               </div>

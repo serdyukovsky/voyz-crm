@@ -174,3 +174,4 @@ python3 reports/smoke_test.py
 2. **Для локальной разработки** - создать `.env.local` с `http://localhost:3001/api` и `http://localhost:3001/realtime`
 3. **Git ignore** - `.env.local` уже в `.gitignore`, не коммитить его в репозиторий
 
+
