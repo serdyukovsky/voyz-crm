@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, User, Link as LinkIcon } from 'lucide-react'
@@ -26,12 +26,34 @@ interface TaskCardProps {
   task: Task
   onTaskUpdate?: (task: Task, silent?: boolean) => void
   onTaskDelete?: (taskId: string) => void
+  selectedTaskId?: string | null
+  onTaskSelect?: (taskId: string | null) => void
 }
 
-export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
+export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onTaskSelect }: TaskCardProps) {
   const { t } = useTranslation()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
+
+  // Sync modal state with selectedTaskId from URL
+  useEffect(() => {
+    const shouldBeOpen = selectedTaskId === task.id
+    console.log('TaskCard: useEffect - syncing modal', { 
+      taskId: task.id, 
+      selectedTaskId: selectedTaskId || 'null', 
+      shouldBeOpen, 
+      currentIsModalOpen: isModalOpen 
+    })
+    
+    // Always sync - if shouldBeOpen is true, open modal; if false, close modal
+    setIsModalOpen(shouldBeOpen)
+    
+    if (shouldBeOpen) {
+      console.log('TaskCard: Modal should be OPEN for task:', task.id)
+    } else {
+      console.log('TaskCard: Modal should be CLOSED for task:', task.id)
+    }
+  }, [selectedTaskId, task.id])
 
   const getInitials = (name: string) => {
     return name
@@ -43,7 +65,21 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
 
   const handleTaskClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsModalOpen(true)
+    e.preventDefault()
+    
+    // Update URL first - this will trigger useEffect to open modal
+    if (onTaskSelect) {
+      onTaskSelect(task.id)
+    } else {
+      // Fallback: update URL directly
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        params.set('task', task.id)
+        const newUrl = `${window.location.pathname}?${params.toString()}`
+        window.history.pushState({}, '', newUrl)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
+    }
   }
 
   const handleDealClick = (e: React.MouseEvent) => {
@@ -104,14 +140,42 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
       </Card>
 
       <TaskDetailModal
-        key={task.id + task.dueDate + task.assigneeId + task.dealId}
+        key={task.id + task.dueDate + (task.dealId || '')}
         task={task}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          // Clear URL
+          if (onTaskSelect) {
+            onTaskSelect(null)
+          } else {
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search)
+              params.delete('task')
+              const queryString = params.toString()
+              const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`
+              window.history.pushState({}, '', newUrl)
+              window.dispatchEvent(new PopStateEvent('popstate'))
+            }
+          }
+        }}
         onUpdate={handleTaskUpdate}
         onDelete={onTaskDelete ? async (taskId: string) => {
           await onTaskDelete(taskId)
           setIsModalOpen(false)
+          if (onTaskSelect) {
+            onTaskSelect(null)
+          } else {
+            // Fallback: clear URL directly
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search)
+              params.delete('task')
+              const queryString = params.toString()
+              const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`
+              window.history.pushState({}, '', newUrl)
+              window.dispatchEvent(new PopStateEvent('popstate'))
+            }
+          }
         } : undefined}
       />
 

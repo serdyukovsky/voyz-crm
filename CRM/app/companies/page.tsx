@@ -5,7 +5,38 @@ import { CRMLayout } from '@/components/crm/layout'
 import { CompaniesListView } from '@/components/crm/companies-list-view'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
+// Custom hooks to replace next/navigation
+const useSearchParams = () => {
+  const [params, setParams] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search)
+    }
+    return new URLSearchParams()
+  })
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const handlePopState = () => {
+      setParams(new URLSearchParams(window.location.search))
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+  
+  return params
+}
+
+const useRouter = () => {
+  return {
+    push: (url: string) => {
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', url)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
+    }
+  }
+}
 import { getCompanies, deleteCompany, type Company } from '@/lib/api/companies'
 import { FilterBar } from '@/components/shared/filter-bar'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'

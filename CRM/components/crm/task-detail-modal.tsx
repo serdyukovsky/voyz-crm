@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Trash2, Search, History, Check, Undo2 } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Trash2, Search, History, Check, Undo2, Pencil } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/command"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
-import { DealDetailModal } from "./deal-detail-modal"
+import { DealDetail } from "./deal-detail"
 import { TaskHistoryModal } from "./task-history-modal"
 import { getUsers, type User as UserType } from '@/lib/api/users'
 import { getDeals, type Deal as DealType } from '@/lib/api/deals'
@@ -96,7 +96,6 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
   const [deals, setDeals] = useState<DealType[]>([])
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [isRescheduleDropdownOpen, setIsRescheduleDropdownOpen] = useState(false)
   const [isDealSelectOpen, setIsDealSelectOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -441,54 +440,113 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
 
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
-                <PopoverTrigger asChild>
-                  <button className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors">
+              {selectedDeal ? (
+                <>
+                  <button 
+                    className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors"
+                    onClick={() => {
+                      // Click on attached deal - navigate to deals page with deal ID in URL
+                      if (selectedDeal) {
+                        window.location.href = `/deals?deal=${selectedDeal.id}`
+                      }
+                    }}
+                  >
                     <LinkIcon className="h-3.5 w-3.5" />
-                    {selectedDeal ? (
-                      <span className="text-foreground">{selectedDeal.title}</span>
-                    ) : (
-                      <span>{t('tasks.selectDeal')}</span>
-                    )}
+                    <span className="text-foreground">{selectedDeal.title}</span>
                   </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[360px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
-                    <CommandList>
-                      <CommandEmpty>{t('deals.noDealsFound') || t('common.noData')}</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none"
-                          onSelect={() => {
-                            setDealId(null)
-                            setIsDealSelectOpen(false)
-                          }}
-                        >
-                          <span>{t('tasks.none')}</span>
-                        </CommandItem>
-                        {deals.map((deal) => (
+                  <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        title={t('tasks.changeDeal') || 'Изменить сделку'}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[360px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
+                        <CommandList>
+                          <CommandEmpty>{t('deals.noDealsFound') || t('common.noData')}</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="none"
+                              onSelect={() => {
+                                setDealId(null)
+                                setIsDealSelectOpen(false)
+                              }}
+                            >
+                              <span>{t('tasks.none') || 'Удалить связь'}</span>
+                            </CommandItem>
+                            {deals.map((deal) => (
+                              <CommandItem
+                                key={deal.id}
+                                value={`${deal.title} ${deal.number || ''} ${deal.amount || ''}`}
+                                onSelect={() => {
+                                  setDealId(deal.id)
+                                  setIsDealSelectOpen(false)
+                                }}
+                              >
+                                <div className="flex flex-col w-full">
+                                  <span className="font-medium">{deal.title}</span>
+                                  {deal.number && (
+                                    <span className="text-xs text-muted-foreground">#{deal.number}</span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </>
+              ) : (
+                <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors">
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      <span>{t('tasks.selectDeal')}</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[360px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
+                      <CommandList>
+                        <CommandEmpty>{t('deals.noDealsFound') || t('common.noData')}</CommandEmpty>
+                        <CommandGroup>
                           <CommandItem
-                            key={deal.id}
-                            value={`${deal.title} ${deal.number || ''} ${deal.amount || ''}`}
+                            value="none"
                             onSelect={() => {
-                              setDealId(deal.id)
+                              setDealId(null)
                               setIsDealSelectOpen(false)
                             }}
                           >
-                            <div className="flex flex-col w-full">
-                              <span className="font-medium">{deal.title}</span>
-                              {deal.number && (
-                                <span className="text-xs text-muted-foreground">#{deal.number}</span>
-                              )}
-                            </div>
+                            <span>{t('tasks.none')}</span>
                           </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                          {deals.map((deal) => (
+                            <CommandItem
+                              key={deal.id}
+                              value={`${deal.title} ${deal.number || ''} ${deal.amount || ''}`}
+                              onSelect={() => {
+                                setDealId(deal.id)
+                                setIsDealSelectOpen(false)
+                              }}
+                            >
+                              <div className="flex flex-col w-full">
+                                <span className="font-medium">{deal.title}</span>
+                                {deal.number && (
+                                  <span className="text-xs text-muted-foreground">#{deal.number}</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">
@@ -637,16 +695,6 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
         </DialogContent>
       </Dialog>
 
-        {selectedDeal && (
-          <DealDetailModal
-            deal={{
-              id: selectedDeal.id,
-              title: selectedDeal.title,
-            }}
-            isOpen={isDealModalOpen}
-            onClose={() => setIsDealModalOpen(false)}
-          />
-        )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

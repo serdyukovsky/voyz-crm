@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
 import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
@@ -9,7 +9,65 @@ import { PipelineSettingsModal, Funnel } from "@/components/crm/pipeline-setting
 import { DealSourcesPanel, DealSource } from "@/components/crm/deal-sources-panel"
 import { Button } from "@/components/ui/button"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+// Custom hooks to replace next/navigation
+let globalSetParams: ((params: URLSearchParams) => void) | null = null
+
+const useSearchParams = () => {
+  const [params, setParams] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search)
+    }
+    return new URLSearchParams()
+  })
+  
+  useEffect(() => {
+    globalSetParams = setParams
+    if (typeof window === 'undefined') return
+    
+    const handlePopState = () => {
+      setParams(new URLSearchParams(window.location.search))
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      if (globalSetParams === setParams) {
+        globalSetParams = null
+      }
+    }
+  }, [])
+  
+  return params
+}
+
+const useRouter = () => {
+  return {
+    push: (url: string) => {
+      if (typeof window !== 'undefined') {
+        console.log('useRouter.push: Updating URL to:', url)
+        // Extract path and search params
+        const [path, search] = url.split('?')
+        const newSearch = search || ''
+        
+        // Update search params state immediately
+        if (globalSetParams) {
+          const newParams = new URLSearchParams(newSearch)
+          console.log('useRouter.push: Updating search params:', newParams.toString())
+          globalSetParams(newParams)
+        }
+        
+        // Update URL using pushState - this should update the address bar
+        const newUrl = path + (newSearch ? `?${newSearch}` : '')
+        window.history.pushState({ path: newUrl }, '', newUrl)
+        
+        // Force update by dispatching popstate event
+        window.dispatchEvent(new PopStateEvent('popstate'))
+        
+        console.log('useRouter.push: URL after pushState:', window.location.href)
+        console.log('useRouter.push: window.location.search:', window.location.search)
+      }
+    }
+  }
+}
 import { PageSkeleton } from "@/components/shared/loading-skeleton"
 import { createDeal, getDeals, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines, createPipeline, createStage } from "@/lib/api/pipelines"
@@ -183,7 +241,62 @@ const demoDeals: Deal[] = [
 export default function DealsPage() {
   useAuthGuard()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+
+  // Read deal ID from URL on mount and when URL changes
+  useEffect(() => {
+    const dealId = searchParams.get('deal')
+    console.log('DealsPage: Reading deal from URL:', dealId, 'Current selectedDealId:', selectedDealId)
+    if (dealId && dealId !== selectedDealId) {
+      console.log('DealsPage: Setting selectedDealId from URL:', dealId)
+      setSelectedDealId(dealId)
+    } else if (!dealId && selectedDealId !== null) {
+      console.log('DealsPage: No deal in URL, clearing selectedDealId')
+      setSelectedDealId(null)
+    }
+  }, [searchParams, selectedDealId])
+
+  // Handle deal click - update URL
+  const handleDealClick = useCallback((dealId: string | null) => {
+    console.log('DealsPage: handleDealClick called with dealId:', dealId)
+    console.log('DealsPage: Current URL before update:', window.location.href)
+    
+    // Update state first
+    setSelectedDealId(dealId)
+    
+    if (typeof window === 'undefined') return
+    
+    const params = new URLSearchParams(window.location.search)
+    if (dealId) {
+      params.set('deal', dealId)
+    } else {
+      params.delete('deal')
+    }
+    const queryString = params.toString()
+    const newUrl = `/deals${queryString ? `?${queryString}` : ''}`
+    console.log('DealsPage: New URL to push:', newUrl)
+    
+    // Update URL using pushState
+    window.history.pushState({ path: newUrl }, '', newUrl)
+    console.log('DealsPage: URL immediately after pushState:', window.location.href)
+    console.log('DealsPage: window.location.search:', window.location.search)
+    
+    // Update search params state
+    if (globalSetParams) {
+      globalSetParams(params)
+    }
+    
+    // Force update by dispatching popstate
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    
+    // Double check after a delay
+    setTimeout(() => {
+      console.log('DealsPage: URL after pushState (delayed):', window.location.href)
+      console.log('DealsPage: window.location.search (delayed):', window.location.search)
+    }, 100)
+  }, [])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isFunnelDropdownOpen, setIsFunnelDropdownOpen] = useState(false)
@@ -272,7 +385,7 @@ export default function DealsPage() {
     }
     
     loadPipelines()
-  }, [router])
+  }, [])
 
   const currentFunnel = funnels.find(f => f.id === currentFunnelId) || funnels[0] || null
 
@@ -706,7 +819,9 @@ export default function DealsPage() {
               ) : (
                 <DealsKanbanBoard 
                   key={kanbanRefreshKey} 
-                  pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined} 
+                  pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
+                  selectedDealId={selectedDealId}
+                  onDealClick={handleDealClick}
                 />
               )}
             </div>
@@ -733,6 +848,8 @@ export default function DealsPage() {
               onBulkDelete={handleBulkDelete}
               onBulkChangeStage={handleBulkChangeStage}
               stages={stages}
+              selectedDealId={selectedDealId}
+              onDealClick={handleDealClick}
             />
           )
           )}

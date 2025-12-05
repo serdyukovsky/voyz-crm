@@ -19,6 +19,8 @@ interface DealsListViewProps {
   onBulkDelete?: () => void
   onBulkChangeStage?: (stage: string) => void
   stages?: Stage[]
+  selectedDealId?: string | null
+  onDealClick?: (dealId: string | null) => void
 }
 
 export function DealsListView({ 
@@ -27,12 +29,22 @@ export function DealsListView({
   onSelectDeals,
   onBulkDelete,
   onBulkChangeStage,
-  stages = []
+  stages = [],
+  selectedDealId: externalSelectedDealId,
+  onDealClick
 }: DealsListViewProps) {
   const { t } = useTranslation()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
-  const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
+  const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
+
+  // Sync with external selectedDealId
+  useEffect(() => {
+    if (externalSelectedDealId !== undefined) {
+      setInternalSelectedDealId(externalSelectedDealId)
+    }
+  }, [externalSelectedDealId])
 
   // Helper function to get stage info by ID
   const getStageInfo = (stageId: string): { name: string; color: string } => {
@@ -87,11 +99,15 @@ export function DealsListView({
     // Open deal in modal
     e.preventDefault()
     e.stopPropagation()
-    setSelectedDealId(dealId)
+    setInternalSelectedDealId(dealId)
+    onDealClick?.(dealId)
   }
 
   const handleCloseDealModal = () => {
-    setSelectedDealId(null)
+    console.log('DealsListView: handleCloseDealModal called')
+    setInternalSelectedDealId(null)
+    console.log('DealsListView: Calling onDealClick(null) to update URL')
+    onDealClick?.(null)
     // Restore scroll position after modal closes
     requestAnimationFrame(() => {
       setTimeout(() => {
