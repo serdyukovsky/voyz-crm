@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { TaskCard } from "@/components/crm/task-card"
-import { AddTaskStageModal } from "@/components/crm/add-task-stage-modal"
-import { Button } from "@/components/ui/button"
-import { Plus } from 'lucide-react'
 import { getTasks, deleteTask, updateTask } from '@/lib/api/tasks'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { startOfDay, startOfWeek, endOfWeek, addWeeks, endOfMonth, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns'
 
 interface Task {
   id: string
@@ -26,19 +24,97 @@ interface Task {
   result?: string
 }
 
-interface Stage {
+interface DateCategory {
   id: string
   name: string
   color: string
-  isDefault: boolean
+  order: number
 }
 
-// Default stages will be translated in component
-const getDefaultStages = (t: (key: string) => string): Stage[] => [
-  { id: "backlog", name: t('tasks.statusBacklog'), color: "#64748b", isDefault: true },
-  { id: "todo", name: t('tasks.statusTodo'), color: "#3b82f6", isDefault: true },
-  { id: "in_progress", name: t('tasks.statusInProgress'), color: "#8b5cf6", isDefault: true },
-  { id: "done", name: t('tasks.statusDone'), color: "#10b981", isDefault: true },
+// Helper function to parse date safely
+const safeParseDate = (dateString: string | undefined | null): Date | null => {
+  if (!dateString) return null
+  const date = new Date(dateString)
+  return isNaN(date.getTime()) ? null : date
+}
+
+// Function to determine task category by date
+const getTaskDateCategory = (task: Task): string => {
+  // Completed tasks always go to "done" category
+  if (task.completed) {
+    return 'done'
+  }
+
+  const dueDate = safeParseDate(task.dueDate)
+  if (!dueDate) {
+    return 'future' // Tasks without date go to future
+  }
+
+  const now = new Date()
+  const today = startOfDay(now)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  const thisWeekEnd = endOfWeek(today, { weekStartsOn: 1 }) // Monday as start of week
+  const nextWeekStart = startOfWeek(addWeeks(today, 1), { weekStartsOn: 1 })
+  const nextWeekEnd = endOfWeek(addWeeks(today, 1), { weekStartsOn: 1 })
+  
+  const thisMonthEnd = endOfMonth(today)
+
+  const taskDate = startOfDay(dueDate)
+
+  // Overdue (before today)
+  if (isBefore(taskDate, today)) {
+    return 'overdue'
+  }
+
+  // Today
+  if (isSameDay(taskDate, today)) {
+    return 'today'
+  }
+
+  // Tomorrow
+  if (isSameDay(taskDate, tomorrow)) {
+    return 'tomorrow'
+  }
+
+  // This week (after tomorrow, before next week)
+  const dayAfterTomorrow = new Date(tomorrow)
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+  if (isWithinInterval(taskDate, { start: startOfDay(dayAfterTomorrow), end: thisWeekEnd })) {
+    return 'thisWeek'
+  }
+
+  // Next week
+  if (isWithinInterval(taskDate, { start: nextWeekStart, end: nextWeekEnd })) {
+    return 'nextWeek'
+  }
+
+  // This month (after next week, but within current month)
+  const afterNextWeek = new Date(nextWeekEnd)
+  afterNextWeek.setDate(afterNextWeek.getDate() + 1)
+  if (isWithinInterval(taskDate, { start: startOfDay(afterNextWeek), end: thisMonthEnd })) {
+    return 'thisMonth'
+  }
+
+  // Future (beyond this month)
+  if (isAfter(taskDate, thisMonthEnd)) {
+    return 'future'
+  }
+
+  return 'future'
+}
+
+// Get date categories with translations
+const getDateCategories = (t: (key: string) => string): DateCategory[] => [
+  { id: "overdue", name: t('tasks.overdue') || 'Просроченные', color: "#ef4444", order: 0 },
+  { id: "today", name: t('tasks.today') || 'На сегодня', color: "#f59e0b", order: 1 },
+  { id: "tomorrow", name: t('tasks.tomorrow') || 'На завтра', color: "#3b82f6", order: 2 },
+  { id: "thisWeek", name: t('tasks.thisWeek') || 'На этой неделе', color: "#8b5cf6", order: 3 },
+  { id: "nextWeek", name: t('tasks.nextWeek') || 'На следующей неделе', color: "#06b6d4", order: 4 },
+  { id: "thisMonth", name: t('tasks.thisMonth') || 'В этом месяце', color: "#10b981", order: 5 },
+  { id: "future", name: t('tasks.future') || 'На будущее', color: "#64748b", order: 6 },
+  { id: "done", name: t('tasks.statusDone') || 'Выполнено', color: "#10b981", order: 7 },
 ]
 
 interface TasksKanbanViewProps {
@@ -48,22 +124,16 @@ interface TasksKanbanViewProps {
   contactFilter: string
   dateFilter: string
   statusFilter: string
+  selectedTaskId?: string | null
+  onTaskSelect?: (taskId: string | null) => void
 }
 
-export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksKanbanViewProps) {
+export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter, selectedTaskId, onTaskSelect }: TasksKanbanViewProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [stages, setStages] = useState<Stage[]>(getDefaultStages(t))
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [insertAfterStageId, setInsertAfterStageId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-
-  // Update stages when translation changes
-  useEffect(() => {
-    setStages(getDefaultStages(t))
-  }, [t])
 
   // Load tasks from API
   const loadTasks = async () => {
@@ -124,7 +194,9 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
     loadTasks()
   }, [statusFilter, refreshKey, t])
 
-  const filteredTasks = tasks.filter(task => {
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
     // Search filter
     if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
     
@@ -158,32 +230,38 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
     }
     
     return true
-  })
+    })
+  }, [tasks, searchQuery, userFilter, dealFilter, contactFilter, dateFilter, t])
 
-  const handleAddStage = (name: string, color: string) => {
-    const newStage: Stage = {
-      id: `custom-${Date.now()}`,
-      name,
-      color,
-      isDefault: false,
-    }
+  // Get all date categories
+  const allCategories = useMemo(() => getDateCategories(t), [t])
 
-    if (insertAfterStageId) {
-      const insertIndex = stages.findIndex(s => s.id === insertAfterStageId)
-      const newStages = [...stages]
-      newStages.splice(insertIndex + 1, 0, newStage)
-      setStages(newStages)
-    } else {
-      setStages([...stages, newStage])
-    }
+  // Group tasks by date category
+  const tasksByCategory = useMemo(() => {
+    const grouped: Record<string, Task[]> = {}
+    allCategories.forEach(cat => {
+      grouped[cat.id] = []
+    })
+    
+    filteredTasks.forEach(task => {
+      const category = getTaskDateCategory(task)
+      if (grouped[category]) {
+        grouped[category].push(task)
+      }
+    })
+    
+    return grouped
+  }, [filteredTasks, allCategories])
 
-    setInsertAfterStageId(null)
-  }
+  // Get visible categories (only those with tasks, plus "done" always)
+  const visibleCategories = useMemo(() => {
+    const categories = allCategories.filter(cat => {
+      if (cat.id === 'done') return true // Always show "done"
+      return tasksByCategory[cat.id] && tasksByCategory[cat.id].length > 0
+    })
+    return categories.sort((a, b) => a.order - b.order)
+  }, [allCategories, tasksByCategory])
 
-  const openAddStageModal = (afterStageId: string) => {
-    setInsertAfterStageId(afterStageId)
-    setIsModalOpen(true)
-  }
 
   const handleTaskUpdate = async (updatedTask: Task, silent: boolean = false) => {
     try {
@@ -277,47 +355,36 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {stages.map((stage) => {
-          // For "done" stage, show completed tasks (status DONE or completed=true)
-          // For other stages, filter by status
-          const stageTasks = stage.id === 'done' 
-            ? filteredTasks.filter(t => t.completed || t.status === 'done')
-            : filteredTasks.filter(t => t.status === stage.id && !t.completed)
+        {visibleCategories.map((category) => {
+          const categoryTasks = tasksByCategory[category.id] || []
           
           return (
-            <div key={stage.id} className="flex-shrink-0 w-[280px]">
+            <div key={category.id} className="flex-shrink-0 w-[280px]">
               <div className="rounded-md border border-border bg-card">
                 {/* Column Header */}
                 <div className="flex items-center justify-between p-3 border-b border-border">
                   <div className="flex items-center gap-2">
                     <div 
                       className="w-2 h-2 rounded-full" 
-                      style={{ backgroundColor: stage.color }}
+                      style={{ backgroundColor: category.color }}
                     />
-                    <h3 className="text-xs font-medium text-foreground">{stage.name}</h3>
+                    <h3 className="text-xs font-medium text-foreground">{category.name}</h3>
                     <span className="text-xs text-muted-foreground">
-                      {stageTasks.length}
+                      {categoryTasks.length}
                     </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => openAddStageModal(stage.id)}
-                    title={t('pipeline.addStageAfter')}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
                 </div>
 
                 {/* Tasks */}
                 <div className="p-3 space-y-2 min-h-[200px]">
-                  {stageTasks.map((task) => (
+                  {categoryTasks.map((task) => (
                     <TaskCard 
                       key={task.id} 
                       task={task} 
                       onTaskUpdate={handleTaskUpdate}
                       onTaskDelete={handleTaskDelete}
+                      selectedTaskId={selectedTaskId}
+                      onTaskSelect={onTaskSelect}
                     />
                   ))}
                 </div>
@@ -326,15 +393,6 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
           )
         })}
       </div>
-
-      <AddTaskStageModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setInsertAfterStageId(null)
-        }}
-        onAdd={handleAddStage}
-      />
     </>
   )
 }

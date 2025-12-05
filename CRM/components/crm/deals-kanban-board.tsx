@@ -80,7 +80,8 @@ interface DealCardData {
 
 interface DealsKanbanBoardProps {
   pipelineId?: string
-  onDealClick?: (dealId: string) => void
+  onDealClick?: (dealId: string | null) => void
+  selectedDealId?: string | null
   showFilters?: boolean
   filters?: FilterState
   sort?: SortState
@@ -476,6 +477,7 @@ function KanbanColumn({
 export function DealsKanbanBoard({ 
   pipelineId, 
   onDealClick,
+  selectedDealId: externalSelectedDealId,
   showFilters: externalShowFilters,
   filters: externalFilters,
   sort: externalSort,
@@ -496,8 +498,16 @@ export function DealsKanbanBoard({
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [isAddStageModalOpen, setIsAddStageModalOpen] = useState(false)
   const [afterStageId, setAfterStageId] = useState<string | null>(null)
-  const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
+  const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
+
+  // Sync with external selectedDealId
+  useEffect(() => {
+    if (externalSelectedDealId !== undefined) {
+      setInternalSelectedDealId(externalSelectedDealId)
+    }
+  }, [externalSelectedDealId])
   
   // Debug: отслеживаем изменения состояния модального окна
   useEffect(() => {
@@ -934,20 +944,58 @@ export function DealsKanbanBoard({
     showError('Not implemented', 'Contact reassignment will be available soon')
   }
 
-  const handleOpenInSidebar = (dealId: string) => {
+  const handleOpenInSidebar = useCallback((dealId: string) => {
+    console.log('DealsKanbanBoard: handleOpenInSidebar called with dealId:', dealId)
+    console.log('DealsKanbanBoard: onDealClick prop:', onDealClick)
     // Save current scroll position before opening modal
     const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
     if (kanbanContainer) {
       scrollPositionRef.current = kanbanContainer.scrollLeft
       console.log('Saved scroll position:', scrollPositionRef.current)
     }
-    setSelectedDealId(dealId)
-  }
+    setInternalSelectedDealId(dealId)
+    console.log('DealsKanbanBoard: Calling onDealClick with dealId:', dealId, 'onDealClick exists:', !!onDealClick, 'type:', typeof onDealClick)
+    
+    // Update URL directly if onDealClick is not provided
+    if (onDealClick) {
+      onDealClick(dealId)
+    } else {
+      console.warn('DealsKanbanBoard: onDealClick is not provided, updating URL directly')
+      // Update URL directly
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        params.set('deal', dealId)
+        const newUrl = `${window.location.pathname}?${params.toString()}`
+        console.log('DealsKanbanBoard: Updating URL directly to:', newUrl)
+        window.history.pushState({}, '', newUrl)
+        console.log('DealsKanbanBoard: URL after pushState:', window.location.href)
+      }
+    }
+  }, [onDealClick])
 
-  const handleCloseDealModal = () => {
-    setSelectedDealId(null)
+  const handleCloseDealModal = useCallback(() => {
+    console.log('DealsKanbanBoard: handleCloseDealModal called')
+    setInternalSelectedDealId(null)
+    
+    // Call onDealClick to update URL - this should handle URL update
+    if (onDealClick) {
+      console.log('DealsKanbanBoard: Calling onDealClick(null) to update URL')
+      onDealClick(null)
+    } else {
+      // Fallback: update URL directly if onDealClick is not provided
+      console.warn('DealsKanbanBoard: onDealClick not provided, updating URL directly')
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        params.delete('deal')
+        const queryString = params.toString()
+        const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`
+        console.log('DealsKanbanBoard: Removing deal from URL:', newUrl)
+        window.history.pushState({}, '', newUrl)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
+    }
+    
     // Restore scroll position after modal closes
-    // Use requestAnimationFrame to ensure DOM is updated
     requestAnimationFrame(() => {
       setTimeout(() => {
         const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
@@ -957,7 +1005,7 @@ export function DealsKanbanBoard({
         }
       }, 50)
     })
-  }
+  }, [onDealClick])
 
   const handleAddStage = (afterStageId: string) => {
     console.log('handleAddStage called for afterStageId:', afterStageId)

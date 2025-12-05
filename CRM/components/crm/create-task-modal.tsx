@@ -83,7 +83,6 @@ export function CreateTaskModal({
             console.warn('CreateTaskModal: No token found, cannot load data')
             setUsers([])
             setDeals([])
-            setContacts([])
             return
           }
           
@@ -182,7 +181,6 @@ export function CreateTaskModal({
         onClose()
       }
     }}>
-      {console.log('CreateTaskModal: Dialog content rendering, isOpen:', isOpen)}
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 rounded-br-3xl">
         <div className="space-y-4">
           {/* Title */}
@@ -309,9 +307,10 @@ export function CreateTaskModal({
               <PopoverTrigger asChild>
                 <button className="text-xs text-muted-foreground hover:text-foreground">
                   {assignedToId ? (
-                    users.find(u => u.id === assignedToId)?.name || 
-                    `${users.find(u => u.id === assignedToId)?.firstName || ''} ${users.find(u => u.id === assignedToId)?.lastName || ''}`.trim() ||
-                    t('tasks.unassigned')
+                    (() => {
+                      const user = users.find(u => u.id === assignedToId)
+                      return user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || t('tasks.unassigned') : t('tasks.unassigned')
+                    })()
                   ) : (
                     t('tasks.unassigned')
                   )}
@@ -329,7 +328,7 @@ export function CreateTaskModal({
                           value={`${user.firstName} ${user.lastName}`}
                           onSelect={() => setAssignedToId(user.id)}
                         >
-                          {user.name || `${user.firstName} ${user.lastName}`}
+                          {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
                         </CommandItem>
                       ))}
                     </CommandGroup>

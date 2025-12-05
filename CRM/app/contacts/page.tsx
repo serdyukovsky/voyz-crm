@@ -5,7 +5,38 @@ import { CRMLayout } from '@/components/crm/layout'
 import { ContactsListView } from '@/components/crm/contacts-list-view'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
+// Custom hooks to replace next/navigation
+const useSearchParams = () => {
+  const [params, setParams] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search)
+    }
+    return new URLSearchParams()
+  })
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const handlePopState = () => {
+      setParams(new URLSearchParams(window.location.search))
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+  
+  return params
+}
+
+const useRouter = () => {
+  return {
+    push: (url: string) => {
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', url)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
+    }
+  }
+}
 import { getContacts, getCompanies, deleteContact } from '@/lib/api/contacts'
 import { Contact, Company } from '@/types/contact'
 import { CreateContactModal } from '@/components/crm/create-contact-modal'

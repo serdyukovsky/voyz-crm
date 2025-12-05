@@ -39,9 +39,11 @@ interface TasksListViewProps {
   contactFilter: string
   dateFilter: string
   statusFilter: string
+  selectedTaskId?: string | null
+  onTaskSelect?: (taskId: string | null) => void
 }
 
-function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter }: TasksListViewProps) {
+function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter, selectedTaskId, onTaskSelect }: TasksListViewProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -153,7 +155,27 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
     setIsModalOpen(true)
+    onTaskSelect?.(task.id)
   }
+
+  // Open modal if task is selected via URL
+  useEffect(() => {
+    if (selectedTaskId) {
+      const task = tasks.find(t => t.id === selectedTaskId)
+      if (task && !isModalOpen) {
+        setSelectedTask(task)
+        setIsModalOpen(true)
+      } else if (!task) {
+        setIsModalOpen(false)
+        setSelectedTask(null)
+      }
+    } else {
+      if (isModalOpen) {
+        setIsModalOpen(false)
+        setSelectedTask(null)
+      }
+    }
+  }, [selectedTaskId, tasks, isModalOpen])
 
   const handleTaskUpdate = async (updatedTask: Task, silent: boolean = false) => {
     try {
@@ -266,6 +288,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
       setTasks(tasks.filter(task => task.id !== taskId))
       setIsModalOpen(false)
       setSelectedTask(null)
+      onTaskSelect?.(null)
       showSuccess(t('tasks.taskDeleted'))
     } catch (error) {
       console.error('Failed to delete task:', error)
@@ -376,7 +399,11 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
         <TaskDetailModal
           task={selectedTask}
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedTask(null)
+            onTaskSelect?.(null)
+          }}
           onUpdate={handleTaskUpdate}
           onDelete={handleTaskDelete}
         />

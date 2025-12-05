@@ -1,6 +1,13 @@
 "use client"
 
-import { useRouter } from 'next/navigation'
+// Custom hook to replace next/navigation
+const useRouter = () => {
+  return {
+    push: (url: string) => {
+      window.location.href = url
+    }
+  }
+}
 import { CRMLayout } from "@/components/crm/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
