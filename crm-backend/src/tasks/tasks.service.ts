@@ -4,6 +4,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
+import { LoggingService } from '@/logging/logging.service';
 import { Task, TaskStatus, ActivityType } from '@prisma/client';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly websocketGateway: RealtimeGateway,
+    private readonly loggingService: LoggingService,
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: string): Promise<Task> {
@@ -225,7 +227,9 @@ export class TasksService {
   }
 
   async update(id: string, updateTaskDto: UpdateTaskDto, userId: string): Promise<Task> {
+    console.log('TasksService.update - Called with:', { id, updateTaskDto, userId });
     const existing = await this.findOne(id);
+    console.log('TasksService.update - Existing task:', existing.id, existing.title);
 
     const updates: any = {};
     const changes: Record<string, { old: any; new: any }> = {};
@@ -233,6 +237,11 @@ export class TasksService {
     if (updateTaskDto.title !== undefined && updateTaskDto.title !== existing.title) {
       updates.title = updateTaskDto.title;
       changes.title = { old: existing.title, new: updateTaskDto.title };
+    }
+
+    if (updateTaskDto.description !== undefined && updateTaskDto.description !== existing.description) {
+      updates.description = updateTaskDto.description;
+      changes.description = { old: existing.description, new: updateTaskDto.description };
     }
 
     if (updateTaskDto.status !== undefined && updateTaskDto.status !== existing.status) {
@@ -253,13 +262,51 @@ export class TasksService {
       changes.assignee = { old: existing.assignedToId, new: updateTaskDto.assignedToId };
     }
 
-    if (updateTaskDto.result !== undefined) {
+    if (updateTaskDto.dealId !== undefined && updateTaskDto.dealId !== existing.dealId) {
+      updates.dealId = updateTaskDto.dealId || null;
+      // Get deal names for better logging
+      const oldDeal = existing.dealId ? await this.prisma.deal.findUnique({
+        where: { id: existing.dealId },
+        select: { title: true },
+      }) : null;
+      const newDeal = updateTaskDto.dealId ? await this.prisma.deal.findUnique({
+        where: { id: updateTaskDto.dealId },
+        select: { title: true },
+      }) : null;
+      changes.dealId = { 
+        old: existing.dealId ? (oldDeal?.title || existing.dealId) : null, 
+        new: updateTaskDto.dealId ? (newDeal?.title || updateTaskDto.dealId) : null 
+      };
+    }
+
+    if (updateTaskDto.contactId !== undefined && updateTaskDto.contactId !== existing.contactId) {
+      updates.contactId = updateTaskDto.contactId || null;
+      // Get contact names for better logging
+      const oldContact = existing.contactId ? await this.prisma.contact.findUnique({
+        where: { id: existing.contactId },
+        select: { fullName: true },
+      }) : null;
+      const newContact = updateTaskDto.contactId ? await this.prisma.contact.findUnique({
+        where: { id: updateTaskDto.contactId },
+        select: { fullName: true },
+      }) : null;
+      changes.contactId = { 
+        old: existing.contactId ? (oldContact?.fullName || existing.contactId) : null, 
+        new: updateTaskDto.contactId ? (newContact?.fullName || updateTaskDto.contactId) : null 
+      };
+    }
+
+    if (updateTaskDto.result !== undefined && updateTaskDto.result !== existing.result) {
       updates.result = updateTaskDto.result;
+      changes.result = { old: existing.result || null, new: updateTaskDto.result || null };
       if (updateTaskDto.status === TaskStatus.DONE && !existing.completedAt) {
         updates.completedAt = new Date();
       }
     }
 
+    console.log('TasksService.update - Updates to apply:', updates);
+    console.log('TasksService.update - Changes detected:', Object.keys(changes));
+    
     const task = await this.prisma.task.update({
       where: { id },
       data: updates,
@@ -270,59 +317,80 @@ export class TasksService {
       },
     });
 
-    // Log activity for changes
+    console.log('TasksService.update - Task updated successfully:', task.id);
+
+    // Log activity for changes - create activities for each changed field
+    console.log('TasksService.update - Creating activities for changes:', Object.keys(changes));
     for (const [field, change] of Object.entries(changes)) {
+      console.log('TasksService.update - Logging activity for field:', field, 'Change:', change);
       const activityType =
         field === 'status' && change.new === TaskStatus.DONE
           ? ActivityType.TASK_COMPLETED
           : ActivityType.TASK_UPDATED;
 
-      await this.activityService.create({
-        type: activityType,
-        userId,
-        taskId: id,
-        dealId: task.dealId || undefined,
-        contactId: task.contactId || undefined,
-        payload: {
-          field,
-          oldValue: change.old,
-          newValue: change.new,
-        },
-      });
+      try {
+        const activity = await this.activityService.create({
+          type: activityType,
+          userId,
+          taskId: id,
+          dealId: task.dealId || undefined,
+          contactId: task.contactId || undefined,
+          payload: {
+            field,
+            oldValue: change.old,
+            newValue: change.new,
+          },
+        });
+        console.log('TasksService.update - Activity created successfully:', activity.id, 'Type:', activity.type, 'Field:', field);
+      } catch (activityError) {
+        console.error('TasksService.update - Failed to create activity for field:', field, activityError);
+      }
     }
+    console.log('TasksService.update - All activities created for task:', id);
 
-    // Log action
-    try {
-      const changeFields = Object.keys(changes);
-      // Get deal and contact names for metadata
-      const deal = task.dealId ? await this.prisma.deal.findUnique({
-        where: { id: task.dealId },
-        select: { title: true },
-      }) : null;
-      const contact = task.contactId ? await this.prisma.contact.findUnique({
-        where: { id: task.contactId },
-        select: { fullName: true },
-      }) : null;
-      
-      await this.loggingService.create({
-        level: 'info',
-        action: 'update',
-        entity: 'task',
-        entityId: task.id,
-        userId,
-        message: `Task "${task.title}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
-        metadata: {
-          taskTitle: task.title,
-          changes,
-          status: task.status,
-          dealId: task.dealId,
-          dealTitle: deal?.title,
-          contactId: task.contactId,
-          contactName: contact?.fullName,
-        },
-      });
-    } catch (logError) {
-      console.error('TasksService.update - failed to create log:', logError);
+    // Log action - only if there are actual changes
+    if (Object.keys(changes).length > 0) {
+      try {
+        const changeFields = Object.keys(changes);
+        console.log('TasksService.update - Creating log for task:', task.id, 'Changes:', changeFields, 'UserId:', userId);
+        
+        // Get deal and contact names for metadata
+        const deal = task.dealId ? await this.prisma.deal.findUnique({
+          where: { id: task.dealId },
+          select: { title: true },
+        }) : null;
+        const contact = task.contactId ? await this.prisma.contact.findUnique({
+          where: { id: task.contactId },
+          select: { fullName: true },
+        }) : null;
+        
+        const logData = {
+          level: 'info',
+          action: 'update',
+          entity: 'task',
+          entityId: task.id,
+          userId,
+          message: `Task "${task.title}" updated: ${changeFields.join(', ')}`,
+          metadata: {
+            taskTitle: task.title,
+            changes,
+            status: task.status,
+            dealId: task.dealId,
+            dealTitle: deal?.title,
+            contactId: task.contactId,
+            contactName: contact?.fullName,
+          },
+        };
+        
+        console.log('TasksService.update - Log data:', JSON.stringify(logData, null, 2));
+        const createdLog = await this.loggingService.create(logData);
+        console.log('TasksService.update - Log created successfully:', createdLog.id, 'Entity:', createdLog.entity, 'EntityId:', createdLog.entityId);
+      } catch (logError) {
+        console.error('TasksService.update - failed to create log:', logError);
+        console.error('TasksService.update - log error details:', logError instanceof Error ? logError.stack : logError);
+      }
+    } else {
+      console.log('TasksService.update - No changes detected, skipping log creation');
     }
 
     // Emit WebSocket events
@@ -379,6 +447,16 @@ export class TasksService {
 
     // Emit WebSocket event
     this.websocketGateway.emitTaskDeleted(id, { dealId: task.dealId, contactId: task.contactId });
+  }
+
+  async getHistory(taskId: string) {
+    // Get activities for this task
+    const activities = await this.activityService.findAll({
+      entityType: 'task',
+      entityId: taskId,
+    });
+
+    return activities;
   }
 }
 

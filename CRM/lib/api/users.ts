@@ -41,7 +41,15 @@ export async function getUsers(): Promise<User[]> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found for getUsers')
+    console.warn('No access token found for getUsers - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
     return []
   }
 
@@ -53,10 +61,17 @@ export async function getUsers(): Promise<User[]> {
   })
 
   if (!response.ok) {
-    // Handle authentication errors without redirecting (let the caller handle it)
+    // Handle authentication errors
     if (response.status === 401 || response.status === 403) {
-      console.warn('Unauthorized to fetch users')
-      // Don't redirect here - let the caller decide
+      console.warn('Unauthorized to fetch users - redirecting to login')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      
       throw new Error('UNAUTHORIZED')
     }
     throw new Error('Failed to fetch users')

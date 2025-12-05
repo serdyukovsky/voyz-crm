@@ -59,7 +59,15 @@ export async function getCompanies(params?: {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, returning empty companies list')
+    console.warn('No access token found - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
     return []
   }
 
@@ -76,9 +84,17 @@ export async function getCompanies(params?: {
     })
 
     if (!response.ok) {
-      // If unauthorized, return empty array instead of throwing
+      // If unauthorized, redirect to login
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch companies')
+        console.warn('Unauthorized to fetch companies - redirecting to login')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         return []
       }
       const errorText = await response.text().catch(() => 'Unknown error')

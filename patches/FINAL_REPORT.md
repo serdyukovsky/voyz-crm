@@ -256,3 +256,5 @@ python3 reports/smoke_test.py
 **Приложение готово к работе в GitHub Codespaces!** 🎉
 
 
+
+

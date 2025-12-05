@@ -73,7 +73,7 @@ describe('AuthService', () => {
           useValue: {
             get: jest.fn((key: string) => {
               const config: Record<string, string> = {
-                ACCESS_TOKEN_EXPIRES_IN: '15m',
+                ACCESS_TOKEN_EXPIRES_IN: '1h',
                 REFRESH_TOKEN_EXPIRES_IN: '30d',
               };
               return config[key];

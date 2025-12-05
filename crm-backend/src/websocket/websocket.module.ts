@@ -10,7 +10,7 @@ import { RealtimeGateway } from './realtime.gateway';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN', '15m'),
+          expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN', '1h'),
         },
       }),
       inject: [ConfigService],

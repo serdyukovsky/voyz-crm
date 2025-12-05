@@ -14,6 +14,7 @@ import { PageSkeleton } from "@/components/shared/loading-skeleton"
 import { createDeal, getDeals, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines, createPipeline, createStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 const defaultFunnels: Funnel[] = [
   { id: "default", name: "Sales Pipeline" },
@@ -180,6 +181,7 @@ const demoDeals: Deal[] = [
 ]
 
 export default function DealsPage() {
+  useAuthGuard()
   const router = useRouter()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -232,13 +234,6 @@ export default function DealsPage() {
       // Check if user is authenticated
       if (typeof window === 'undefined') return
       
-      const token = localStorage.getItem('access_token')
-      if (!token) {
-        console.warn('No access token found, redirecting to login')
-        router.push('/login')
-        return
-      }
-
       try {
         setPipelinesLoading(true)
         const pipelines = await getPipelines()

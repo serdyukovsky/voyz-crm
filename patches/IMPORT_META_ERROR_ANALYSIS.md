@@ -232,3 +232,5 @@ export async function getDeals(...) {
 3. Проверить что API запросы работают
 
 
+
+

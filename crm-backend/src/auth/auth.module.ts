@@ -22,7 +22,7 @@ import { CommonModule } from '@/common/common.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_ACCESS_SECRET') || 'access-secret-key',
         signOptions: {
-          expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '15m',
+          expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '1h',
         },
       }),
     }),

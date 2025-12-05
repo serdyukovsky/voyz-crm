@@ -4,8 +4,11 @@ import { CRMLayout } from "@/components/crm/layout"
 import { Dashboard } from "@/components/crm/dashboard"
 import { Button } from "@/components/ui/button"
 import { Plus } from 'lucide-react'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function DashboardPage() {
+  useAuthGuard()
+  
   return (
     <CRMLayout>
       <div className="min-h-[calc(100vh-3rem)] px-6 py-6">

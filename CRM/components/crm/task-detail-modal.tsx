@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Contact, Trash2, Plus, Search } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, User, Link as LinkIcon, Trash2, Search, History, Check, Undo2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,12 +52,9 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { DealDetailModal } from "./deal-detail-modal"
-import { CreateContactModal } from "./create-contact-modal"
-import { getContacts, createContact, type CreateContactDto } from '@/lib/api/contacts'
-import { getCompanies } from '@/lib/api/companies'
+import { TaskHistoryModal } from "./task-history-modal"
 import { getUsers, type User as UserType } from '@/lib/api/users'
 import { getDeals, type Deal as DealType } from '@/lib/api/deals'
-import { Contact as ContactType } from '@/types/contact'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 
@@ -92,50 +90,49 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
   const [dueDate, setDueDate] = useState(task.dueDate)
   const [description, setDescription] = useState(task.description || "")
   const [title, setTitle] = useState(task.title)
-  const [contactId, setContactId] = useState<string | null>(task.contactId || null)
   const [assigneeId, setAssigneeId] = useState<string | null>(task.assigneeId || null)
   const [dealId, setDealId] = useState<string | null>(task.dealId || null)
-  const [contacts, setContacts] = useState<ContactType[]>([])
   const [users, setUsers] = useState<UserType[]>([])
-  const [companies, setCompanies] = useState<any[]>([])
   const [deals, setDeals] = useState<DealType[]>([])
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [isRescheduleDropdownOpen, setIsRescheduleDropdownOpen] = useState(false)
-  const [isContactSelectOpen, setIsContactSelectOpen] = useState(false)
   const [isDealSelectOpen, setIsDealSelectOpen] = useState(false)
-  const [isCreateContactModalOpen, setIsCreateContactModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0)
   const calendarButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Update local state when task prop changes
   useEffect(() => {
     if (isOpen) {
+      console.log('TaskDetailModal: Task prop changed, updating state:', {
+        id: task.id,
+        title: task.title,
+        dueDate: task.dueDate,
+        assigneeId: task.assigneeId,
+        dealId: task.dealId,
+        result: task.result,
+      })
       setResult(task.result || "")
       setDueDate(task.dueDate)
       setDescription(task.description || "")
       setTitle(task.title)
-      setContactId(task.contactId || null)
       setAssigneeId(task.assigneeId || null)
       setDealId(task.dealId || null)
     }
   }, [task, isOpen])
 
-  // Load contacts and users
   useEffect(() => {
     if (isOpen) {
       const loadData = async () => {
         try {
-          const [contactsData, usersData, companiesData, dealsData] = await Promise.all([
-            getContacts(),
+          const [usersData, dealsData] = await Promise.all([
             getUsers(),
-            getCompanies(),
             getDeals(),
           ])
-          setContacts(contactsData)
           setUsers(usersData)
-          setCompanies(companiesData)
           setDeals(dealsData)
         } catch (error) {
           console.error('Failed to load data:', error)
@@ -145,99 +142,102 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     }
   }, [isOpen])
 
-  // Auto-save title (with debounce to avoid too many updates)
   useEffect(() => {
+    if (!isOpen) return
     if (!isEditingTitle && title !== task.title && title.trim()) {
       const timeoutId = setTimeout(() => {
         const updatedTask = {
           ...task,
           title,
         }
-        onUpdate(updatedTask, true) // silent = true for auto-save
-      }, 500) // 500ms debounce
+        onUpdate(updatedTask, true)
+      }, 500)
       return () => clearTimeout(timeoutId)
     }
-  }, [title, isEditingTitle])
+  }, [title, isEditingTitle, isOpen, task.title, task, onUpdate])
 
-  // Auto-save description (with debounce)
   useEffect(() => {
+    if (!isOpen) return
     if (!isEditingDescription && description !== (task.description || "")) {
-      const timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(async () => {
+        console.log('TaskDetailModal: Auto-saving description:', description)
         const updatedTask = {
           ...task,
           description,
         }
-        onUpdate(updatedTask, true) // silent = true for auto-save
-      }, 500) // 500ms debounce
+        console.log('TaskDetailModal: Updated task with description:', updatedTask)
+        await onUpdate(updatedTask, true)
+        // Refresh history after update
+        setHistoryRefreshTrigger(prev => prev + 1)
+      }, 500)
       return () => clearTimeout(timeoutId)
     }
-  }, [description, isEditingDescription])
+  }, [description, isEditingDescription, isOpen, task.description, task, onUpdate])
 
-  // Auto-save due date
-  useEffect(() => {
-    if (dueDate && dueDate !== task.dueDate) {
-      const timeoutId = setTimeout(() => {
-        const updatedTask = {
-          ...task,
-          dueDate,
-        }
-        onUpdate(updatedTask, true) // silent = true for auto-save
-      }, 300) // 300ms debounce
-      return () => clearTimeout(timeoutId)
-    }
-  }, [dueDate])
 
-  // Auto-save contact
   useEffect(() => {
-    if (contactId !== task.contactId && contacts.length > 0) {
-      const selectedContact = contacts.find((c) => c.id === contactId)
-      const updatedTask = {
-        ...task,
-        contactId: contactId || undefined,
-        contactName: selectedContact?.fullName || undefined,
-      }
-      onUpdate(updatedTask, true) // silent = true for auto-save
-    }
-  }, [contactId, contacts])
-
-  // Auto-save assignee
-  useEffect(() => {
-    if (assigneeId !== task.assigneeId && users.length > 0) {
+    if (!isOpen) return
+    const current = task.assigneeId ?? null
+    const next = assigneeId ?? null
+    if (next !== current && users.length > 0) {
       const selectedUser = users.find((u) => u.id === assigneeId)
       const updatedTask = {
         ...task,
         assigneeId: assigneeId || undefined,
         assignee: selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : task.assignee,
       }
-      onUpdate(updatedTask, true) // silent = true for auto-save
+      onUpdate(updatedTask, true).then(() => {
+        // Refresh history after update
+        setHistoryRefreshTrigger(prev => prev + 1)
+      })
     }
-  }, [assigneeId, users])
+  }, [assigneeId, users, isOpen, task.assigneeId, task, onUpdate])
 
-  // Auto-save deal
   useEffect(() => {
-    if (dealId !== task.dealId && deals.length > 0) {
+    if (!isOpen) return
+    const current = task.dealId ?? null
+    const next = dealId ?? null
+    if (next !== current && deals.length > 0) {
       const selectedDeal = deals.find((d) => d.id === dealId)
       const updatedTask = {
         ...task,
         dealId: dealId || undefined,
         dealName: selectedDeal?.title || undefined,
       }
-      onUpdate(updatedTask, true) // silent = true for auto-save
+      onUpdate(updatedTask, true).then(() => {
+        // Refresh history after update
+        setHistoryRefreshTrigger(prev => prev + 1)
+      })
     }
-  }, [dealId, deals])
+  }, [dealId, deals, isOpen, task.dealId, task, onUpdate])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (result !== (task.result || "")) {
+      const timeoutId = setTimeout(async () => {
+        const updatedTask = {
+          ...task,
+          result,
+        }
+        await onUpdate(updatedTask, true)
+        // Refresh history after update
+        setHistoryRefreshTrigger(prev => prev + 1)
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [result, isOpen, task.result, task, onUpdate])
 
   const handleTitleDoubleClick = () => {
     setIsEditingTitle(true)
   }
 
-  // Helper function to safely parse date
   const safeParseDate = (dateString: string | undefined | null): Date => {
     if (!dateString) return new Date()
     const date = new Date(dateString)
     return isNaN(date.getTime()) ? new Date() : date
   }
 
-  const handleReschedule = (days: number | null, date?: Date) => {
+  const handleReschedule = async (days: number | null, date?: Date) => {
     let newDate: Date
     if (date) {
       newDate = date
@@ -255,10 +255,20 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     }
 
     const formattedDate = format(newDate, "yyyy-MM-dd")
+    console.log('TaskDetailModal: Changing dueDate from', dueDate, 'to', formattedDate)
     setDueDate(formattedDate)
+    
+    // Immediately save the change
+    const updatedTask = {
+      ...task,
+      dueDate: formattedDate,
+    }
+    console.log('TaskDetailModal: Calling onUpdate with updatedTask:', updatedTask)
+    await onUpdate(updatedTask, true)
+    console.log('TaskDetailModal: onUpdate completed')
+    // Refresh history after update
+    setHistoryRefreshTrigger(prev => prev + 1)
   }
-
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   const handleCustomDate = (date: Date | undefined) => {
     if (date) {
@@ -273,9 +283,18 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
       return
     }
 
+    // If dueDate is not set, set it to current date
+    let finalDueDate = dueDate || task.dueDate
+    if (!finalDueDate || finalDueDate.trim() === '') {
+      const now = new Date()
+      finalDueDate = format(now, 'yyyy-MM-dd')
+      setDueDate(finalDueDate)
+    }
+
     const updatedTask = {
       ...task,
       result,
+      dueDate: finalDueDate,
       status: 'DONE',
       completed: true,
       dealId: dealId || task.dealId || null,
@@ -283,35 +302,32 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     }
     
     try {
-      await onUpdate(updatedTask, false) // Not silent - show success message
+      await onUpdate(updatedTask, false)
       showSuccess(t('tasks.taskCompleted') || 'Task completed successfully')
-      onClose() // Close modal after successful completion
+      onClose()
     } catch (error) {
       console.error('Failed to complete task:', error)
       showError(t('tasks.taskUpdated') || 'Failed to complete task')
     }
   }
 
-  const handleCreateContact = async (contactData?: CreateContactDto) => {
-    if (!contactData) return
-
-    try {
-      const newContact = await createContact(contactData)
-      const updatedContacts = await getContacts()
-      setContacts(updatedContacts)
-      setContactId(newContact.id)
-      setIsCreateContactModalOpen(false)
-      setIsContactSelectOpen(false)
-      showSuccess(t('contacts.createdSuccess'))
-    } catch (error) {
-      console.error('Failed to create contact:', error)
-      showError(t('contacts.createError'))
+  const handleReopenTask = async () => {
+    const updatedTask = {
+      ...task,
+      status: 'TODO',
+      completed: false,
+      dealId: dealId || task.dealId || null,
+      dealName: selectedDeal?.title || task.dealName || null,
     }
-  }
-
-  const handleOpenCreateContactModal = () => {
-    setIsContactSelectOpen(false)
-    setIsCreateContactModalOpen(true)
+    
+    try {
+      await onUpdate(updatedTask, false)
+      showSuccess('Вернули задачу в работу')
+      setHistoryRefreshTrigger(prev => prev + 1)
+    } catch (error) {
+      console.error('Failed to reopen task:', error)
+      showError(t('tasks.taskUpdated') || 'Failed to reopen task')
+    }
   }
 
   const handleDelete = async () => {
@@ -329,101 +345,114 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
   const dueDateObj = safeParseDate(dueDate)
   const tomorrow = new Date(dueDateObj)
   tomorrow.setDate(tomorrow.getDate() + 1)
-
   const dayAfterTomorrow = new Date(dueDateObj)
   dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2)
-
   const nextWeek = new Date(dueDateObj)
   nextWeek.setDate(nextWeek.getDate() + 7)
 
   const createdAt = safeParseDate(task.createdAt)
-  const selectedContact = contacts.find((c) => c.id === contactId)
   const selectedUser = users.find((u) => u.id === assigneeId)
   const selectedDeal = deals.find((d) => d.id === dealId)
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pr-10">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 rounded-br-3xl">
+          {task.completed && (
+            <button
+              className="ring-offset-background focus:ring-ring absolute top-4 right-10 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none text-muted-foreground hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:size-4"
+              onClick={handleReopenTask}
+              title="Вернуть в работу"
+            >
+              <Undo2 />
+              <span className="sr-only">Вернуть в работу</span>
+            </button>
+          )}
+          <DialogHeader className="space-y-2">
             {isEditingTitle ? (
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setIsEditingTitle(false)
-                  }
-                  if (e.key === 'Escape') {
-                    setTitle(task.title)
-                    setIsEditingTitle(false)
-                  }
-                }}
-                className="text-xl font-semibold h-auto py-1 pr-2"
-                autoFocus
-              />
-            ) : (
-              <DialogTitle 
-                className="text-xl font-semibold cursor-pointer hover:text-primary transition-colors pr-2"
-                onDoubleClick={handleTitleDoubleClick}
-              >
-                {title}
-              </DialogTitle>
-            )}
-            
-            {/* Description under task title */}
-            {description || isEditingDescription ? (
-              <div className="pt-1">
-                {isEditingDescription ? (
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    onBlur={() => setIsEditingDescription(false)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setDescription(task.description || "")
-                        setIsEditingDescription(false)
-                      }
-                    }}
-                    className="text-sm min-h-[60px] resize-none"
-                    autoFocus
-                  />
-                ) : (
-                  <p 
-                    className="text-sm text-muted-foreground whitespace-pre-wrap cursor-pointer hover:text-foreground transition-colors"
-                    onDoubleClick={() => setIsEditingDescription(true)}
-                  >
-                    {description || t('tasks.noDescription')}
-                  </p>
-                )}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ${
+                    task.completed ? 'bg-emerald-500' : 'bg-amber-400'
+                  }`}
+                  aria-label={task.completed ? t('tasks.completed') : t('tasks.incomplete')}
+                />
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={() => setIsEditingTitle(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setIsEditingTitle(false)
+                    }
+                    if (e.key === 'Escape') {
+                      setTitle(task.title)
+                      setIsEditingTitle(false)
+                    }
+                  }}
+                  className="!text-lg !font-semibold h-auto py-1 border-0 shadow-none focus-visible:ring-0 pr-12"
+                  autoFocus
+                />
               </div>
-            ) : null}
+            ) : (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+                    task.completed ? 'bg-emerald-500' : 'bg-amber-400'
+                  }`}
+                  aria-label={task.completed ? t('tasks.completed') : t('tasks.incomplete')}
+                />
+                <DialogTitle 
+                  className={`text-lg font-semibold cursor-pointer hover:text-primary transition-colors ${task.completed ? 'line-through' : ''}`}
+                  onDoubleClick={handleTitleDoubleClick}
+                >
+                  {title}
+                </DialogTitle>
+              </div>
+            )}
           </DialogHeader>
+            
+          {description || isEditingDescription ? (
+            <div className="space-y-1">
+              {isEditingDescription ? (
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={() => setIsEditingDescription(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setDescription(task.description || "")
+                      setIsEditingDescription(false)
+                    }
+                  }}
+                  className="text-sm min-h-[80px] resize-none"
+                  autoFocus
+                />
+              ) : (
+                <p
+                  className={`text-sm text-muted-foreground whitespace-pre-wrap cursor-pointer hover:text-foreground transition-colors ${task.completed ? 'line-through' : ''}`}
+                  onDoubleClick={() => setIsEditingDescription(true)}
+                >
+                  {description || t('tasks.noDescription')}
+                </p>
+              )}
+            </div>
+          ) : null}
 
-          <div className="space-y-6 mt-4">
-            {/* Deal */}
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground flex items-center gap-2">
-                <LinkIcon className="h-4 w-4" />
-                {t('tasks.taskDeal')}
-              </label>
-              <div className="flex gap-2">
-                <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={isDealSelectOpen}
-                    className="w-full justify-between h-9 text-sm font-normal"
-                  >
-                    <span className={selectedDeal ? "text-foreground" : "text-muted-foreground"}>
-                      {selectedDeal ? selectedDeal.title : t('tasks.selectDeal')}
-                    </span>
-                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
+                  <button className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors">
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    {selectedDeal ? (
+                      <span className="text-foreground">{selectedDeal.title}</span>
+                    ) : (
+                      <span>{t('tasks.selectDeal')}</span>
+                    )}
+                  </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[360px] p-0" align="start">
                   <Command>
                     <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
                     <CommandList>
@@ -460,78 +489,108 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                   </Command>
                 </PopoverContent>
               </Popover>
-              {selectedDeal && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 flex-shrink-0"
-                  onClick={() => setIsDealModalOpen(true)}
-                  title={t('deals.viewDeal') || 'Просмотр сделки'}
-                >
-                  <LinkIcon className="h-4 w-4" />
-                </Button>
-              )}
             </div>
-            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {dueDate && !isNaN(safeParseDate(dueDate).getTime())
+                  ? format(safeParseDate(dueDate), "PPP")
+                  : t('tasks.notSet')}
+              </span>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal>
+                <DropdownMenu open={isRescheduleDropdownOpen} onOpenChange={setIsRescheduleDropdownOpen}>
+                  <PopoverAnchor asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        ref={calendarButtonRef}
+                        title={t('tasks.reschedule')}
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </PopoverAnchor>
+                  <DropdownMenuContent align="end" onCloseAutoFocus={(e) => {
+                    if (isCalendarOpen) {
+                      e.preventDefault()
+                    }
+                  }}>
+                    <DropdownMenuItem onClick={() => handleReschedule(1)}>
+                      {t('tasks.tomorrow')} ({format(tomorrow, "MMM d")})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleReschedule(2)}>
+                      {t('tasks.dayAfterTomorrow')} ({format(dayAfterTomorrow, "MMM d")})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleReschedule(7)}>
+                      {t('tasks.nextWeek')} ({format(nextWeek, "MMM d")})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        setIsRescheduleDropdownOpen(false)
+                        requestAnimationFrame(() => {
+                          setIsCalendarOpen(true)
+                        })
+                      }}
+                    >
+                      {t('tasks.chooseDate')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-            {/* Contact */}
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground flex items-center gap-2">
-                <Contact className="h-4 w-4" />
-                {t('tasks.taskContact')}
+                <PopoverContent
+                  className="w-auto p-0"
+                  align="end"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                  onInteractOutside={(e) => {
+                    const target = e.target as Node
+                    if (calendarButtonRef.current && calendarButtonRef.current.contains(target)) {
+                      e.preventDefault()
+                    }
+                  }}
+                >
+                  <Calendar
+                    mode="single"
+                    selected={safeParseDate(dueDate)}
+                    onSelect={handleCustomDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="-mb-1.5">
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="result" className="text-sm font-medium">
+                {t('tasks.result')}
               </label>
-              <Popover open={isContactSelectOpen} onOpenChange={setIsContactSelectOpen}>
+              <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={isContactSelectOpen}
-                    className="w-full justify-between h-9 text-sm font-normal"
-                  >
-                    <span className="text-muted-foreground">
-                      {selectedContact ? selectedContact.fullName : t('tasks.selectContact')}
-                    </span>
-                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Button variant="link" className="h-auto p-0 text-xs text-foreground hover:text-primary">
+                    {selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : t('tasks.unassigned')}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[200px] p-0">
                   <Command>
-                    <CommandInput placeholder={t('contacts.searchPlaceholder')} />
+                    <CommandInput placeholder={t('tasks.searchAssignee')} />
                     <CommandList>
-                      <CommandEmpty>{t('contacts.noContactsFound')}</CommandEmpty>
+                      <CommandEmpty>{t('tasks.noUsersFound')}</CommandEmpty>
                       <CommandGroup>
                         <CommandItem
-                          value="__create_new__"
-                          onSelect={handleOpenCreateContactModal}
-                          className="text-primary"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          <span>{t('contacts.createNewContact')}</span>
-                        </CommandItem>
-                        <CommandItem
                           value="none"
-                          onSelect={() => {
-                            setContactId(null)
-                            setIsContactSelectOpen(false)
-                          }}
+                          onSelect={() => setAssigneeId(null)}
                         >
-                          <span>{t('tasks.none')}</span>
+                          {t('tasks.unassigned')}
                         </CommandItem>
-                        {contacts.map((contact) => (
+                        {users.map((user) => (
                           <CommandItem
-                            key={contact.id}
-                            value={`${contact.fullName} ${contact.email || ''} ${contact.phone || ''}`}
-                            onSelect={() => {
-                              setContactId(contact.id)
-                              setIsContactSelectOpen(false)
-                            }}
+                            key={user.id}
+                            value={`${user.firstName} ${user.lastName}`}
+                            onSelect={() => setAssigneeId(user.id)}
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{contact.fullName}</span>
-                              {contact.email && (
-                                <span className="text-xs text-muted-foreground">{contact.email}</span>
-                              )}
-                            </div>
+                            {user.firstName} {user.lastName}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -540,150 +599,44 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                 </PopoverContent>
               </Popover>
             </div>
-
-            {/* Task Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{t('tasks.created')}</span>
-                </div>
-                <div className="text-sm font-medium">
-                  {format(createdAt, "PPP 'at' p")}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span>{t('tasks.responsible') || t('tasks.assignedTo')}</span>
-                </div>
-                <Select
-                  value={assigneeId || "none"}
-                  onValueChange={(value) => {
-                    setAssigneeId(value === "none" ? null : value)
-                  }}
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder={t('tasks.selectUser')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t('tasks.none')}</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Due Date with Reschedule */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{t('tasks.taskDeadline')}:</span>
-                <span className="text-sm font-medium">
-                  {dueDate && !isNaN(safeParseDate(dueDate).getTime()) 
-                    ? format(safeParseDate(dueDate), "PPP")
-                    : t('tasks.notSet')}
-                </span>
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal>
-                  <DropdownMenu open={isRescheduleDropdownOpen} onOpenChange={setIsRescheduleDropdownOpen}>
-                    <PopoverAnchor asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="ml-auto text-xs" ref={calendarButtonRef}>
-                          {t('tasks.reschedule')}
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </PopoverAnchor>
-                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => {
-                      if (isCalendarOpen) {
-                        e.preventDefault()
-                      }
-                    }}>
-                      <DropdownMenuItem onClick={() => handleReschedule(1)}>
-                        {t('tasks.tomorrow')} ({format(tomorrow, "MMM d")})
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleReschedule(2)}>
-                        {t('tasks.dayAfterTomorrow')} ({format(dayAfterTomorrow, "MMM d")})
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleReschedule(7)}>
-                        {t('tasks.nextWeek')} ({format(nextWeek, "MMM d")})
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onSelect={(e) => {
-                          e.preventDefault()
-                          setIsRescheduleDropdownOpen(false)
-                          requestAnimationFrame(() => {
-                            setIsCalendarOpen(true)
-                          })
-                        }}
-                      >
-                        {t('tasks.chooseDate')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  
-                  <PopoverContent 
-                    className="w-auto p-0" 
-                    align="end"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                    onInteractOutside={(e) => {
-                      const target = e.target as Node
-                      if (calendarButtonRef.current && calendarButtonRef.current.contains(target)) {
-                        e.preventDefault()
-                      }
-                    }}
-                  >
-                    <Calendar
-                      mode="single"
-                      selected={safeParseDate(dueDate)}
-                      onSelect={handleCustomDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Result Field */}
-            <div className="space-y-2">
-              <label htmlFor="result" className="text-sm font-medium">
-                {t('tasks.result')}
-              </label>
+            <div className="relative">
               <Textarea
                 id="result"
                 placeholder={t('tasks.resultPlaceholder')}
                 value={result}
                 onChange={(e) => setResult(e.target.value)}
-                className="min-h-[120px] resize-none"
+                className="min-h-[140px] resize-none pr-16 pb-14 rounded-br-3xl"
               />
+              <Button 
+                size="icon" 
+                className="absolute bottom-2 right-2 h-10 w-10 rounded-full" 
+                onClick={handleComplete}
+                title={t('tasks.complete') || t('tasks.execute') || 'Выполнить'}
+              >
+                <Check className="h-5 w-5" strokeWidth={3} />
+              </Button>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-between items-center mt-6">
+          <div className="flex items-center justify-start gap-2 text-xs -mt-1.5 -mb-4">
             {onDelete && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
                 onClick={() => setIsDeleteDialogOpen(true)}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
-            <div className="flex gap-2 ml-auto">
-              <Button onClick={handleComplete}>
-                {t('tasks.complete') || t('tasks.execute') || 'Выполнить'}
-              </Button>
-            </div>
+            <Button variant="link" className="h-auto p-0 text-xs font-normal text-muted-foreground hover:text-foreground" onClick={() => setIsHistoryOpen(true)}>
+              {format(createdAt, 'PPP p')}
+            </Button>
           </div>
-        </DialogContent>
 
-        {/* Deal Detail Modal */}
+        </DialogContent>
+      </Dialog>
+
         {selectedDeal && (
           <DealDetailModal
             deal={{
@@ -694,17 +647,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
             onClose={() => setIsDealModalOpen(false)}
           />
         )}
-      </Dialog>
 
-      {/* Create Contact Modal */}
-      <CreateContactModal
-        isOpen={isCreateContactModalOpen}
-        onClose={() => setIsCreateContactModalOpen(false)}
-        onSave={handleCreateContact}
-        companies={companies}
-      />
-
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -721,6 +664,13 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TaskHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        task={task}
+        refreshTrigger={historyRefreshTrigger}
+      />
     </>
   )
 }
