@@ -12,8 +12,10 @@ import { CreateContactModal } from '@/components/crm/create-contact-modal'
 import { FilterBar } from '@/components/shared/filter-bar'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function ContactsPage() {
+  useAuthGuard()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showSuccess, showError } = useToastNotification()

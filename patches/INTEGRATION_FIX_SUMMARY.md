@@ -175,3 +175,5 @@ python3 reports/smoke_test.py
 3. **Git ignore** - `.env.local` уже в `.gitignore`, не коммитить его в репозиторий
 
 
+
+

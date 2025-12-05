@@ -82,6 +82,10 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter,
         console.log('Loading logs with filters:', filters)
         const data = await getLogs(filters)
         console.log('Loaded logs:', data.length, 'items')
+        console.log('Sample logs:', data.slice(0, 3))
+        // Filter for task logs specifically to debug
+        const taskLogs = data.filter(log => log.entity === 'task')
+        console.log('Task logs:', taskLogs.length, taskLogs)
         setLogs(data)
       } catch (error) {
         console.error('Failed to load logs:', error)
@@ -92,6 +96,13 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter,
     }
 
     loadLogs()
+    
+    // Set up interval to refresh logs every 30 seconds
+    const interval = setInterval(() => {
+      loadLogs()
+    }, 30000)
+    
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionFilter, userFilter, entityFilter, dateRange])
 

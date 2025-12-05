@@ -73,6 +73,14 @@ export class TasksController {
     return this.tasksService.update(id, updateTaskDto, user.userId || user.id);
   }
 
+  @Get(':id/history')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
+  @ApiOperation({ summary: 'Get task history' })
+  @ApiResponse({ status: 200, description: 'Task history' })
+  getHistory(@Param('id') id: string) {
+    return this.tasksService.getHistory(id);
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete task' })

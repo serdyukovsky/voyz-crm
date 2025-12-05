@@ -77,7 +77,7 @@ export async function getPipelines(): Promise<Pipeline[]> {
     console.log('Pipelines response status:', response.status, response.statusText)
 
     if (!response.ok) {
-      // If unauthorized, clear token and throw error to trigger redirect
+      // If unauthorized, clear token and redirect to login
       if (response.status === 401 || response.status === 403) {
         console.warn('Unauthorized to fetch pipelines - token may be invalid or expired')
         const errorText = await response.text().catch(() => 'Unauthorized')
@@ -87,6 +87,11 @@ export async function getPipelines(): Promise<Pipeline[]> {
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
+        
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
         
         // Throw error to trigger redirect in component
         throw new Error('UNAUTHORIZED')
@@ -272,6 +277,11 @@ export async function createStage(pipelineId: string, data: CreateStageDto): Pro
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
         
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         // Throw error to trigger redirect in component
         throw new Error('UNAUTHORIZED')
       }
@@ -344,6 +354,11 @@ export async function updateStage(id: string, data: UpdateStageDto): Promise<Sta
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
+        
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
         
         // Throw error to trigger redirect in component
         throw new Error('UNAUTHORIZED')

@@ -91,7 +91,15 @@ export async function getDealComments(dealId: string): Promise<Comment[]> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, returning empty comments list')
+    console.warn('No access token found - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
     return []
   }
 
@@ -106,9 +114,15 @@ export async function getDealComments(dealId: string): Promise<Comment[]> {
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
+        console.warn('Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         throw new Error('UNAUTHORIZED')
       }
       const errorText = await response.text().catch(() => 'Unknown error')
@@ -150,5 +164,6 @@ export async function deleteComment(commentId: string): Promise<void> {
     throw new Error('Failed to delete comment')
   }
 }
+
 
 

@@ -18,6 +18,7 @@ interface Task {
   contactName?: string | null
   dueDate: string
   assignee: string
+  assigneeId?: string
   completed: boolean
   status: string
   description?: string
@@ -96,6 +97,7 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
           contactName: task.contact?.fullName || null,
           dueDate: task.deadline || '',
           assignee: task.assignedTo?.name || t('tasks.unassigned'),
+          assigneeId: task.assignedTo?.id || undefined,
           completed,
           status,
           description: task.description,
@@ -187,9 +189,18 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
     try {
       // Update via API
       const statusToSend = updatedTask.status === 'DONE' ? 'DONE' : updatedTask.status?.toUpperCase() || 'TODO'
-      console.log('Updating task:', updatedTask.id, 'Status:', statusToSend, 'Completed:', updatedTask.completed)
+      console.log('TasksKanbanView: Updating task:', updatedTask.id, {
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: statusToSend,
+        completed: updatedTask.completed,
+        dueDate: updatedTask.dueDate,
+        assigneeId: updatedTask.assigneeId,
+        dealId: updatedTask.dealId,
+        result: updatedTask.result,
+      })
       
-      await updateTask(updatedTask.id, {
+      const response = await updateTask(updatedTask.id, {
         title: updatedTask.title,
         description: updatedTask.description,
         deadline: updatedTask.dueDate,
@@ -200,21 +211,51 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
         result: updatedTask.result,
       })
       
-      console.log('Task updated in API, reloading tasks...')
-      // Reload tasks to ensure they appear in the correct stage
+      console.log('TasksKanbanView: Task updated in API, response:', response)
+      
+      // Transform API response to Task format
+      const apiTask = response as any
+      const finalUpdatedTask: Task = {
+        id: apiTask?.id || updatedTask.id,
+        title: apiTask?.title || updatedTask.title,
+        description: apiTask?.description || updatedTask.description,
+        dueDate: apiTask?.deadline || updatedTask.dueDate,
+        assigneeId: apiTask?.assignedTo?.id || updatedTask.assigneeId,
+        assignee: apiTask?.assignedTo?.name || updatedTask.assignee || t('tasks.unassigned'),
+        dealId: apiTask?.deal?.id || updatedTask.dealId || null,
+        dealName: apiTask?.deal?.title || updatedTask.dealName || null,
+        contactId: apiTask?.contact?.id || updatedTask.contactId,
+        contactName: apiTask?.contact?.fullName || updatedTask.contactName,
+        status: statusToSend.toLowerCase(),
+        completed: statusToSend === 'DONE',
+        result: apiTask?.result || updatedTask.result,
+        createdAt: apiTask?.createdAt || updatedTask.createdAt,
+      }
+      
+      console.log('TasksKanbanView: Final updated task:', finalUpdatedTask)
+      
+      // Immediately update the task in local state to reflect changes in the UI
+      setTasks(prevTasks => {
+        const updatedTasks = prevTasks.map(t => 
+          t.id === finalUpdatedTask.id ? finalUpdatedTask : t
+        )
+        console.log('TasksKanbanView: Local state updated, updated task:', updatedTasks.find(t => t.id === finalUpdatedTask.id))
+        return updatedTasks
+      })
+      
+      // Also reload tasks from API after a short delay to ensure consistency
       // This is especially important when status changes to DONE
-      // Add a small delay to ensure backend has processed the update
       setTimeout(() => {
-        console.log('Refreshing tasks after update...')
+        console.log('TasksKanbanView: Refreshing tasks from API after update...')
         setRefreshKey(prev => prev + 1)
-      }, 300)
+      }, 500)
       
       // Only show success message if not silent (i.e., not auto-save)
       if (!silent) {
         showSuccess(t('tasks.taskUpdated') || 'Task updated successfully')
       }
     } catch (error) {
-      console.error('Failed to update task:', error)
+      console.error('TasksKanbanView: Failed to update task:', error)
       if (!silent) {
         showError(t('tasks.taskUpdated') || 'Failed to update task')
       }

@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Settings, User, Keyboard, LogOut } from 'lucide-react'
 import Link from "next/link"
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function SettingsPage() {
+  useAuthGuard()
   const router = useRouter()
 
   const handleLogout = () => {

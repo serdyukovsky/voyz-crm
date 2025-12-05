@@ -23,6 +23,7 @@ interface Task {
   contactName?: string | null
   dueDate: string
   assignee: string
+  assigneeId?: string
   completed: boolean
   status: string
   description?: string
@@ -71,6 +72,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
           contactName: task.contact?.fullName || null,
           dueDate: task.deadline || '',
           assignee: task.assignedTo?.name || t('tasks.unassigned'),
+          assigneeId: task.assignedTo?.id || undefined,
           completed: task.status === 'DONE',
           status: task.status?.toLowerCase() || 'todo',
           description: task.description,
@@ -156,43 +158,95 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
   const handleTaskUpdate = async (updatedTask: Task, silent: boolean = false) => {
     try {
       // Update via API
-      await updateTask(updatedTask.id, {
+      const statusToSend = updatedTask.status === 'DONE' ? 'DONE' : updatedTask.status?.toUpperCase() || 'TODO'
+      console.log('TasksListView: Updating task:', updatedTask.id, {
+        title: updatedTask.title,
+        status: statusToSend,
+        dueDate: updatedTask.dueDate,
+        assigneeId: updatedTask.assigneeId,
+        dealId: updatedTask.dealId,
+      })
+      
+      const response = await updateTask(updatedTask.id, {
         title: updatedTask.title,
         description: updatedTask.description,
         deadline: updatedTask.dueDate,
         contactId: updatedTask.contactId || undefined,
         assignedToId: updatedTask.assigneeId || undefined,
         dealId: updatedTask.dealId || undefined,
-        status: updatedTask.status === 'DONE' ? 'DONE' : updatedTask.status?.toUpperCase() || 'TODO',
+        status: statusToSend,
         result: updatedTask.result,
       })
       
-      // Reload tasks to ensure they appear correctly
-      const tasksData = await getTasks({
-        status: statusFilter || undefined,
+      console.log('TasksListView: Task updated in API, response:', response)
+      
+      // Transform API response to Task format
+      const apiTask = response as any
+      const finalUpdatedTask: Task = {
+        id: apiTask?.id || updatedTask.id,
+        title: apiTask?.title || updatedTask.title,
+        description: apiTask?.description || updatedTask.description,
+        dueDate: apiTask?.deadline || updatedTask.dueDate,
+        assigneeId: apiTask?.assignedTo?.id || updatedTask.assigneeId,
+        assignee: apiTask?.assignedTo?.name || updatedTask.assignee || t('tasks.unassigned'),
+        dealId: apiTask?.deal?.id || updatedTask.dealId || null,
+        dealName: apiTask?.deal?.title || updatedTask.dealName || null,
+        contactId: apiTask?.contact?.id || updatedTask.contactId,
+        contactName: apiTask?.contact?.fullName || updatedTask.contactName,
+        status: statusToSend.toLowerCase(),
+        completed: statusToSend === 'DONE',
+        result: apiTask?.result || updatedTask.result,
+        createdAt: apiTask?.createdAt || updatedTask.createdAt,
+      }
+      
+      console.log('TasksListView: Final updated task:', finalUpdatedTask)
+      
+      // Immediately update the task in local state to reflect changes in the UI
+      setTasks(prevTasks => {
+        const updatedTasks = prevTasks.map(t => 
+          t.id === finalUpdatedTask.id ? finalUpdatedTask : t
+        )
+        return updatedTasks
       })
       
-      const transformedTasks: Task[] = tasksData.map((task: any) => ({
-        id: task.id,
-        title: task.title,
-        dealId: task.deal?.id || null,
-        dealName: task.deal?.title || null,
-        contactId: task.contact?.id || null,
-        contactName: task.contact?.fullName || null,
-        dueDate: task.deadline || '',
-        assignee: task.assignedTo?.name || t('tasks.unassigned'),
-        completed: task.status === 'DONE',
-        status: task.status?.toLowerCase() || 'todo',
-        description: task.description,
-        createdAt: task.createdAt,
-        result: task.result,
-      }))
+      // Update selected task if it's the one being updated
+      setSelectedTask(prev => 
+        prev && prev.id === finalUpdatedTask.id ? finalUpdatedTask : prev
+      )
       
-      setTasks(transformedTasks)
-      const updated = transformedTasks.find(t => t.id === updatedTask.id)
-      if (updated) {
-        setSelectedTask(updated)
-      }
+      // Also reload tasks from API after a short delay to ensure consistency
+      setTimeout(async () => {
+        try {
+          const tasksData = await getTasks({
+            status: statusFilter || undefined,
+          })
+          
+          const transformedTasks: Task[] = tasksData.map((task: any) => ({
+            id: task.id,
+            title: task.title,
+            dealId: task.deal?.id || null,
+            dealName: task.deal?.title || null,
+            contactId: task.contact?.id || null,
+            contactName: task.contact?.fullName || null,
+            dueDate: task.deadline || '',
+            assignee: task.assignedTo?.name || t('tasks.unassigned'),
+            assigneeId: task.assignedTo?.id || undefined,
+            completed: task.status === 'DONE',
+            status: task.status?.toLowerCase() || 'todo',
+            description: task.description,
+            createdAt: task.createdAt,
+            result: task.result,
+          }))
+          
+          setTasks(transformedTasks)
+          const updated = transformedTasks.find(t => t.id === updatedTask.id)
+          if (updated) {
+            setSelectedTask(updated)
+          }
+        } catch (error) {
+          console.error('Failed to reload tasks:', error)
+        }
+      }, 500)
       
       // Only show success message if not silent (i.e., not auto-save)
       if (!silent) {

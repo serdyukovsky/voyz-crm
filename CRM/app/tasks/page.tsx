@@ -14,8 +14,10 @@ import { Contact } from '@/types/contact'
 import { CreateTaskModal } from '@/components/crm/create-task-modal'
 import { createTask } from '@/lib/api/tasks'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function TasksPage() {
+  useAuthGuard()
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
   const [searchQuery, setSearchQuery] = useState("")
   const [userFilter, setUserFilter] = useState<string>("")
@@ -31,15 +33,6 @@ export default function TasksPage() {
   useEffect(() => {
     console.log('TasksPage: isCreateTaskModalOpen changed to:', isCreateTaskModalOpen)
   }, [isCreateTaskModalOpen])
-
-  // Check authentication on mount
-  useEffect(() => {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      console.warn('No access token found on tasks page, redirecting to login')
-      window.location.href = '/login'
-    }
-  }, [])
 
   const users = ["All Users", "Alex Chen", "Sarah Lee", "Mike Johnson"]
   const deals = ["All Deals", "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]

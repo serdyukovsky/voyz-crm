@@ -234,17 +234,22 @@ export class ActivityService {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' }, // Changed to desc to show latest first
     });
 
+    console.log('ActivityService.findAll - Found', activities.length, 'activities');
+
     // Transform activities to include computed 'name' field for user
-    return activities.map(activity => ({
+    const transformed = activities.map(activity => ({
       ...activity,
-      user: {
+      user: activity.user ? {
         ...activity.user,
         name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
-      },
+      } : null,
     }));
+    
+    console.log('ActivityService.findAll - Transformed activities:', transformed.length);
+    return transformed;
   }
 }
 

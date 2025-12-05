@@ -11,8 +11,10 @@ import { FilterBar } from '@/components/shared/filter-bar'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useRealtimeCompany } from '@/hooks/use-realtime-company'
+import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function CompaniesPage() {
+  useAuthGuard()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showSuccess, showError } = useToastNotification()

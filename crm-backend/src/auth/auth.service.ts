@@ -92,9 +92,9 @@ export class AuthService {
       role: user.role,
     };
 
-    // Generate access token (15 minutes)
+    // Generate access token (1 hour)
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '15m',
+      expiresIn: this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '1h',
     });
 
     // Generate refresh token (30 days)
@@ -228,7 +228,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '15m',
+      expiresIn: this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '1h',
     });
 
     // Rotate refresh token: delete old and create new

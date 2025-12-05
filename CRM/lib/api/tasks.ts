@@ -147,6 +147,11 @@ export async function createTask(data: CreateTaskDto): Promise<Task> {
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
         
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         // Throw error to trigger redirect in component
         throw new Error('UNAUTHORIZED')
       }
@@ -205,6 +210,15 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
 
   const token = localStorage.getItem('access_token')
   if (!token) {
+    console.warn('API: No access token found - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
     throw new Error('No access token found')
   }
 
@@ -222,9 +236,15 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
+        console.warn('API: Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         throw new Error('UNAUTHORIZED')
       }
 
@@ -259,6 +279,15 @@ export async function deleteTask(id: string): Promise<void> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
+    console.warn('API: No access token found - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
     throw new Error('No access token found')
   }
 
@@ -274,9 +303,15 @@ export async function deleteTask(id: string): Promise<void> {
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
+        console.warn('API: Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
+        
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
         throw new Error('UNAUTHORIZED')
       }
 

@@ -51,8 +51,10 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
     setIsDealModalOpen(true)
   }
 
-  const handleTaskUpdate = async (updatedTask: Task) => {
-    await onTaskUpdate?.(updatedTask)
+  const handleTaskUpdate = async (updatedTask: Task, silent?: boolean) => {
+    console.log('TaskCard: handleTaskUpdate called with:', updatedTask)
+    await onTaskUpdate?.(updatedTask, silent)
+    console.log('TaskCard: handleTaskUpdate completed')
   }
 
   return (
@@ -102,6 +104,7 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete }: TaskCardProps) {
       </Card>
 
       <TaskDetailModal
+        key={task.id + task.dueDate + task.assigneeId + task.dealId}
         task={task}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
