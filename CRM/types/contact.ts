@@ -38,6 +38,14 @@ export interface Contact {
     vk?: string
   }
 
+  // New fields
+  link?: string // Ссылка
+  subscriberCount?: string // Кол-во подписчиков
+  directions?: string[] // Направление (множественный выбор)
+  contactMethods?: string[] // Способ связи: Whatsapp, Telegram, Direct
+  websiteOrTgChannel?: string // Сайт, тг канал
+  contactInfo?: string // Контакт (номер телефона или никнейм в телеграме)
+
   createdAt: string
   updatedAt: string
 
@@ -85,6 +93,13 @@ export interface CreateContactDto {
     whatsapp?: string
     vk?: string
   }
+  // New fields
+  link?: string
+  subscriberCount?: string
+  directions?: string[]
+  contactMethods?: string[]
+  websiteOrTgChannel?: string
+  contactInfo?: string
 }
 
 export interface UpdateContactDto extends Partial<CreateContactDto> {}

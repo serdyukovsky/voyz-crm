@@ -333,7 +333,6 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
 
 export function ActivityTimeline({ activities, className, pipelineStages }: ActivityTimelineProps) {
   const { t } = useTranslation()
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
 
   // Group activities by date
   const groupedActivities = useMemo(() => {
@@ -359,9 +358,18 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
     return groups
   }, [activities])
 
-  const sortedDates = Object.keys(groupedActivities).sort((a, b) => 
-    new Date(a).getTime() - new Date(b).getTime()
-  )
+  const sortedDates = useMemo(() => 
+    Object.keys(groupedActivities).sort((a, b) => 
+      new Date(a).getTime() - new Date(b).getTime()
+    ), [groupedActivities])
+
+  // Initialize expandedDates with all dates - all sections should be expanded by default
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
+
+  // Update expandedDates when sortedDates changes - always expand all sections
+  React.useEffect(() => {
+    setExpandedDates(new Set(sortedDates))
+  }, [sortedDates.join(',')])
 
   const toggleDate = (dateKey: string) => {
     setExpandedDates(prev => {
@@ -395,7 +403,8 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
         if (isTodayDate) dateLabel = t('deals.today')
         if (isYesterdayDate) dateLabel = t('deals.yesterday')
 
-        const isExpanded = expandedDates.has(dateKey) || sortedDates.length === 1
+        // All sections should be expanded by default
+        const isExpanded = expandedDates.has(dateKey)
 
         return (
           <Collapsible

@@ -47,83 +47,8 @@ export function DealFieldsPanel({
 
   // If no custom fields, show default groups
   if (customFields.length === 0) {
-    return (
-      <div className="space-y-4 pt-3">
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <button
-              onClick={() => toggleGroup('basic')}
-              className="w-full flex items-center justify-between text-xs font-medium text-foreground hover:text-primary transition-colors"
-            >
-              <span>Basic Information</span>
-              {expandedGroups['basic'] ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
-              )}
-            </button>
-            {expandedGroups['basic'] && (
-              <div className="space-y-3 pl-2">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Industry
-                  </label>
-                  <Input
-                    defaultValue="Technology"
-                    className="h-9 text-sm bg-background/50 border-border/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Company Size
-                  </label>
-                  <Input
-                    defaultValue="500-1000"
-                    className="h-9 text-sm bg-background/50 border-border/50"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Source
-                  </label>
-                  <Input
-                    defaultValue="Website"
-                    className="h-9 text-sm bg-background/50 border-border/50"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2 pt-3 border-t border-border/50">
-            <button
-              onClick={() => toggleGroup('financial')}
-              className="w-full flex items-center justify-between text-xs font-medium text-foreground hover:text-primary transition-colors"
-            >
-              <span>Financial Details</span>
-              {expandedGroups['financial'] ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
-              )}
-            </button>
-            {expandedGroups['financial'] && (
-              <div className="space-y-3 pl-2">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    Budget
-                  </label>
-                  <Input
-                    defaultValue="$125,000"
-                    className="h-9 text-sm bg-background/50 border-border/50"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
+    // Hide Basic Information and Financial Details sections
+    return null
   }
 
   return (

@@ -68,5 +68,37 @@ export class CreateContactDto {
   @ValidateNested()
   @Type(() => SocialLinksDto)
   social?: SocialLinksDto;
+
+  @ApiPropertyOptional({ description: 'Ссылка' })
+  @IsOptional()
+  @IsString()
+  link?: string;
+
+  @ApiPropertyOptional({ description: 'Кол-во подписчиков' })
+  @IsOptional()
+  @IsString()
+  subscriberCount?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Направление (множественный выбор)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  directions?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Способ связи: Whatsapp, Telegram, Direct' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  contactMethods?: string[];
+
+  @ApiPropertyOptional({ description: 'Сайт, тг канал' })
+  @IsOptional()
+  @IsString()
+  websiteOrTgChannel?: string;
+
+  @ApiPropertyOptional({ description: 'Контакт (номер телефона или никнейм в телеграме)' })
+  @IsOptional()
+  @IsString()
+  contactInfo?: string;
 }
 

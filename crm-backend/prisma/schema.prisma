@@ -254,6 +254,13 @@ model Contact {
   tags      String[] @default([])
   notes     String?
   social    Json?    // { instagram, telegram, whatsapp, vk }
+  // New fields
+  link      String?  // Ссылка
+  subscriberCount String? // Кол-во подписчиков
+  directions String[] @default([]) // Направление (множественный выбор)
+  contactMethods String[] @default([]) // Способ связи: Whatsapp, Telegram, Direct
+  websiteOrTgChannel String? // Сайт, тг канал
+  contactInfo String? // Контакт (номер телефона или никнейм в телеграме)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -321,6 +328,7 @@ model Deal {
   closedAt        DateTime?
   description     String?
   tags            String[]  @default([])
+  rejectionReasons String[] @default([]) // Причина отказа (множественный выбор)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

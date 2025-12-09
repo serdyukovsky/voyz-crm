@@ -191,7 +191,17 @@
     "noPipelineAvailable": "No pipeline available",
     "createPipelineWithStages": "Please create a pipeline with stages first",
     "dealCreatedSuccess": "Deal created successfully",
-    "failedToCreateDeal": "Failed to create deal"
+    "failedToCreateDeal": "Failed to create deal",
+    "rejectionReasons": "Rejection Reasons",
+    "selectRejectionReason": "Select rejection reason",
+    "rejectionReason": {
+      "price": "Price",
+      "competitor": "Competitor",
+      "timing": "Timing",
+      "budget": "Budget",
+      "requirements": "Requirements",
+      "other": "Other"
+    }
   },
   "auth": {
     "loggedIn": "logged in",
@@ -301,7 +311,32 @@
     "active": "Active",
     "closed": "Closed",
     "created": "Created",
-    "social": "Social"
+    "social": "Social",
+    "additionalInfo": "Additional Information",
+    "link": "Link",
+    "linkPlaceholder": "Paste a link",
+    "subscriberCount": "Subscriber Count",
+    "subscriberCountPlaceholder": "Enter count",
+    "directions": "Direction",
+    "selectDirection": "Select direction",
+    "contactMethods": "Contact Methods",
+    "selectContactMethod": "Select contact method",
+    "websiteOrTgChannel": "Website, TG Channel",
+    "websiteOrTgChannelPlaceholder": "Enter website or TG channel link",
+    "contactInfo": "Contact",
+    "contactInfoPlaceholder": "Phone number or Telegram username",
+    "direction": {
+      "marketing": "Marketing",
+      "sales": "Sales",
+      "support": "Support",
+      "development": "Development",
+      "other": "Other"
+    },
+    "contactMethod": {
+      "whatsapp": "Whatsapp",
+      "telegram": "Telegram",
+      "direct": "Direct"
+    }
   },
   "settings": {
     "title": "Settings",

@@ -43,6 +43,13 @@ export interface Deal {
       whatsapp?: string
       vk?: string
     }
+    // New fields
+    link?: string
+    subscriberCount?: string
+    directions?: string[]
+    contactMethods?: string[]
+    websiteOrTgChannel?: string
+    contactInfo?: string
     stats?: {
       activeDeals: number
       closedDeals: number
@@ -53,6 +60,7 @@ export interface Deal {
   createdAt: string
   expectedClose?: string
   tags: string[]
+  rejectionReasons?: string[] // Причина отказа (множественный выбор)
   customFields?: CustomField[]
 }
 
