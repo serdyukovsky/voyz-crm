@@ -47,6 +47,24 @@ export class ContactResponseDto {
     vk?: string;
   };
 
+  @ApiPropertyOptional({ description: 'Ссылка' })
+  link?: string;
+
+  @ApiPropertyOptional({ description: 'Кол-во подписчиков' })
+  subscriberCount?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Направление (множественный выбор)' })
+  directions?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Способ связи: Whatsapp, Telegram, Direct' })
+  contactMethods?: string[];
+
+  @ApiPropertyOptional({ description: 'Сайт, тг канал' })
+  websiteOrTgChannel?: string;
+
+  @ApiPropertyOptional({ description: 'Контакт (номер телефона или никнейм в телеграме)' })
+  contactInfo?: string;
+
   @ApiProperty()
   createdAt: Date;
 

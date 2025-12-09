@@ -27,7 +27,10 @@ import {
 import { Label } from "@/components/ui/label"
 import { 
   GripVertical, 
-  MoreVertical, 
+  MoreVertical,
+  Link as LinkIcon,
+  Users,
+  Hash, 
   CheckCircle2, 
   XCircle, 
   UserPlus,
@@ -62,6 +65,9 @@ interface DealCardData {
   contact?: {
     id: string
     fullName: string
+    link?: string
+    subscriberCount?: string
+    directions?: string[]
   }
   company?: {
     id: string
@@ -288,15 +294,49 @@ function DealCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-1 text-sm font-semibold">
-            {formatCurrency(deal.amount)}
+        {/* Link */}
+        {deal.contact?.link && (
+          <div className="mb-2" data-no-navigate>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <LinkIcon className="h-3 w-3" />
+              <span className="truncate">{deal.contact.link}</span>
+            </div>
           </div>
+        )}
+
+        {/* Subscriber Count */}
+        {deal.contact?.subscriberCount && (
+          <div className="mb-2" data-no-navigate>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Users className="h-3 w-3" />
+              <span>{deal.contact.subscriberCount}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Directions */}
+        {deal.contact?.directions && deal.contact.directions.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1" data-no-navigate>
+            {deal.contact.directions.map((direction, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/50 text-xs text-muted-foreground"
+              >
+                <Hash className="h-3 w-3" />
+                {direction}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Updated Date */}
+        <div className="mb-2">
           <div className="text-xs text-muted-foreground">
             {formatRelativeTime(deal.updatedAt)}
           </div>
         </div>
 
+        {/* Responsible */}
         {deal.assignedTo && (
           <div className="flex items-center gap-2 mt-2">
             <Avatar className="h-5 w-5">
@@ -663,6 +703,9 @@ export function DealsKanbanBoard({
           contact: deal.contact ? {
             id: deal.contact.id,
             fullName: deal.contact.fullName || 'Unknown Contact',
+            link: deal.contact.link,
+            subscriberCount: deal.contact.subscriberCount,
+            directions: deal.contact.directions,
           } : undefined,
           company: deal.company ? {
             id: deal.company.id,

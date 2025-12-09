@@ -29,19 +29,23 @@ interface CreateTaskModalProps {
     dealId?: string
     assignedToId: string
   }) => Promise<void>
+  defaultDealId?: string
+  defaultContactId?: string
 }
 
 export function CreateTaskModal({ 
   isOpen, 
   onClose, 
-  onSave
+  onSave,
+  defaultDealId,
+  defaultContactId
 }: CreateTaskModalProps) {
   const { t } = useTranslation()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [deadline, setDeadline] = useState("")
   const [assignedToId, setAssignedToId] = useState("")
-  const [dealId, setDealId] = useState("")
+  const [dealId, setDealId] = useState(defaultDealId || "")
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
@@ -71,7 +75,7 @@ export function CreateTaskModal({
       setDescription("")
       setDeadline("")
       setAssignedToId(currentUserId) // Set current user as default assignee
-      setDealId("")
+      setDealId(defaultDealId || "")
       setLoading(false)
       
       // Load users, deals, and contacts

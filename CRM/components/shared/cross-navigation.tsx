@@ -72,26 +72,26 @@ export function CrossNavigation({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-2", className)}>
       {companies && companies.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium flex items-center gap-2">
+              <Building2 className="h-3.5 w-3.5" />
               Company
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {companies.map((company) => (
                 <Link
                   key={company.id}
                   href={`/companies/${company.id}`}
-                  className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50 transition-colors group"
+                  className="flex items-center justify-between p-1.5 rounded-md hover:bg-accent/50 transition-colors group"
                 >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-medium truncate">{company.name}</span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium truncate">{company.name}</span>
                     {company.industry && (
                       <Badge variant="outline" className="text-xs">
                         {company.industry}
@@ -113,15 +113,15 @@ export function CrossNavigation({
 
       {contacts && contacts.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Contact className="h-4 w-4" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium flex items-center gap-2">
+              <Contact className="h-3.5 w-3.5" />
               Contact{contacts.length > 1 ? 's' : ''}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-2 pr-4">
+            <ScrollArea className="h-[120px]">
+              <div className="space-y-1.5 pr-4">
                 {contacts.map((contact) => {
                   const initials = contact.fullName
                     .split(' ')
@@ -134,22 +134,22 @@ export function CrossNavigation({
                     <Link
                       key={contact.id}
                       href={`/contacts/${contact.id}`}
-                      className="flex items-center gap-2 p-2 rounded-md hover:bg-accent/50 transition-colors group"
+                      className="flex items-center gap-1.5 p-1.5 rounded-md hover:bg-accent/50 transition-colors group"
                     >
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                           {initials}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{contact.fullName}</div>
+                        <div className="text-xs font-medium truncate">{contact.fullName}</div>
                         {contact.position && (
-                          <div className="text-xs text-muted-foreground truncate">
+                          <div className="text-[10px] text-muted-foreground truncate">
                             {contact.position}
                           </div>
                         )}
                         {contact.companyName && (
-                          <div className="text-xs text-muted-foreground truncate">
+                          <div className="text-[10px] text-muted-foreground truncate">
                             {contact.companyName}
                           </div>
                         )}

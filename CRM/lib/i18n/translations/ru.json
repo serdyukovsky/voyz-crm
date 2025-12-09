@@ -191,7 +191,17 @@
     "noPipelineAvailable": "Нет доступной воронки",
     "createPipelineWithStages": "Пожалуйста, создайте воронку со стадиями сначала",
     "dealCreatedSuccess": "Сделка успешно создана",
-    "failedToCreateDeal": "Не удалось создать сделку"
+    "failedToCreateDeal": "Не удалось создать сделку",
+    "rejectionReasons": "Причина отказа",
+    "selectRejectionReason": "Выберите причину отказа",
+    "rejectionReason": {
+      "price": "Цена",
+      "competitor": "Конкурент",
+      "timing": "Сроки",
+      "budget": "Бюджет",
+      "requirements": "Требования",
+      "other": "Другое"
+    }
   },
   "auth": {
     "loggedIn": "вошел(а) в систему",
@@ -301,7 +311,32 @@
     "active": "Активных",
     "closed": "Закрытых",
     "created": "Создан",
-    "social": "Соцсети"
+    "social": "Соцсети",
+    "additionalInfo": "Дополнительная информация",
+    "link": "Ссылка",
+    "linkPlaceholder": "Вставьте ссылку",
+    "subscriberCount": "Кол-во подписчиков",
+    "subscriberCountPlaceholder": "Введите количество",
+    "directions": "Направление",
+    "selectDirection": "Выберите направление",
+    "contactMethods": "Способ связи",
+    "selectContactMethod": "Выберите способ связи",
+    "websiteOrTgChannel": "Сайт, тг канал",
+    "websiteOrTgChannelPlaceholder": "Введите ссылку на сайт или тг канал",
+    "contactInfo": "Контакт",
+    "contactInfoPlaceholder": "Номер телефона или никнейм в телеграме",
+    "direction": {
+      "marketing": "Маркетинг",
+      "sales": "Продажи",
+      "support": "Поддержка",
+      "development": "Разработка",
+      "other": "Другое"
+    },
+    "contactMethod": {
+      "whatsapp": "Whatsapp",
+      "telegram": "Telegram",
+      "direct": "Direct"
+    }
   },
   "settings": {
     "title": "Настройки",

@@ -86,6 +86,13 @@ export class ContactsService {
         tags: createContactDto.tags || [],
         notes: sanitizeOptionalTextFields(createContactDto.notes),
         social: normalizedSocial || {},
+        // New fields
+        link: sanitizeOptionalTextFields(createContactDto.link),
+        subscriberCount: sanitizeOptionalTextFields(createContactDto.subscriberCount),
+        directions: createContactDto.directions || [],
+        contactMethods: createContactDto.contactMethods || [],
+        websiteOrTgChannel: sanitizeOptionalTextFields(createContactDto.websiteOrTgChannel),
+        contactInfo: sanitizeOptionalTextFields(createContactDto.contactInfo),
       },
       include: {
         company: true,
@@ -353,6 +360,44 @@ export class ContactsService {
       }
     }
 
+    // Handle new fields
+    if (updateContactDto.link !== undefined) {
+      updateData.link = sanitizeOptionalTextFields(updateContactDto.link);
+      if (updateData.link !== existing.link) {
+        changes.link = { old: existing.link, new: updateData.link };
+      }
+    }
+    if (updateContactDto.subscriberCount !== undefined) {
+      updateData.subscriberCount = sanitizeOptionalTextFields(updateContactDto.subscriberCount);
+      if (updateData.subscriberCount !== existing.subscriberCount) {
+        changes.subscriberCount = { old: existing.subscriberCount, new: updateData.subscriberCount };
+      }
+    }
+    if (updateContactDto.directions !== undefined) {
+      updateData.directions = updateContactDto.directions;
+      if (JSON.stringify(updateData.directions) !== JSON.stringify(existing.directions)) {
+        changes.directions = { old: existing.directions, new: updateData.directions };
+      }
+    }
+    if (updateContactDto.contactMethods !== undefined) {
+      updateData.contactMethods = updateContactDto.contactMethods;
+      if (JSON.stringify(updateData.contactMethods) !== JSON.stringify(existing.contactMethods)) {
+        changes.contactMethods = { old: existing.contactMethods, new: updateData.contactMethods };
+      }
+    }
+    if (updateContactDto.websiteOrTgChannel !== undefined) {
+      updateData.websiteOrTgChannel = sanitizeOptionalTextFields(updateContactDto.websiteOrTgChannel);
+      if (updateData.websiteOrTgChannel !== existing.websiteOrTgChannel) {
+        changes.websiteOrTgChannel = { old: existing.websiteOrTgChannel, new: updateData.websiteOrTgChannel };
+      }
+    }
+    if (updateContactDto.contactInfo !== undefined) {
+      updateData.contactInfo = sanitizeOptionalTextFields(updateContactDto.contactInfo);
+      if (updateData.contactInfo !== existing.contactInfo) {
+        changes.contactInfo = { old: existing.contactInfo, new: updateData.contactInfo };
+      }
+    }
+
     const contact = await this.prisma.contact.update({
       where: { id },
       data: updateData,
@@ -511,6 +556,13 @@ export class ContactsService {
         whatsapp?: string;
         vk?: string;
       }) || undefined,
+      // New fields
+      link: contact.link || undefined,
+      subscriberCount: contact.subscriberCount || undefined,
+      directions: contact.directions || [],
+      contactMethods: contact.contactMethods || [],
+      websiteOrTgChannel: contact.websiteOrTgChannel || undefined,
+      contactInfo: contact.contactInfo || undefined,
       createdAt: contact.createdAt,
       updatedAt: contact.updatedAt,
       stats,

@@ -100,10 +100,19 @@ export function useDealTasks({ dealId }: UseDealTasksOptions) {
   const createTask = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
     try {
       console.log('Creating task with data:', taskData)
+      // Map status from component format to API format
+      const statusMap: Record<string, string> = {
+        'open': 'TODO',
+        'in_progress': 'IN_PROGRESS',
+        'completed': 'DONE',
+        'overdue': 'OVERDUE'
+      }
+      const apiStatus = statusMap[taskData.status?.toLowerCase() || 'open'] || 'TODO'
+
       const newTaskApi = await createTaskApi({
         title: taskData.title,
         description: taskData.description,
-        status: taskData.status?.toUpperCase() || 'TODO',
+        status: apiStatus,
         priority: taskData.priority?.toUpperCase() || 'MEDIUM',
         deadline: taskData.dueDate,
         dealId: taskData.dealId || dealId,

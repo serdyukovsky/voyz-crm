@@ -32,7 +32,8 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onTaskSelect }: TaskCardProps) {
   const { t } = useTranslation()
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  // Initialize modal state from selectedTaskId
+  const [isModalOpen, setIsModalOpen] = useState(() => selectedTaskId === task.id)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
 
   // Sync modal state with selectedTaskId from URL
@@ -41,18 +42,18 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onT
     console.log('TaskCard: useEffect - syncing modal', { 
       taskId: task.id, 
       selectedTaskId: selectedTaskId || 'null', 
-      shouldBeOpen, 
-      currentIsModalOpen: isModalOpen 
+      shouldBeOpen
     })
     
-    // Always sync - if shouldBeOpen is true, open modal; if false, close modal
-    setIsModalOpen(shouldBeOpen)
-    
-    if (shouldBeOpen) {
-      console.log('TaskCard: Modal should be OPEN for task:', task.id)
-    } else {
-      console.log('TaskCard: Modal should be CLOSED for task:', task.id)
-    }
+    // Always sync with selectedTaskId - this is the source of truth
+    // Use functional update to avoid stale closure issues
+    setIsModalOpen(prev => {
+      if (prev !== shouldBeOpen) {
+        console.log('TaskCard: Updating modal state from', prev, 'to', shouldBeOpen, 'for task:', task.id)
+        return shouldBeOpen
+      }
+      return prev
+    })
   }, [selectedTaskId, task.id])
 
   const getInitials = (name: string) => {
@@ -67,8 +68,14 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onT
     e.stopPropagation()
     e.preventDefault()
     
-    // Update URL first - this will trigger useEffect to open modal
+    console.log('TaskCard: handleTaskClick called for task:', task.id)
+    
+    // Open modal immediately
+    setIsModalOpen(true)
+    
+    // Update URL and state - this will trigger useEffect to keep modal open
     if (onTaskSelect) {
+      console.log('TaskCard: Calling onTaskSelect with taskId:', task.id)
       onTaskSelect(task.id)
     } else {
       // Fallback: update URL directly

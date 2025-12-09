@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { User, Phone, Mail, MessageCircle, Edit2, X, Search, Plus } from 'lucide-react'
+import { User, Phone, Mail, MessageCircle, Edit2, X, Search, Plus, Link as LinkIcon, Users, Globe, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SocialLinks } from '../social-links'
 import { CreateContactModal } from '../create-contact-modal'
@@ -315,6 +315,85 @@ export function ContactPerson({
               >
                 {contact.email}
               </a>
+            </div>
+          )}
+
+          {/* New Contact Fields */}
+          {contact.link && (
+            <div className="flex items-center gap-2">
+              <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
+              <a
+                href={contact.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-foreground hover:text-primary transition-colors break-all"
+              >
+                {contact.link}
+              </a>
+            </div>
+          )}
+
+          {contact.subscriberCount && (
+            <div className="flex items-center gap-2">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-foreground">
+                {t('contacts.subscriberCount') || 'Подписчиков'}: {contact.subscriberCount}
+              </span>
+            </div>
+          )}
+
+          {contact.directions && contact.directions.length > 0 && (
+            <div className="flex items-start gap-2">
+              <Hash className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+              <div className="flex flex-wrap gap-1">
+                <span className="text-xs text-muted-foreground mr-1">
+                  {t('contacts.directions') || 'Направление'}:
+                </span>
+                {contact.directions.map((direction, idx) => (
+                  <span key={idx} className="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">
+                    {direction}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {contact.contactMethods && contact.contactMethods.length > 0 && (
+            <div className="flex items-start gap-2">
+              <MessageCircle className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+              <div className="flex flex-wrap gap-1">
+                <span className="text-xs text-muted-foreground mr-1">
+                  {t('contacts.contactMethods') || 'Способ связи'}:
+                </span>
+                {contact.contactMethods.map((method, idx) => (
+                  <span key={idx} className="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">
+                    {method}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {contact.websiteOrTgChannel && (
+            <div className="flex items-center gap-2">
+              <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+              <a
+                href={contact.websiteOrTgChannel}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-foreground hover:text-primary transition-colors break-all"
+              >
+                {contact.websiteOrTgChannel}
+              </a>
+            </div>
+          )}
+
+          {contact.contactInfo && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-foreground">
+                {t('contacts.contactInfo') || 'Контакт'}: {contact.contactInfo}
+              </span>
             </div>
           )}
 

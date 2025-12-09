@@ -3,6 +3,7 @@ import { PrismaService } from '@/common/services/prisma.service';
 import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 import { Deal, ActivityType } from '@prisma/client';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class DealsService {
     private readonly activityService: ActivityService,
     private readonly websocketGateway: RealtimeGateway,
     private readonly loggingService: LoggingService,
+    private readonly customFieldsService: CustomFieldsService,
   ) {}
 
   async create(data: any, userId: string) {
@@ -30,6 +32,7 @@ export class DealsService {
         companyId: data.companyId || null,
         description: data.description || null,
         expectedCloseAt: data.expectedCloseAt || null,
+        rejectionReasons: data.rejectionReasons || [],
       };
 
       console.log('DealsService.create - dealData:', dealData);
@@ -256,7 +259,13 @@ export class DealsService {
       where,
       include: {
         stage: true,
-        pipeline: true,
+        pipeline: {
+          include: {
+            stages: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
         createdBy: true,
         assignedTo: true,
         contact: {
@@ -265,6 +274,9 @@ export class DealsService {
           },
         },
         company: true,
+        customFieldValues: {
+          include: { customField: true },
+        },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -349,6 +361,13 @@ export class DealsService {
                 whatsapp?: string;
                 vk?: string;
               }),
+            // New fields
+            link: deal.contact.link || null,
+            subscriberCount: deal.contact.subscriberCount || null,
+            directions: deal.contact.directions || [],
+            contactMethods: deal.contact.contactMethods || [],
+            websiteOrTgChannel: deal.contact.websiteOrTgChannel || null,
+            contactInfo: deal.contact.contactInfo || null,
             stats: contactStats,
           };
         } catch (contactError) {
@@ -456,6 +475,83 @@ export class DealsService {
           createdAt: result.pipeline.createdAt || null,
           updatedAt: result.pipeline.updatedAt || null,
         };
+      }
+
+      // Load and merge custom fields
+      try {
+        // Get all active custom fields for deals
+        const allCustomFields = await this.customFieldsService.findByEntity('deal');
+        console.log(`formatDealResponse - Found ${allCustomFields.length} custom fields for deal ${deal.id}`);
+        
+        // Create a map of field values by customFieldId for quick lookup
+        const fieldValuesMap = new Map<string, any>();
+        if (deal.customFieldValues && Array.isArray(deal.customFieldValues)) {
+          console.log(`formatDealResponse - Found ${deal.customFieldValues.length} custom field values for deal ${deal.id}`);
+          deal.customFieldValues.forEach((fieldValue: any) => {
+            if (fieldValue.customFieldId) {
+              fieldValuesMap.set(fieldValue.customFieldId, fieldValue.value);
+            }
+          });
+        } else {
+          console.log(`formatDealResponse - No custom field values found for deal ${deal.id}`);
+        }
+
+        // Merge all custom fields with their values
+        console.log(`formatDealResponse - Merging ${allCustomFields.length} custom fields for deal ${deal.id}`);
+        result.customFields = allCustomFields.map((field: any) => {
+          const value = fieldValuesMap.get(field.id) ?? field.defaultValue ?? null;
+          
+          // Parse options if it's a JSON string
+          let options = undefined;
+          if (field.options) {
+            if (Array.isArray(field.options)) {
+              options = field.options;
+            } else if (typeof field.options === 'string') {
+              try {
+                options = JSON.parse(field.options);
+              } catch (e) {
+                console.warn(`Failed to parse options for field ${field.id}:`, e);
+                options = undefined;
+              }
+            } else {
+              options = field.options;
+            }
+          }
+          
+          // Convert type from uppercase enum to lowercase for frontend
+          // Also convert BOOLEAN to checkbox
+          let type = field.type?.toLowerCase() || 'text';
+          if (type === 'boolean') {
+            type = 'checkbox';
+          } else if (type === 'multi_select') {
+            type = 'multi-select';
+          }
+          
+          return {
+            id: field.id,
+            name: field.name,
+            key: field.key,
+            type: type,
+            value: value,
+            options: options,
+            group: field.group || 'other',
+            order: field.order || 0,
+            isRequired: field.isRequired || false,
+            description: field.description || null,
+          };
+        }).sort((a: any, b: any) => {
+          // Sort by group first, then by order
+          if (a.group !== b.group) {
+            return (a.group || 'other').localeCompare(b.group || 'other');
+          }
+          return (a.order || 0) - (b.order || 0);
+        });
+        console.log(`formatDealResponse - Final custom fields count for deal ${deal.id}: ${result.customFields.length}`);
+      } catch (customFieldsError) {
+        console.error('formatDealResponse - failed to load custom fields:', customFieldsError);
+        console.error('formatDealResponse - custom fields error stack:', customFieldsError instanceof Error ? customFieldsError.stack : 'No stack');
+        // Return empty array if custom fields loading fails
+        result.customFields = [];
       }
 
       return result;

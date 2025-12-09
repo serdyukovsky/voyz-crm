@@ -1,26 +1,26 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, ChevronDown, Check, Plus } from 'lucide-react'
+import { DollarSign, ChevronDown, Check, Plus, XCircle, Link as LinkIcon, Users, Hash, MessageCircle, Globe } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealHeader } from './deal/deal-header'
-import { DealFieldsPanel } from './deal/deal-fields-panel'
 import { DealTasksList } from './deal/deal-tasks-list'
-import { TaskQuickCreate } from './deal/task-quick-create'
+import { ContactCard } from './deal/contact-card'
+import { CreateTaskModal } from './create-task-modal'
 import { ActivityTimeline } from '@/components/shared/activity-timeline'
 import { useActivity } from '@/hooks/use-activity'
 import { DealCommentsPanel } from './deal/deal-comments-panel'
-import { ContactPerson } from './deal/contact-person'
 import { useDeal } from '@/hooks/use-deal'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
 import { useRealtimeDeal } from '@/hooks/use-realtime-deal'
-import { getContacts } from '@/lib/api/contacts'
+import { getContacts, updateContact, createContact } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
 import type { Task } from '@/hooks/use-deal-tasks'
 import type { Activity } from '@/hooks/use-deal-activity'
@@ -44,6 +44,46 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
+  
+  // Helper functions for translations
+  const getDirectionLabel = (value: string) => {
+    return t(`contacts.direction.${value}`) || value
+  }
+  
+  const getContactMethodLabel = (value: string) => {
+    return t(`contacts.contactMethod.${value.toLowerCase()}`) || value
+  }
+  
+  const getRejectionReasonLabel = (value: string) => {
+    return t(`deals.rejectionReason.${value}`) || value
+  }
+
+  // Helper function to ensure contact exists
+  const ensureContact = async () => {
+    if (deal?.contact?.id) {
+      return deal.contact.id
+    }
+    
+    // Create a minimal contact if it doesn't exist
+    try {
+      const newContact = await createContact({
+        fullName: deal?.title || 'New Contact',
+      })
+      
+      // Link contact to deal
+      if (deal?.id) {
+        await updateDealApi(deal.id, { contactId: newContact.id } as any)
+        await refetchDeal()
+      }
+      
+      return newContact.id
+    } catch (error) {
+      console.error('Failed to create contact:', error)
+      showError('Failed to create contact', error instanceof Error ? error.message : 'Unknown error')
+      throw error
+    }
+  }
+  
   const [selectedStage, setSelectedStage] = useState("new")
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
@@ -54,13 +94,41 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [users, setUsers] = useState<User[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
   const [pipeline, setPipeline] = useState<Pipeline | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
+  
+  // Local state for contact fields to prevent losing input on refetch
+  const [contactLink, setContactLink] = useState('')
+  const [contactSubscriberCount, setContactSubscriberCount] = useState('')
+  const [contactWebsite, setContactWebsite] = useState('')
+  const [contactInfo, setContactInfo] = useState('')
+  
+  // Refs for debounce timers
+  const linkTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const subscriberCountTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const websiteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const contactInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Use hooks
   const { deal, loading: dealLoading, error: dealError, updateDeal, updateField, refetch: refetchDeal } = useDeal({ dealId })
+  
+  // Sync local state with deal.contact when deal changes
+  useEffect(() => {
+    if (deal?.contact) {
+      setContactLink(deal.contact.link || '')
+      setContactSubscriberCount(deal.contact.subscriberCount || '')
+      setContactWebsite(deal.contact.websiteOrTgChannel || '')
+      setContactInfo(deal.contact.contactInfo || '')
+    } else {
+      setContactLink('')
+      setContactSubscriberCount('')
+      setContactWebsite('')
+      setContactInfo('')
+    }
+  }, [deal?.contact?.id, deal?.contact?.link, deal?.contact?.subscriberCount, deal?.contact?.websiteOrTgChannel, deal?.contact?.contactInfo])
   const { tasks, createTask, updateTask, deleteTask, refetch: refetchTasks } = useDealTasks({ dealId })
   const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useActivity({ entityType: 'deal', entityId: dealId })
@@ -266,13 +334,82 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   }
 
   const handleTaskCreate = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
-    const newTask = await createTask(taskData)
-    
-    // Reload activities to show the task creation activity (created by backend)
-    await refetchActivities()
-    
-    // Reload tasks to show the newly created task
-    await refetchTasks()
+    try {
+      console.log('handleTaskCreate called with:', taskData)
+      const newTask = await createTask(taskData)
+      console.log('Task created:', newTask)
+      
+      // Reload activities to show the task creation activity (created by backend)
+      await refetchActivities()
+      
+      // Reload tasks to show the newly created task
+      await refetchTasks()
+      
+      showSuccess(t('tasks.taskCreated') || 'Task created successfully')
+    } catch (error) {
+      console.error('Failed to create task:', error)
+      showError(t('tasks.createError') || 'Failed to create task', error instanceof Error ? error.message : 'Unknown error')
+      throw error
+    }
+  }
+
+  const handleCreateTaskFromModal = async (taskData: {
+    title: string
+    description?: string
+    deadline?: string
+    dealId?: string
+    assignedToId: string
+  }) => {
+    try {
+      console.log('handleCreateTaskFromModal called with:', taskData)
+      
+      // Get current user ID if not provided
+      let assignedToId = taskData.assignedToId
+      if (!assignedToId) {
+        try {
+          const userStr = localStorage.getItem('user')
+          if (userStr) {
+            const user = JSON.parse(userStr)
+            assignedToId = user.id || ''
+          }
+        } catch (e) {
+          console.error('Failed to get current user:', e)
+        }
+      }
+
+      // Ensure we have a valid assignedToId
+      if (!assignedToId) {
+        // Try to get from users list
+        if (users.length > 0) {
+          assignedToId = users[0].id
+        } else {
+          console.warn('No assignedToId available, using empty string')
+          assignedToId = ''
+        }
+      }
+
+      const taskPayload: Omit<Task, 'id' | 'createdAt'> = {
+        title: taskData.title,
+        description: taskData.description,
+        dueDate: taskData.deadline,
+        dealId: taskData.dealId || dealId,
+        contactId: deal?.contact?.id,
+        assignee: assignedToId, // Pass as string, hook will handle conversion
+        status: 'open', // Will be converted to 'TODO' in the hook
+        priority: 'medium',
+        completed: false
+      }
+      
+      console.log('Creating task with payload:', taskPayload)
+      
+      await handleTaskCreate(taskPayload)
+      
+      console.log('Task created successfully')
+      setIsCreateTaskModalOpen(false)
+    } catch (error) {
+      console.error('Failed to create task from modal:', error)
+      showError('Failed to create task', error instanceof Error ? error.message : 'Unknown error')
+    }
   }
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -475,20 +612,20 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         <div className="px-6 py-4 space-y-4">
           {/* Stage */}
           <div>
-            <label className="text-xs text-muted-foreground mb-2 block">{t('deals.stage')}</label>
+            <label className="text-xs font-semibold text-foreground mb-2 block">{t('deals.stage')}</label>
             {pipelineLoading ? (
-              <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
+              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.loadingStages')}</span>
               </div>
             ) : stages.length === 0 ? (
-              <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
+              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.noStagesAvailable')}</span>
               </div>
             ) : (
               <div className="relative stage-dropdown-container">
                 <button
                   onClick={() => setShowStageDropdown(!showStageDropdown)}
-                  className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-background/50 border border-border/50 hover:border-border transition-colors"
+                  className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
                 >
                   <div className="flex items-center gap-2">
                     <div 
@@ -526,20 +663,20 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
           {/* Responsible */}
           <div>
-            <label className="text-xs text-muted-foreground mb-2 block">Responsible</label>
+            <label className="text-xs font-semibold text-foreground mb-2 block">Ответственный</label>
             {usersLoading ? (
-              <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
+              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">Loading users...</span>
               </div>
             ) : usersForDropdown.length === 0 ? (
-              <div className="w-full px-3 h-9 rounded-md bg-background/50 border border-border/50 flex items-center">
+              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">No users available</span>
               </div>
             ) : (
               <div className="relative user-dropdown-container">
                 <button
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
-                  className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-background/50 border border-border/50 hover:border-border transition-colors"
+                  className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
                 >
                   <div className="flex items-center gap-2">
                     <Avatar className="h-5 w-5">
@@ -607,139 +744,398 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             )}
           </div>
 
-          {/* Cross Navigation */}
-          <CrossNavigation
-            contacts={
-              deal?.contact
-                ? [
-                    {
-                      id: deal.contact.id,
-                      fullName: deal.contact.fullName || deal.contact.name || '',
-                      email: deal.contact.email || undefined,
-                      position: deal.contact.position || undefined,
-                      companyName: deal.contact.companyName || undefined,
-                      stats: deal.contact.stats || undefined,
-                    },
-                  ]
-                : []
-            }
-            companies={
-              deal?.company
-                ? [
-                    {
-                      id: deal.company.id,
-                      name: deal.company.name || '',
-                      industry: deal.company.industry || undefined,
-                      stats: deal.company.stats || undefined,
-                    },
-                  ]
-                : deal?.contact?.company
-                ? [
-                    {
-                      id: deal.contact.company.id,
-                      name: deal.contact.company.name || '',
-                      industry: deal.contact.company.industry || undefined,
-                      stats: deal.contact.company.stats || undefined,
-                    },
-                  ]
-                : []
-            }
-            // Tasks are displayed separately below, so we don't pass them here
-          />
+          {/* Contact Fields - Always show, even if contact doesn't exist */}
+          <div className="space-y-3 pt-4 border-t border-border/50">
+              {/* Link */}
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.link') || 'Ссылка'}
+                </label>
+                <Input
+                  value={contactLink}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setContactLink(value) // Update local state immediately
+                    
+                    // Clear previous timeout
+                    if (linkTimeoutRef.current) {
+                      clearTimeout(linkTimeoutRef.current)
+                    }
+                    
+                    // Debounce API call
+                    linkTimeoutRef.current = setTimeout(async () => {
+                      try {
+                        const contactId = deal?.contact?.id || await ensureContact()
+                        await updateContact(contactId, { link: value || undefined })
+                        await refetchDeal()
+                        await refetchActivities()
+                      } catch (error) {
+                        console.error('Failed to update link:', error)
+                        // Restore previous value on error
+                        setContactLink(deal?.contact?.link || '')
+                      }
+                    }, 800)
+                  }}
+                  placeholder={t('contacts.linkPlaceholder') || 'Вставьте ссылку'}
+                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                />
+              </div>
 
-          {/* Contact Person */}
-          <ContactPerson
-            contact={
-              deal?.contact
-                ? {
-                    id: deal.contact.id,
-                    fullName: deal.contact.fullName || deal.contact.name || '',
-                    email: deal.contact.email || undefined,
-                    phone: deal.contact.phone || undefined,
-                    position: deal.contact.position || undefined,
-                    companyName: deal.contact.companyName || undefined,
-                    social: deal.contact.social || undefined,
-                    tags: [],
-                    createdAt: '',
-                    updatedAt: '',
-                    deals: [],
-                    stats: deal.contact.stats || {
-                      activeDeals: 0,
-                      closedDeals: 0,
-                      totalDeals: 0,
-                    },
-                  }
-                : null
-            }
-            contacts={contacts}
-            onContactChange={async (contactId) => {
-              try {
-                if (contactId) {
-                  await linkContactToDeal(dealId, contactId)
-                } else {
-                  await unlinkContactFromDeal(dealId)
-                }
-                // Reload deal to get updated contact data
-                await refetchDeal()
-                // Reload activities to show the contact link/unlink activity (created by backend)
-                await refetchActivities()
-                // Reload contacts list to get updated data
-                const updatedContacts = await getContacts()
-                setContacts(updatedContacts)
-              } catch (error) {
-                console.error('Failed to link/unlink contact:', error)
-              }
-            }}
-            onContactsUpdate={async (updatedContacts) => {
-              setContacts(updatedContacts)
-            }}
-            isRequired={!deal?.contact}
-          />
+              {/* Subscriber Count */}
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.subscriberCount') || 'Кол-во подписчиков'}
+                </label>
+                <Input
+                  value={contactSubscriberCount}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setContactSubscriberCount(value) // Update local state immediately
+                    
+                    // Clear previous timeout
+                    if (subscriberCountTimeoutRef.current) {
+                      clearTimeout(subscriberCountTimeoutRef.current)
+                    }
+                    
+                    // Debounce API call
+                    subscriberCountTimeoutRef.current = setTimeout(async () => {
+                      try {
+                        const contactId = deal?.contact?.id || await ensureContact()
+                        await updateContact(contactId, { subscriberCount: value || undefined })
+                        await refetchDeal()
+                        await refetchActivities()
+                      } catch (error) {
+                        console.error('Failed to update subscriber count:', error)
+                        setContactSubscriberCount(deal?.contact?.subscriberCount || '')
+                      }
+                    }, 800)
+                  }}
+                  placeholder={t('contacts.subscriberCountPlaceholder') || 'Введите количество'}
+                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                />
+              </div>
 
-          {/* Send Email Button */}
-          {deal?.contact?.email && (
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEmailModalOpen(true)}
-                className="w-full"
-              >
-                <Mail className="mr-2 h-4 w-4" />
-                {t('deals.sendEmail')}
-              </Button>
+              {/* Directions - Multi-select */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.directions') || 'Направление'}
+                </label>
+                <Select
+                  value=""
+                  onValueChange={async (value) => {
+                    try {
+                      const contactId = await ensureContact()
+                      const currentDirections = deal?.contact?.directions || []
+                      if (!currentDirections.includes(value)) {
+                        await updateContact(contactId, { directions: [...currentDirections, value] })
+                        await refetchDeal()
+                        await refetchActivities()
+                      }
+                    } catch (error) {
+                      console.error('Failed to update directions:', error)
+                    }
+                  }}
+                  modal={true}
+                >
+                  <SelectTrigger 
+                    className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SelectValue placeholder={t('contacts.selectDirection') || 'Выберите направление'} />
+                  </SelectTrigger>
+                  <SelectContent 
+                    onInteractOutside={(e) => {
+                      e.preventDefault()
+                    }}
+                    onEscapeKeyDown={(e) => {
+                      e.preventDefault()
+                    }}
+                  >
+                    <SelectItem value="marketing">
+                      {t('contacts.direction.marketing') || 'Маркетинг'}
+                    </SelectItem>
+                    <SelectItem value="sales">
+                      {t('contacts.direction.sales') || 'Продажи'}
+                    </SelectItem>
+                    <SelectItem value="support">
+                      {t('contacts.direction.support') || 'Поддержка'}
+                    </SelectItem>
+                    <SelectItem value="development">
+                      {t('contacts.direction.development') || 'Разработка'}
+                    </SelectItem>
+                    <SelectItem value="other">
+                      {t('contacts.direction.other') || 'Другое'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {deal?.contact?.directions && deal.contact.directions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {deal.contact.directions.map((direction, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
+                      >
+                        <span>{getDirectionLabel(direction)}</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const contactId = await ensureContact()
+                              const updatedDirections = deal?.contact?.directions?.filter((d) => d !== direction) || []
+                              await updateContact(contactId, { directions: updatedDirections })
+                              await refetchDeal()
+                              await refetchActivities()
+                            } catch (error) {
+                              console.error('Failed to remove direction:', error)
+                            }
+                          }}
+                          className="ml-1 hover:text-destructive transition-colors"
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Contact Methods - Multi-select */}
+              <div onClick={(e) => e.stopPropagation()}>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.contactMethods') || 'Способ связи'}
+                </label>
+                <Select
+                  value=""
+                  onValueChange={async (value) => {
+                    try {
+                      const contactId = await ensureContact()
+                      const currentMethods = deal?.contact?.contactMethods || []
+                      if (!currentMethods.includes(value)) {
+                        await updateContact(contactId, { contactMethods: [...currentMethods, value] })
+                        await refetchDeal()
+                        await refetchActivities()
+                      }
+                    } catch (error) {
+                      console.error('Failed to update contact methods:', error)
+                    }
+                  }}
+                  modal={true}
+                >
+                  <SelectTrigger 
+                    className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SelectValue placeholder={t('contacts.selectContactMethod') || 'Выберите способ связи'} />
+                  </SelectTrigger>
+                  <SelectContent 
+                    onInteractOutside={(e) => {
+                      e.preventDefault()
+                    }}
+                    onEscapeKeyDown={(e) => {
+                      e.preventDefault()
+                    }}
+                  >
+                    <SelectItem value="Whatsapp">
+                      {t('contacts.contactMethod.whatsapp') || 'Whatsapp'}
+                    </SelectItem>
+                    <SelectItem value="Telegram">
+                      {t('contacts.contactMethod.telegram') || 'Telegram'}
+                    </SelectItem>
+                    <SelectItem value="Direct">
+                      {t('contacts.contactMethod.direct') || 'Direct'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {deal.contact.contactMethods.map((method, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
+                      >
+                        <span>{getContactMethodLabel(method)}</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const contactId = await ensureContact()
+                              const updatedMethods = deal?.contact?.contactMethods?.filter((m) => m !== method) || []
+                              await updateContact(contactId, { contactMethods: updatedMethods })
+                              await refetchDeal()
+                              await refetchActivities()
+                            } catch (error) {
+                              console.error('Failed to remove contact method:', error)
+                            }
+                          }}
+                          className="ml-1 hover:text-destructive transition-colors"
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Website or TG Channel */}
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
+                </label>
+                <Input
+                  value={contactWebsite}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setContactWebsite(value) // Update local state immediately
+                    
+                    // Clear previous timeout
+                    if (websiteTimeoutRef.current) {
+                      clearTimeout(websiteTimeoutRef.current)
+                    }
+                    
+                    // Debounce API call
+                    websiteTimeoutRef.current = setTimeout(async () => {
+                      try {
+                        const contactId = deal?.contact?.id || await ensureContact()
+                        await updateContact(contactId, { websiteOrTgChannel: value || undefined })
+                        await refetchDeal()
+                        await refetchActivities()
+                      } catch (error) {
+                        console.error('Failed to update website/TG channel:', error)
+                        setContactWebsite(deal?.contact?.websiteOrTgChannel || '')
+                      }
+                    }, 800)
+                  }}
+                  placeholder={t('contacts.websiteOrTgChannelPlaceholder') || 'Введите ссылку на сайт или тг канал'}
+                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                />
+              </div>
+
+              {/* Contact Info */}
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  {t('contacts.contactInfo') || 'Контакт'}
+                </label>
+                <Input
+                  value={contactInfo}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setContactInfo(value) // Update local state immediately
+                    
+                    // Clear previous timeout
+                    if (contactInfoTimeoutRef.current) {
+                      clearTimeout(contactInfoTimeoutRef.current)
+                    }
+                    
+                    // Debounce API call
+                    contactInfoTimeoutRef.current = setTimeout(async () => {
+                      try {
+                        const contactId = deal?.contact?.id || await ensureContact()
+                        await updateContact(contactId, { contactInfo: value || undefined })
+                        await refetchDeal()
+                        await refetchActivities()
+                      } catch (error) {
+                        console.error('Failed to update contact info:', error)
+                        setContactInfo(deal?.contact?.contactInfo || '')
+                      }
+                    }, 800)
+                  }}
+                  placeholder={t('contacts.contactInfoPlaceholder') || 'Номер телефона или никнейм в телеграме'}
+                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                />
+              </div>
             </div>
-          )}
 
-          {/* Budget */}
-          <div>
-            <label className="text-xs text-muted-foreground mb-2 block">{t('deals.amount')}</label>
-            <div className="flex items-center gap-2 px-3 h-9 rounded-md bg-background/50 border border-border/50">
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="text"
-                value={deal.amount === 0 ? "" : deal.amount.toString()}
-                onChange={async (e) => {
-                  const value = e.target.value.replace(/[^0-9]/g, "")
-                  await updateDeal({ amount: value ? parseFloat(value) : 0 })
-                  // Reload activities to show the update activity (created by backend)
-                  await refetchActivities()
+          {/* Rejection Reasons */}
+          <div className="pt-4 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+            <label className="text-xs font-semibold text-foreground mb-2 block">
+              {t('deals.rejectionReasons') || 'Причина отказа'}
+            </label>
+            <div className="space-y-2">
+              <Select
+                value=""
+                onValueChange={async (value) => {
+                  const currentReasons = deal.rejectionReasons || []
+                  if (!currentReasons.includes(value)) {
+                    await updateDeal({ rejectionReasons: [...currentReasons, value] })
+                    await refetchActivities()
+                  }
                 }}
-                placeholder="0"
-                className="border-0 px-0 h-auto bg-transparent focus-visible:ring-0 text-sm font-medium flex-1"
-              />
+                modal={true}
+              >
+                <SelectTrigger 
+                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                >
+                  <SelectValue placeholder={t('deals.selectRejectionReason') || 'Выберите причину отказа'} />
+                </SelectTrigger>
+                <SelectContent 
+                  onInteractOutside={(e) => {
+                    e.preventDefault()
+                  }}
+                  onEscapeKeyDown={(e) => {
+                    e.preventDefault()
+                  }}
+                >
+                  <SelectItem value="price">
+                    {t('deals.rejectionReason.price') || 'Цена'}
+                  </SelectItem>
+                  <SelectItem value="competitor">
+                    {t('deals.rejectionReason.competitor') || 'Конкурент'}
+                  </SelectItem>
+                  <SelectItem value="timing">
+                    {t('deals.rejectionReason.timing') || 'Сроки'}
+                  </SelectItem>
+                  <SelectItem value="budget">
+                    {t('deals.rejectionReason.budget') || 'Бюджет'}
+                  </SelectItem>
+                  <SelectItem value="requirements">
+                    {t('deals.rejectionReason.requirements') || 'Требования'}
+                  </SelectItem>
+                  <SelectItem value="other">
+                    {t('deals.rejectionReason.other') || 'Другое'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {deal.rejectionReasons && deal.rejectionReasons.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {deal.rejectionReasons.map((reason, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
+                    >
+                      <span>{getRejectionReasonLabel(reason)}</span>
+                      <button
+                        onClick={async () => {
+                          const updatedReasons = deal.rejectionReasons?.filter((r) => r !== reason) || []
+                          await updateDeal({ rejectionReasons: updatedReasons })
+                          await refetchActivities()
+                        }}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <XCircle className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Tasks */}
-          <div className="space-y-2">
+          {/* Tasks - Moved to end */}
+          <div className="space-y-2 pt-4 border-t border-border/50">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">{t('deals.tasks')}</h3>
-              <TaskQuickCreate 
-                onCreate={handleTaskCreate} 
-                dealId={dealId}
-                dealContactId={deal?.contactId}
-              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setIsCreateTaskModalOpen(true)}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Task
+              </Button>
             </div>
             {!tasks || tasks.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">{t('deals.noTasksYet')}</p>
@@ -757,12 +1153,40 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             )}
           </div>
 
-          {/* Custom Fields */}
-          <DealFieldsPanel
-            deal={deal}
-            onFieldUpdate={updateField}
-            customFields={deal.customFields || []}
-          />
+          {/* Cross Navigation - Compact - Moved to end */}
+          <div className="pt-1">
+            <CrossNavigation
+              companies={
+                deal?.company
+                  ? [
+                      {
+                        id: deal.company.id,
+                        name: deal.company.name || '',
+                        industry: deal.company.industry || undefined,
+                        stats: deal.company.stats || undefined,
+                      },
+                    ]
+                  : deal?.contact?.company
+                  ? [
+                      {
+                        id: deal.contact.company.id,
+                        name: deal.contact.company.name || '',
+                        industry: deal.contact.company.industry || undefined,
+                        stats: deal.contact.company.stats || undefined,
+                      },
+                    ]
+                  : []
+              }
+              className="space-y-2"
+            />
+          </div>
+
+          {/* Contact Card - Simple card like TaskCard - At the end */}
+          {deal?.contact && (
+            <div className="pt-1">
+              <ContactCard contact={deal.contact} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -836,6 +1260,15 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         contactId={deal?.contact?.id}
         companyId={deal?.company?.id}
         defaultSubject={deal ? `Re: ${deal.title}` : ''}
+      />
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={() => setIsCreateTaskModalOpen(false)}
+        onSave={handleCreateTaskFromModal}
+        defaultDealId={dealId}
+        defaultContactId={deal?.contact?.id}
       />
     </div>
   )
