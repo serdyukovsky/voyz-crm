@@ -227,7 +227,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
 
   const stages = [
     { value: "lead", label: "Lead", color: "bg-zinc-500" },
-    { value: "qualified", label: "Qualified", color: "bg-blue-500" },
+    { value: "qualified", label: "Qualified", color: "bg-slate-500" },
     { value: "proposal", label: "Proposal", color: "bg-purple-500" },
     { value: "negotiation", label: "Negotiation", color: "bg-orange-500" },
     { value: "closed", label: "Closed Won", color: "bg-green-500" },

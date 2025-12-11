@@ -4,13 +4,16 @@ import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
 import { Trash2, MoveRight } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
 import { DealDetail } from './deal-detail'
+import { useSidebar } from './sidebar-context'
+import { useSearch } from './search-context'
+import { cn } from '@/lib/utils'
 
 interface DealsListViewProps {
   deals: Deal[]
@@ -21,6 +24,7 @@ interface DealsListViewProps {
   stages?: Stage[]
   selectedDealId?: string | null
   onDealClick?: (dealId: string | null) => void
+  searchQuery?: string
 }
 
 export function DealsListView({ 
@@ -31,13 +35,16 @@ export function DealsListView({
   onBulkChangeStage,
   stages = [],
   selectedDealId: externalSelectedDealId,
-  onDealClick
+  onDealClick,
+  searchQuery = ''
 }: DealsListViewProps) {
   const { t } = useTranslation()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
   const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
   const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
+  const { searchValue } = useSearch()
+  const finalSearchQuery = searchQuery || searchValue || ''
 
   // Sync with external selectedDealId
   useEffect(() => {
@@ -197,10 +204,15 @@ export function DealsListView({
             </tr>
           </thead>
           <tbody>
-            {deals.map((deal) => (
+            {deals.map((deal) => {
+              const isHighlighted = finalSearchQuery && deal.title.toLowerCase().includes(finalSearchQuery.toLowerCase())
+              return (
               <tr
                 key={deal.id}
-                className="border-b border-border/40 hover:bg-surface/30 transition-colors"
+                className={cn(
+                  "border-b border-border/40 hover:bg-surface/30 transition-colors",
+                  isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
+                )}
               >
                 <td className="px-4 py-3">
                   <input
@@ -250,7 +262,8 @@ export function DealsListView({
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(deal.updatedAt)}</td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -263,7 +276,12 @@ export function DealsListView({
           }
         }}>
           <DialogContent 
-            className="!max-w-[calc(100vw-240px)] !w-[calc(100vw-240px)] !h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] left-[240px] animate-in fade-in-0 zoom-in-95 duration-200"
+            className="!h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] animate-in fade-in-0 zoom-in-95 duration-200 transition-[left,width]"
+            style={{
+              left: isCollapsed ? '4rem' : '15rem',
+              width: isCollapsed ? 'calc(100vw - 4rem)' : 'calc(100vw - 15rem)',
+              maxWidth: 'none'
+            }}
             showCloseButton={false}
           >
             <div className="h-full overflow-hidden">

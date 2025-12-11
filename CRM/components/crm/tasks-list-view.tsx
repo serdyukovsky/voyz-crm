@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -60,28 +60,39 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     const loadTasks = async () => {
       try {
         setLoading(true)
+        console.log('📋 TasksListView: Loading tasks, statusFilter:', statusFilter)
         const tasksData = await getTasks({
           status: statusFilter || undefined,
         })
         
-        // Transform API tasks to component format
-        const transformedTasks: Task[] = tasksData.map((task: any) => ({
-          id: task.id,
-          title: task.title,
-          dealId: task.deal?.id || null,
-          dealName: task.deal?.title || null,
-          contactId: task.contact?.id || null,
-          contactName: task.contact?.fullName || null,
-          dueDate: task.deadline || '',
-          assignee: task.assignedTo?.name || t('tasks.unassigned'),
-          assigneeId: task.assignedTo?.id || undefined,
-          completed: task.status === 'DONE',
-          status: task.status?.toLowerCase() || 'todo',
-          description: task.description,
-          createdAt: task.createdAt,
-          result: task.result,
-        }))
+        console.log('📋 TasksListView: Loaded tasks from API:', tasksData.length)
         
+        // Transform API tasks to component format
+        const transformedTasks: Task[] = tasksData.map((task: any) => {
+          try {
+            return {
+              id: task.id,
+              title: task.title || 'Untitled',
+              dealId: task.deal?.id || null,
+              dealName: task.deal?.title || null,
+              contactId: task.contact?.id || null,
+              contactName: task.contact?.fullName || null,
+              dueDate: task.deadline || '',
+              assignee: task.assignedTo?.name || t('tasks.unassigned'),
+              assigneeId: task.assignedTo?.id || undefined,
+              completed: task.status === 'DONE',
+              status: task.status?.toLowerCase() || 'todo',
+              description: task.description,
+              createdAt: task.createdAt,
+              result: task.result,
+            }
+          } catch (error) {
+            console.error('Error transforming task:', task, error)
+            return null
+          }
+        }).filter((task): task is Task => task !== null)
+        
+        console.log('📋 TasksListView: Transformed tasks:', transformedTasks.length)
         setTasks(transformedTasks)
       } catch (error) {
         console.error('Failed to load tasks:', error)
@@ -96,7 +107,7 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     }
     
     loadTasks()
-  }, [statusFilter])
+  }, [statusFilter, t])
 
   useEffect(() => {
     const loadContacts = async () => {
@@ -110,9 +121,10 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     loadContacts()
   }, [])
 
-  const filteredTasks = tasks.filter(task => {
-    // Search filter
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      // Search filter
+      if (searchQuery && task.title && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
     
     // User filter
     if (userFilter && task.assignee !== userFilter) return false
@@ -128,23 +140,33 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     if (statusFilter === "incomplete" && task.completed) return false
     
     // Date filter
-    if (dateFilter) {
-      const taskDate = new Date(task.dueDate)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      if (dateFilter === "today" && taskDate.toDateString() !== today.toDateString()) return false
-      if (dateFilter === "overdue" && taskDate >= today) return false
-      if (dateFilter === "upcoming" && taskDate <= today) return false
-      if (dateFilter === "this week") {
-        const weekFromNow = new Date(today)
-        weekFromNow.setDate(weekFromNow.getDate() + 7)
-        if (taskDate < today || taskDate > weekFromNow) return false
+    if (dateFilter && task.dueDate) {
+      try {
+        const taskDate = new Date(task.dueDate)
+        if (isNaN(taskDate.getTime())) return true // Skip invalid dates
+        
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        if (dateFilter === "today" && taskDate.toDateString() !== today.toDateString()) return false
+        if (dateFilter === "overdue" && taskDate >= today) return false
+        if (dateFilter === "upcoming" && taskDate <= today) return false
+        if (dateFilter === "this week") {
+          const weekFromNow = new Date(today)
+          weekFromNow.setDate(weekFromNow.getDate() + 7)
+          if (taskDate < today || taskDate > weekFromNow) return false
+        }
+      } catch (error) {
+        console.error('Error parsing date:', task.dueDate, error)
+        return true // Skip tasks with invalid dates
       }
     }
     
     return true
-  })
+    })
+  }, [tasks, searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter])
+
+  console.log('📋 TasksListView: Filtered tasks:', filteredTasks.length, 'from', tasks.length, 'total tasks')
 
   const toggleTask = (id: string) => {
     setTasks(tasks.map(task => 
@@ -304,6 +326,14 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     }
   }
 
+  if (loading) {
+    return (
+      <div className="rounded-md border border-border bg-card p-12 text-center">
+        <p className="text-sm text-muted-foreground">{t('common.loading') || 'Загрузка...'}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-md border border-border bg-card">
       <table className="w-full">
@@ -321,71 +351,87 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
           </tr>
         </thead>
         <tbody>
-          {filteredTasks.map((task) => (
-            <tr
-              key={task.id}
-              className="border-b border-border last:border-0 hover:bg-accent/5 transition-colors"
-            >
-              <td className="p-3">
-                <Checkbox 
-                  checked={task.completed}
-                  onCheckedChange={() => toggleTask(task.id)}
-                  aria-label={`${t('tasks.markAs')} "${task.title}" ${task.completed ? t('tasks.incomplete') : t('tasks.completed')}`}
-                />
-              </td>
-              <td className="p-3">
-                <button 
-                  onClick={() => handleTaskClick(task)}
-                  className={`text-sm text-left hover:text-primary transition-colors ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-                >
-                  {task.title}
-                </button>
-              </td>
-              <td className="p-3">
-                {task.dealId && task.dealName ? (
-                  <button
-                    onClick={(e) => handleDealClick(task, e)}
-                    className="text-sm text-primary hover:underline text-left"
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map((task) => (
+              <tr
+                key={task.id}
+                className="border-b border-border last:border-0 hover:bg-accent/5 transition-colors"
+              >
+                <td className="p-3">
+                  <Checkbox 
+                    checked={task.completed}
+                    onCheckedChange={() => toggleTask(task.id)}
+                    aria-label={`${t('tasks.markAs')} "${task.title}" ${task.completed ? t('tasks.incomplete') : t('tasks.completed')}`}
+                  />
+                </td>
+                <td className="p-3">
+                  <button 
+                    onClick={() => handleTaskClick(task)}
+                    className={`text-sm text-left hover:text-primary transition-colors ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
                   >
-                    {task.dealName}
+                    {task.title}
                   </button>
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </td>
-              <td className="p-3">
-                {task.contactName ? (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                </td>
+                <td className="p-3">
+                  {task.dealId && task.dealName ? (
+                    <button
+                      onClick={(e) => handleDealClick(task, e)}
+                      className="text-sm text-primary hover:underline text-left"
+                    >
+                      {task.dealName}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="p-3">
+                  {task.contactName ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                         <div className="flex items-center gap-1.5">
-                          <Contact className="h-4 w-4 text-muted-foreground" />
+                          <ContactIcon className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{task.contactName}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </td>
-              <td className="p-3">
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{task.contactName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="p-3">
                 <span className="text-sm text-muted-foreground">
-                  {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {task.dueDate ? (() => {
+                    try {
+                      const date = new Date(task.dueDate)
+                      if (isNaN(date.getTime())) return '—'
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    } catch {
+                      return '—'
+                    }
+                  })() : '—'}
                 </span>
               </td>
-              <td className="p-3">
-                <span className="text-sm text-muted-foreground">{task.assignee}</span>
-              </td>
-              <td className="p-3">
-                <span className={`text-sm ${task.completed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                  {task.completed ? (t('tasks.completed') || 'Завершена') : (t('tasks.incomplete') || 'Не завершена')}
-                </span>
+                <td className="p-3">
+                  <span className="text-sm text-muted-foreground">{task.assignee}</span>
+                </td>
+                <td className="p-3">
+                  <span className={`text-sm ${task.completed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    {task.completed ? (t('tasks.completed') || 'Завершена') : (t('tasks.incomplete') || 'Не завершена')}
+                  </span>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={7} className="p-12 text-center">
+                <p className="text-sm text-muted-foreground">{t('tasks.noTasksFound')}</p>
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
 

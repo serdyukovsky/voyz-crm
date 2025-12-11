@@ -17,9 +17,10 @@ import { usePipelines, useCreatePipeline } from "@/hooks/use-pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
-import { getDeals } from "@/lib/api/deals"
+import { getDeals, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines } from "@/lib/api/pipelines"
 import { useTranslation } from "@/lib/i18n/i18n-context"
+import { useSearch } from "@/components/crm/search-context"
 
 // Lazy load heavy kanban board component (998 lines)
 const DealsKanbanBoard = lazy(() => import("@/components/crm/deals-kanban-board").then(m => ({ default: m.DealsKanbanBoard })))
@@ -188,9 +189,10 @@ const demoDeals: Deal[] = [
   },
 ]
 
-export default function DealsPage() {
+function DealsPageContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { searchValue } = useSearch()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -430,20 +432,29 @@ export default function DealsPage() {
     amountMax?: number
     updatedAfter?: string
     updatedBefore?: string
+    title?: string
   }>({})
   const [sort, setSort] = useState<{ field: 'amount' | 'updatedAt'; direction: 'asc' | 'desc' }>({ 
     field: 'updatedAt', 
     direction: 'desc' 
   })
   
-  const hasActiveFilters = Object.keys(filters).length > 0
-  const clearFilters = () => setFilters({})
+  // Обновляем фильтр по названию при изменении поискового запроса
+  useEffect(() => {
+    const newTitle = searchValue.trim() || undefined
+    setFilters(prev => ({
+      ...prev,
+      title: newTitle
+    }))
+  }, [searchValue])
 
   useEffect(() => {
     if (viewMode === 'list' && selectedPipelineForList) {
+      console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList)
       setListLoading(true)
       getDeals({ pipelineId: selectedPipelineForList })
         .then((deals) => {
+          console.log('📋 DealsPage: Loaded deals for list:', deals.length)
           setListDeals(deals)
         })
         .catch((error) => {
@@ -453,6 +464,8 @@ export default function DealsPage() {
         .finally(() => {
           setListLoading(false)
         })
+    } else if (viewMode === 'list' && !selectedPipelineForList) {
+      console.log('📋 DealsPage: List view but no pipeline selected')
     }
   }, [viewMode, selectedPipelineForList])
 
@@ -504,7 +517,6 @@ export default function DealsPage() {
   }
 
   return (
-    <CRMLayout>
       <div className="h-[calc(100vh-3rem)] flex flex-col px-6 py-6">
         <div className="flex-shrink-0 pb-2 pt-2 mb-3">
           {isEditMode ? (
@@ -673,20 +685,6 @@ export default function DealsPage() {
               <Settings className="mr-2 h-4 w-4 shrink-0" />
               {t('settings.title')}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-xs"
-            >
-              <Filter className="mr-2 h-4 w-4 shrink-0" />
-              {t('common.filters')}
-              {hasActiveFilters && (
-                <Badge variant="secondary" className="ml-2">
-                  {Object.keys(filters).length}
-                </Badge>
-              )}
-            </Button>
             <Select
               value={`${sort.field}-${sort.direction}`}
               onValueChange={(value) => {
@@ -705,12 +703,6 @@ export default function DealsPage() {
                 <SelectItem value="updatedAt-asc">{t('deals.lastUpdate')}: {t('deals.oldest')}</SelectItem>
               </SelectContent>
             </Select>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
-                <X className="mr-2 h-4 w-4 shrink-0" />
-                {t('common.clearFilters')}
-              </Button>
-            )}
               <Button size="sm" onClick={handleCreateNewDeal} className="text-xs">
                 <Plus className="mr-2 h-4 w-4 shrink-0" />
                 {t('deals.newDeal')}
@@ -867,8 +859,19 @@ export default function DealsPage() {
           listLoading ? (
             <PageSkeleton />
           ) : (
-            <DealsListView
-              deals={listDeals.map(deal => ({
+            <>
+              {console.log('📋 DealsPage: Rendering list view, deals:', listDeals.length, 'searchValue:', searchValue)}
+              <DealsListView
+                deals={listDeals
+                .filter(deal => {
+                  // Фильтрация по названию сделки
+                  if (searchValue) {
+                    const searchLower = searchValue.toLowerCase()
+                    return deal.title?.toLowerCase().includes(searchLower)
+                  }
+                  return true
+                })
+                .map(deal => ({
                 id: deal.id,
                 title: deal.title,
                 client: deal.contact?.fullName || deal.company?.name || 'No client',
@@ -884,6 +887,7 @@ export default function DealsPage() {
               onSelectDeals={setSelectedDeals}
               onBulkDelete={handleBulkDelete}
               onBulkChangeStage={handleBulkChangeStage}
+              searchQuery={searchValue}
               stages={(() => {
                 // Convert API stages (with 'name') to component format (with 'label')
                 const currentPipeline = pipelines.find(p => p.id === selectedPipelineForList)
@@ -897,7 +901,8 @@ export default function DealsPage() {
                 }
                 return stages
               })()}
-            />
+              />
+            </>
           )
           )}
         </div>
@@ -915,6 +920,13 @@ export default function DealsPage() {
         />
 
       </div>
+  )
+}
+
+export default function DealsPage() {
+  return (
+    <CRMLayout>
+      <DealsPageContent />
     </CRMLayout>
   )
 }

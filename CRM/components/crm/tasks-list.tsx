@@ -28,8 +28,8 @@ const initialTasks: Task[] = [
 ]
 
 const priorityColors = {
-  low: "bg-slate-500/10 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20 dark:border-slate-500/20",
-  medium: "bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-500/20",
+  low: "bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/20",
+  medium: "bg-slate-100 dark:bg-blue-500/10 text-slate-600 dark:text-blue-400 border-slate-200 dark:border-blue-500/20",
   high: "bg-orange-500/10 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20 dark:border-orange-500/20",
 }
 
