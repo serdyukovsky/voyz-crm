@@ -201,6 +201,76 @@
       "budget": "Бюджет",
       "requirements": "Требования",
       "other": "Другое"
+    },
+    "search": {
+      "presets": {
+        "title": "Быстрые фильтры",
+        "open": "Открытые сделки",
+        "overdueTasks": "Сделки с просроченными задачами",
+        "myDeals": "Только мои сделки",
+        "closedWon": "Успешно завершенные",
+        "closedLost": "Нереализованные сделки",
+        "noTasks": "Сделки без задач"
+      },
+      "fields": {
+        "title": "Название сделки",
+        "number": "Номер сделки",
+        "description": "Описание",
+        "dateRange": "За все время",
+        "activeStages": "Активные статусы",
+        "allActiveStages": "Все активные этапы",
+        "pipeline": "Воронка",
+        "assignedTo": "Менеджеры",
+        "createdBy": "Кем создана",
+        "contact": "Контакт",
+        "company": "Компания",
+        "budget": "Бюджет",
+        "amount": "Сумма сделки",
+        "rejectionReasons": "Причины отказа",
+        "contactSubscriberCount": "Кол-во подписчиков",
+        "contactDirections": "Направления"
+      },
+      "dateType": {
+        "created": "Созданы",
+        "closed": "Закрыты",
+        "expectedClose": "Ожидаемая дата закрытия"
+      },
+      "dateRange": {
+        "placeholder": "Выберите период...",
+        "from": "От",
+        "to": "До"
+      },
+      "datePresets": {
+        "today": "За сегодня",
+        "yesterday": "За вчера",
+        "last30days": "За последние 30 дней",
+        "thisWeek": "За эту неделю",
+        "lastWeek": "За прошлую неделю",
+        "thisMonth": "За этот месяц",
+        "lastMonth": "За прошлый месяц",
+        "quarter": "За квартал",
+        "thisYear": "За этот год"
+      },
+      "placeholders": {
+        "title": "Введите название...",
+        "number": "Введите номер...",
+        "min": "От",
+        "max": "До"
+      },
+      "tags": {
+        "title": "Теги",
+        "manage": "Управление",
+        "search": "Найти тег",
+        "noTags": "Теги не найдены"
+      },
+      "stages": {
+        "deselectAll": "Снять выделение",
+        "selectAll": "Выделить все"
+      },
+      "clear": "Очистить",
+      "selectPipeline": "Выберите воронку для выбора этапов",
+      "allValues": "Все значения",
+      "closed": "закрыт"
     }
   },
   "auth": {

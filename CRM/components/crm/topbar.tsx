@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Search, Bell, Command, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Link } from 'react-router-dom'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useSidebar } from './sidebar-context'
+import { useSearch } from './search-context'
+import { cn } from '@/lib/utils'
+import { DealSearchPanel, type DealSearchFilters } from './deal-search-panel'
 
 interface Notification {
   id: string
@@ -31,7 +35,12 @@ const initialNotifications: Notification[] = [
 export function Topbar() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { isCollapsed } = useSidebar()
+  const { searchValue, setSearchValue } = useSearch()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<DealSearchFilters | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const handleLogout = async () => {
     try {
@@ -54,25 +63,61 @@ export function Topbar() {
 
   return (
     <header 
-      className="fixed left-60 right-0 top-0 z-10 h-12 border-b border-border/50 bg-card" 
+      className={cn(
+        "fixed right-0 top-0 z-10 h-12 border-b border-border/50 bg-card",
+        "transition-[left] duration-300 ease-in-out",
+        isCollapsed ? "left-16" : "left-60"
+      )} 
       role="banner"
     >
       <div className="flex h-full items-center justify-between px-6">
         {/* Search */}
-        <div className="flex flex-1 items-center gap-4">
+        <div className="flex flex-1 items-center gap-4 relative">
           <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" aria-hidden="true" />
             <Input 
-              type="search"
-              placeholder={t('common.searchPlaceholder')}
-              className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-12 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              ref={searchInputRef}
+              type="text"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder={t('common.searchPlaceholder') || 'Поиск и фильтр'}
+              className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-12 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               aria-label={t('common.search')}
+              onFocus={() => setSearchPanelOpen(true)}
             />
-            <kbd className="pointer-events-none absolute right-2 top-1/2 flex h-5 -translate-y-1/2 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+            {searchValue.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setSearchValue('')
+                  searchInputRef.current?.focus()
+                }}
+                className="absolute right-12 top-1/2 -translate-y-1/2 z-30 h-3.5 w-3.5 flex items-center justify-center rounded-sm hover:bg-accent/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                aria-label={t('common.clear') || 'Очистить'}
+                style={{ pointerEvents: 'auto' }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            <kbd className="pointer-events-none absolute right-2 top-1/2 flex h-5 -translate-y-1/2 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 z-10">
               <Command className="h-3 w-3" />
               K
             </kbd>
           </div>
+          
+          {/* Deal Search Panel - позиционируется под инпутом */}
+          <DealSearchPanel
+            open={searchPanelOpen}
+            onClose={() => setSearchPanelOpen(false)}
+            onApplyFilters={(filters) => {
+              setAppliedFilters(filters)
+              // Здесь можно добавить логику применения фильтров
+              // Например, обновить URL или передать фильтры в родительский компонент
+              console.log('Applied filters:', filters)
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-3">

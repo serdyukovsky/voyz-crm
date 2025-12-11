@@ -30,7 +30,7 @@ const activities = [
     target: "Follow-up call with CloudFlow",
     time: "5 hours ago",
     icon: CheckCircle2,
-    color: "text-blue-600 dark:text-blue-400",
+    color: "text-slate-600 dark:text-blue-400",
   },
   {
     type: "comment",

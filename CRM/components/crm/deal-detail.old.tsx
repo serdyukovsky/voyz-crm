@@ -105,7 +105,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
 
   const stages = [
     { value: "lead", label: "Lead", color: "bg-zinc-500" },
-    { value: "qualified", label: "Qualified", color: "bg-blue-500" },
+    { value: "qualified", label: "Qualified", color: "bg-slate-500" },
     { value: "proposal", label: "Proposal", color: "bg-purple-500" },
     { value: "negotiation", label: "Negotiation", color: "bg-orange-500" },
     { value: "closed", label: "Closed Won", color: "bg-green-500" },
@@ -536,8 +536,8 @@ export function DealDetail({ dealId }: DealDetailProps) {
                     </div>
                   )}
                   {activity.type === 'file' && (
-                    <div className="rounded-full bg-blue-500/10 p-1.5">
-                      <FileText className="h-3 w-3 text-blue-500" />
+                    <div className="rounded-full bg-slate-100 dark:bg-blue-500/10 p-1.5">
+                      <FileText className="h-3 w-3 text-slate-600 dark:text-blue-500" />
                     </div>
                   )}
                   {activity.type === 'field_update' && (

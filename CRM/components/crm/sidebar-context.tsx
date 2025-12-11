@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 interface SidebarContextType {
   isCollapsed: boolean
@@ -9,8 +9,30 @@ interface SidebarContextType {
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
+const SIDEBAR_STORAGE_KEY = 'crm-sidebar-collapsed'
+
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // Загружаем состояние из localStorage при инициализации
+  const [isCollapsed, setIsCollapsedState] = useState(() => {
+    if (typeof window === 'undefined') return false
+    
+    try {
+      const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY)
+      return saved === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // Сохраняем состояние в localStorage при изменении
+  const setIsCollapsed = (collapsed: boolean) => {
+    setIsCollapsedState(collapsed)
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed))
+    } catch (error) {
+      console.warn('Failed to save sidebar state to localStorage:', error)
+    }
+  }
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>

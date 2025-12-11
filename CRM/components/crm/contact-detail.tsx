@@ -495,10 +495,10 @@ export function ContactDetail({ contactId }: ContactDetailProps) {
                                       task.status === 'done'
                                         ? 'bg-green-500/10 dark:bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 dark:border-green-500/20'
                                         : task.status === 'in_progress'
-                                        ? 'bg-blue-500/10 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 dark:border-blue-500/20'
+                                        ? 'bg-slate-100 dark:bg-blue-500/10 text-slate-600 dark:text-blue-400 border border-slate-200 dark:border-blue-500/20'
                                         : task.status === 'overdue'
                                         ? 'bg-red-500/10 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:border-red-500/20'
-                                        : 'bg-gray-500/10 dark:bg-gray-500/10 text-gray-700 dark:text-gray-300 border border-gray-500/20 dark:border-gray-500/20'
+                                        : 'bg-slate-100 dark:bg-gray-500/10 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-500/20'
                                     }`}
                                   >
                                     {task.status.replace('_', ' ')}

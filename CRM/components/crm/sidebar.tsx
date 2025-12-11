@@ -8,6 +8,7 @@ import { useTheme } from 'next-themes'
 import { useSidebar } from './sidebar-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const navItemsConfig = [
   { href: "/", icon: LayoutDashboard, key: "common.dashboard" },
@@ -28,14 +29,11 @@ export function Sidebar() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
-  const [isHovered, setIsHovered] = useState(false)
   const { t, language, setLanguage } = useTranslation()
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const isExpanded = !isCollapsed || isHovered
   
   const navItems = navItemsConfig.map(item => ({
     ...item,
@@ -43,44 +41,46 @@ export function Sidebar() {
   }))
 
   return (
-    <aside 
-      className={cn(
-        "fixed left-0 top-0 z-20 h-screen border-r border-border/50 bg-sidebar transition-[width] duration-200 ease-out overflow-hidden",
-        isExpanded ? "w-60" : "w-16"
-      )}
-      role="navigation" 
-      aria-label="Main navigation"
-      onMouseEnter={() => {
-        if (isCollapsed) {
-          setIsHovered(true)
-        }
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false)
-      }}
-    >
+    <TooltipProvider delayDuration={400}>
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 z-20 h-screen border-r border-border/50 bg-sidebar",
+          "transition-all duration-300 ease-in-out will-change-[width]",
+          "overflow-hidden",
+          isCollapsed ? "w-16" : "w-60"
+        )}
+        role="navigation" 
+        aria-label="Main navigation"
+      >
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-12 items-center border-b border-border/50 px-4">
-          <div className="flex items-center gap-2 w-full">
-            <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
-            {isExpanded && (
-              <span className="text-sm font-medium text-sidebar-foreground whitespace-nowrap">
+          {isCollapsed ? (
+            <div className="flex items-center justify-center w-full relative">
+              <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 w-full min-w-0">
+              <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
+              <span 
+                className={cn(
+                  "text-sm font-medium text-sidebar-foreground whitespace-nowrap",
+                  "transition-all duration-300 ease-in-out",
+                  "overflow-hidden block",
+                  "opacity-100 w-auto"
+                )}
+              >
                 {t('sidebar.pipelineCrm')}
               </span>
-            )}
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="ml-auto flex-shrink-0 p-1 rounded-md hover:bg-sidebar-accent/50 transition-colors"
-              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-sidebar-foreground/70" />
-              ) : (
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="ml-auto flex-shrink-0 p-1 rounded-md hover:bg-sidebar-accent/50 transition-colors"
+                aria-label="Collapse sidebar"
+              >
                 <ChevronLeft className="h-4 w-4 text-sidebar-foreground/70" />
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -88,64 +88,113 @@ export function Sidebar() {
           {navItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
-            return (
+            
+            const linkContent = (
               <Link
-                key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex items-center rounded-md text-sm font-medium transition-colors",
-                  isExpanded ? "gap-3 px-3 py-1.5" : "justify-center px-2 py-1.5",
+                  "flex items-center rounded-md text-sm font-medium transition-all duration-200",
+                  "min-w-0",
+                  isCollapsed ? "justify-center px-2 py-1.5" : "gap-3 px-3 py-1.5",
                   isActive 
                     ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 )}
                 aria-current={isActive ? "page" : undefined}
-                title={!isExpanded ? item.label : undefined}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                {isExpanded && (
-                  <span className="whitespace-nowrap">{item.label}</span>
-                )}
+                <span 
+                  className={cn(
+                    "whitespace-nowrap overflow-hidden block",
+                    "transition-all duration-300 ease-in-out",
+                    isCollapsed ? "opacity-0 w-0" : "opacity-100 w-auto"
+                  )}
+                >
+                  {item.label}
+                </span>
               </Link>
             )
+
+            // Показываем tooltip только когда меню свернуто
+            if (isCollapsed) {
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    {linkContent}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={12} className="z-[60]">
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            }
+
+            return <div key={item.href}>{linkContent}</div>
           })}
+          
+          {/* Кнопка разворачивания - только когда свернуто, под пунктами меню */}
+          {isCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setIsCollapsed(false)}
+                  className={cn(
+                    "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    "w-full h-9 mt-0.5"
+                  )}
+                  aria-label="Expand sidebar"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={12} className="z-[60]">
+                {t('sidebar.expand') || 'Развернуть меню'}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </nav>
 
         {/* User section */}
         <div className="border-t border-border/50 p-2">
           {mounted && (
-            <div className="flex items-center gap-2">
-              {/* Theme Toggle */}
-              <button 
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className={cn(
-                  "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                  "h-9 w-9"
-                )}
-                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-                title={theme === "dark" ? t('sidebar.lightMode') : t('sidebar.darkMode')}
-              >
-                {theme === "dark" ? (
-                  <Sun className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Moon className="h-4 w-4" aria-hidden="true" />
-                )}
-              </button>
-              
-              {/* Language Switcher */}
+            <div className={cn(
+              "flex gap-2",
+              isCollapsed ? "flex-col items-center" : "flex-row items-center"
+            )}>
+              {/* Language Switcher - первый */}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button 
-                    className={cn(
-                      "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-                      "h-9 w-9"
-                    )}
-                    aria-label="Select language"
-                    title={language === 'en' ? 'Русский' : 'English'}
-                  >
-                    <Languages className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </DropdownMenuTrigger>
+                {isCollapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button 
+                          className={cn(
+                            "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                            "h-9 w-9"
+                          )}
+                          aria-label="Select language"
+                        >
+                          <Languages className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" sideOffset={8}>
+                      {language === 'en' ? 'Русский' : 'English'}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className={cn(
+                        "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                        "h-9 w-9"
+                      )}
+                      aria-label="Select language"
+                    >
+                      <Languages className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </DropdownMenuTrigger>
+                )}
                 <DropdownMenuContent align="end" className="w-20">
                   <DropdownMenuItem 
                     onClick={() => setLanguage('en')}
@@ -173,10 +222,51 @@ export function Sidebar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Theme Toggle - второй */}
+              {isCollapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                      className={cn(
+                        "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                        "h-9 w-9"
+                      )}
+                      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                    >
+                      {theme === "dark" ? (
+                        <Sun className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Moon className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={8}>
+                    {theme === "dark" ? t('sidebar.lightMode') : t('sidebar.darkMode')}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <button 
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className={cn(
+                    "flex items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    "h-9 w-9"
+                  )}
+                  aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Moon className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
     </aside>
+    </TooltipProvider>
   )
 }

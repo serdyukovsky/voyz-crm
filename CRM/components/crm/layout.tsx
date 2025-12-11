@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { SidebarProvider, useSidebar } from "./sidebar-context"
+import { SearchProvider } from "./search-context"
 import { QuickSearch } from "@/components/shared/quick-search"
 import { cn } from "@/lib/utils"
 
@@ -21,7 +22,7 @@ function LayoutContent({ children }: LayoutProps) {
       <Topbar />
       <main 
         className={cn(
-          "pt-12 transition-[margin-left] duration-200 ease-out",
+          "pt-12 transition-[margin-left] duration-300 ease-in-out",
           isCollapsed ? "ml-16" : "ml-60"
         )} 
         role="main"
@@ -36,7 +37,9 @@ function LayoutContent({ children }: LayoutProps) {
 export function Layout({ children }: LayoutProps) {
   return (
     <SidebarProvider>
-      <LayoutContent>{children}</LayoutContent>
+      <SearchProvider>
+        <LayoutContent>{children}</LayoutContent>
+      </SearchProvider>
     </SidebarProvider>
   )
 }

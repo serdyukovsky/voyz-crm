@@ -7,6 +7,7 @@ async function checkBackendAvailable(): Promise<boolean> {
   }
   
   try {
+    const API_BASE_URL = getApiBaseUrl()
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
     

@@ -57,6 +57,7 @@ import { io, Socket } from 'socket.io-client'
 import { getWsUrl } from '@/lib/config'
 import { CreateDealModal } from './create-deal-modal'
 import { AddStageModal } from './add-stage-modal'
+import { useSidebar } from './sidebar-context'
 
 interface DealCardData {
   id: string
@@ -104,6 +105,7 @@ interface FilterState {
   amountMax?: number
   updatedAfter?: string
   updatedBefore?: string
+  title?: string
 }
 
 type SortField = 'amount' | 'updatedAt'
@@ -156,7 +158,8 @@ function DealCard({
   onMarkAsLost,
   onReassignContact,
   onOpenInSidebar,
-  availableContacts
+  availableContacts,
+  searchQuery
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
   const navigate = useNavigate()
@@ -207,6 +210,8 @@ function DealCard({
     onOpenInSidebar(deal.id)
   }
 
+  const isHighlighted = searchQuery && deal.title.toLowerCase().includes(searchQuery.toLowerCase())
+
   return (
     <Card
       draggable
@@ -214,8 +219,9 @@ function DealCard({
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
       className={cn(
-        "mb-2 cursor-pointer hover:shadow-md transition-all group",
-        isDragging && "opacity-50"
+        "mb-2 cursor-pointer transition-all group shadow-none",
+        isDragging && "opacity-50",
+        isHighlighted && "bg-blue-50/40 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-800/30"
       )}
     >
       <CardContent className="p-3">
@@ -373,6 +379,7 @@ interface KanbanColumnProps {
   onAddStage?: (afterStageId: string) => void
   availableContacts: Contact[]
   pipelineId: string
+  searchQuery?: string
 }
 
 // Helper function to check if stage is "Won" or "Lost"
@@ -398,7 +405,8 @@ function KanbanColumn({
   onAddDeal,
   onAddStage,
   availableContacts,
-  pipelineId
+  pipelineId,
+  searchQuery
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const handleDragOver = (e: React.DragEvent) => {
@@ -467,7 +475,7 @@ function KanbanColumn({
 
       <Card
         className={cn(
-          "flex flex-col",
+          "flex flex-col shadow-none",
           isDraggedOver && "border-primary border-2"
         )}
         onDragOver={handleDragOver}
@@ -505,6 +513,7 @@ function KanbanColumn({
                 onReassignContact={onReassignContact}
                 onOpenInSidebar={onOpenInSidebar}
                 availableContacts={availableContacts}
+                searchQuery={searchQuery}
               />
             ))
           )}
@@ -526,6 +535,7 @@ export function DealsKanbanBoard({
   onAddDeal
 }: DealsKanbanBoardProps) {
   const { t } = useTranslation()
+  const { isCollapsed } = useSidebar()
   const { showSuccess, showError } = useToastNotification()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
@@ -886,6 +896,14 @@ export function DealsKanbanBoard({
   // Filter and sort deals
   const filteredAndSortedDeals = useMemo(() => {
     let filtered = [...deals]
+
+    // Apply title filter (search by name)
+    if (filters.title) {
+      const searchLower = filters.title.toLowerCase()
+      filtered = filtered.filter(d => 
+        d.title?.toLowerCase().includes(searchLower)
+      )
+    }
 
     // Apply amount range filter
     if (filters.amountMin !== undefined) {
@@ -1398,6 +1416,7 @@ export function DealsKanbanBoard({
               onAddStage={handleAddStage}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
+              searchQuery={filters.title}
             />
           )
           })}
@@ -1461,7 +1480,12 @@ export function DealsKanbanBoard({
           }
         }}>
           <DialogContent 
-            className="!max-w-[calc(100vw-240px)] !w-[calc(100vw-240px)] !h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] left-[240px] animate-in fade-in-0 zoom-in-95 duration-200"
+            className="!h-screen max-h-[100vh] overflow-hidden p-0 m-0 rounded-none border-0 translate-x-0 translate-y-[-50%] top-[50%] animate-in fade-in-0 zoom-in-95 duration-200 transition-[left,width]"
+            style={{
+              left: isCollapsed ? '4rem' : '15rem',
+              width: isCollapsed ? 'calc(100vw - 4rem)' : 'calc(100vw - 15rem)',
+              maxWidth: 'none'
+            }}
             showCloseButton={false}
           >
             <div className="overflow-y-auto h-full w-full">
