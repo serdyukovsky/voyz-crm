@@ -302,7 +302,8 @@ export async function deleteTask(id: string): Promise<void> {
     })
 
     if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
+      // 401 = Unauthorized (token invalid/expired) - redirect to login
+      if (response.status === 401) {
         console.warn('API: Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
@@ -313,6 +314,27 @@ export async function deleteTask(id: string): Promise<void> {
         }
         
         throw new Error('UNAUTHORIZED')
+      }
+
+      // 403 = Forbidden (user authenticated but lacks permission) - show error, don't redirect
+      if (response.status === 403) {
+        let errorMessage = 'You do not have permission to delete this task'
+        try {
+          const errorData = await response.json()
+          if (errorData.message) {
+            errorMessage = Array.isArray(errorData.message) 
+              ? errorData.message.join(', ')
+              : errorData.message
+          } else if (errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch {
+          const errorText = await response.text().catch(() => 'You do not have permission to delete this task')
+          if (errorText && errorText !== 'Unknown error') {
+            errorMessage = errorText
+          }
+        }
+        throw new Error(errorMessage)
       }
 
       let errorMessage = 'Unknown error'

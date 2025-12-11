@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Delete,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -25,6 +26,9 @@ import { PipelineResponseDto } from './dto/pipeline-response.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
+import { Permissions } from '@/common/decorators/permissions.decorator';
+import { PERMISSIONS } from '@/common/constants/permissions';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('Pipelines')
@@ -35,20 +39,23 @@ export class PipelinesController {
   constructor(private readonly pipelinesService: PipelinesService) {}
 
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
+  @Permissions(PERMISSIONS.PIPELINES_VIEW)
   @ApiOperation({ summary: 'Get all pipelines', description: 'Retrieve all active pipelines with their stages' })
   @ApiResponse({
     status: 200,
     description: 'List of pipelines',
     type: [PipelineResponseDto],
   })
-  findAll() {
+  findAll(@CurrentUser() user?: any) {
+    console.log('PipelinesController.findAll - user:', user ? { id: user.id, role: user.role, permissions: user.permissions } : 'no user');
     return this.pipelinesService.findAll();
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Create a new pipeline', description: 'Create a new sales pipeline' })
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create a new pipeline', description: 'Create a new sales pipeline (Admin only)' })
   @ApiResponse({
     status: 201,
     description: 'Pipeline created successfully',
@@ -79,6 +86,20 @@ export class PipelinesController {
   @ApiResponse({ status: 404, description: 'Pipeline not found' })
   update(@Param('id') id: string, @Body() updatePipelineDto: UpdatePipelineDto) {
     return this.pipelinesService.update(id, updatePipelineDto);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete a pipeline', description: 'Delete a pipeline (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Pipeline ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pipeline deleted successfully',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Pipeline not found' })
+  remove(@Param('id') id: string) {
+    return this.pipelinesService.remove(id);
   }
 
   @Post(':id/stages')

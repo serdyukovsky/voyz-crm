@@ -44,6 +44,8 @@ export class UsersService {
         password: hashedPassword,
         firstName: sanitizeTextFields(createUserDto.firstName)!,
         lastName: sanitizeTextFields(createUserDto.lastName)!,
+        phone: createUserDto.phone ? sanitizeOptionalTextFields(createUserDto.phone) : undefined,
+        telegramUsername: createUserDto.telegramUsername ? sanitizeOptionalTextFields(createUserDto.telegramUsername) : undefined,
         role: createUserDto.role || UserRole.MANAGER,
         isActive: createUserDto.isActive ?? true,
       },
@@ -53,6 +55,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        phone: true,
+        telegramUsername: true,
         role: true,
         isActive: true,
         lastLoginAt: true,
@@ -72,6 +76,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        phone: true,
+        telegramUsername: true,
         role: true,
         isActive: true,
         lastLoginAt: true,
@@ -93,6 +99,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        phone: true,
+        telegramUsername: true,
         role: true,
         isActive: true,
         lastLoginAt: true,
@@ -172,6 +180,12 @@ export class UsersService {
     if (updateUserDto.avatar !== undefined) {
       updateData.avatar = sanitizeOptionalTextFields(updateUserDto.avatar);
     }
+    if (updateUserDto.phone !== undefined) {
+      updateData.phone = sanitizeOptionalTextFields(updateUserDto.phone) || undefined;
+    }
+    if (updateUserDto.telegramUsername !== undefined) {
+      updateData.telegramUsername = sanitizeOptionalTextFields(updateUserDto.telegramUsername) || undefined;
+    }
 
     // Hash password if provided
     if (updateUserDto.password) {
@@ -187,6 +201,8 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        phone: true,
+        telegramUsername: true,
         role: true,
         isActive: true,
         lastLoginAt: true,

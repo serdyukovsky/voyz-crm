@@ -119,17 +119,19 @@ enum FileType {
 // ============================================
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String
-  firstName     String
-  lastName      String
-  avatar        String?
-  role          UserRole @default(MANAGER)
-  isActive      Boolean  @default(true)
-  lastLoginAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String
+  firstName       String
+  lastName        String
+  avatar          String?
+  phone           String?
+  telegramUsername String?
+  role            UserRole @default(MANAGER)
+  isActive        Boolean  @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relations
   deals         Deal[]            @relation("DealCreator")

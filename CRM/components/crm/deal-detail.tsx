@@ -45,6 +45,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
   
+  // Validate dealId - use a safe default if invalid
+  const safeDealId = (dealId && typeof dealId === 'string' && dealId.trim() !== '') ? dealId : ''
+  
   // Helper functions for translations
   const getDirectionLabel = (value: string) => {
     return t(`contacts.direction.${value}`) || value

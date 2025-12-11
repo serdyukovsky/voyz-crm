@@ -21,6 +21,7 @@ import { getDeals, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines } from "@/lib/api/pipelines"
 import { useTranslation } from "@/lib/i18n/i18n-context"
 import { useSearch } from "@/components/crm/search-context"
+import { useUserRole } from "@/hooks/use-user-role"
 
 // Lazy load heavy kanban board component (998 lines)
 const DealsKanbanBoard = lazy(() => import("@/components/crm/deals-kanban-board").then(m => ({ default: m.DealsKanbanBoard })))
@@ -193,6 +194,7 @@ function DealsPageContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { searchValue } = useSearch()
+  const { canManagePipelines } = useUserRole()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -569,18 +571,20 @@ function DealsPageContent() {
                           </button>
                         ))
                       )}
-                      <div className="border-t border-border/50">
-                        <button
-                          onClick={() => {
-                            setIsFunnelDropdownOpen(false)
-                            setIsSettingsOpen(true)
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          {t('deals.addPipeline')}
-                        </button>
-                      </div>
+                      {canManagePipelines && (
+                        <div className="border-t border-border/50">
+                          <button
+                            onClick={() => {
+                              setIsFunnelDropdownOpen(false)
+                              setIsSettingsOpen(true)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            {t('deals.addPipeline')}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -633,18 +637,20 @@ function DealsPageContent() {
                         </button>
                       ))
                     )}
-                    <div className="border-t border-border/50">
-                      <button
-                        onClick={() => {
-                          setIsFunnelDropdownOpen(false)
-                          setIsSettingsOpen(true)
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        {t('deals.addPipeline')}
-                      </button>
-                    </div>
+                    {canManagePipelines && (
+                      <div className="border-t border-border/50">
+                        <button
+                          onClick={() => {
+                            setIsFunnelDropdownOpen(false)
+                            setIsSettingsOpen(true)
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          {t('deals.addPipeline')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

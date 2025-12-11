@@ -8,6 +8,8 @@ export interface User {
   firstName: string
   lastName: string
   avatar?: string
+  phone?: string
+  telegramUsername?: string
   role: UserRole
   isActive: boolean
   lastLoginAt?: string
@@ -20,6 +22,8 @@ export interface CreateUserDto {
   password: string
   firstName: string
   lastName: string
+  phone?: string
+  telegramUsername?: string
   role?: UserRole
   isActive?: boolean
 }
@@ -95,6 +99,62 @@ export async function getUser(id: string): Promise<User> {
   return response.json()
 }
 
+export async function getMyProfile(): Promise<User> {
+  if (typeof window === 'undefined') {
+    throw new Error('Cannot fetch profile on server side')
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    console.warn('No access token found for getMyProfile - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
+    throw new Error('UNAUTHORIZED')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const url = `${API_BASE_URL}/users/me`
+  console.log('getMyProfile: Fetching from:', url)
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  console.log('getMyProfile: Response status:', response.status, response.statusText)
+
+  if (!response.ok) {
+    // Handle authentication errors
+    if (response.status === 401 || response.status === 403) {
+      console.warn('Unauthorized to fetch profile - redirecting to login')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      
+      throw new Error('UNAUTHORIZED')
+    }
+    
+    const error = await response.json().catch(() => ({ message: 'Failed to fetch profile' }))
+    console.error('getMyProfile: Error response:', error)
+    throw new Error(error.message || 'Failed to fetch profile')
+  }
+
+  const data = await response.json()
+  console.log('getMyProfile: Received data:', data)
+  return data
+}
+
 export async function createUser(data: CreateUserDto): Promise<User> {
   const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/users`, {
@@ -128,6 +188,57 @@ export async function updateUser(id: string, data: UpdateUserDto): Promise<User>
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Failed to update user' }))
     throw new Error(error.message || 'Failed to update user')
+  }
+
+  return response.json()
+}
+
+export async function updateMyProfile(data: UpdateUserDto): Promise<User> {
+  if (typeof window === 'undefined') {
+    throw new Error('Cannot update profile on server side')
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    console.warn('No access token found for updateMyProfile - redirecting to login')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    
+    throw new Error('UNAUTHORIZED')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/users/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    // Handle authentication errors
+    if (response.status === 401 || response.status === 403) {
+      console.warn('Unauthorized to update profile - redirecting to login')
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+      
+      throw new Error('UNAUTHORIZED')
+    }
+    
+    const error = await response.json().catch(() => ({ message: 'Failed to update profile' }))
+    throw new Error(error.message || 'Failed to update profile')
   }
 
   return response.json()

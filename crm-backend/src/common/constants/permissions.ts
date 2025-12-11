@@ -43,12 +43,16 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.DEALS_CREATE,
     PERMISSIONS.DEALS_UPDATE,
     PERMISSIONS.DEALS_UPDATE_RESTRICTED,
+    // MANAGER cannot delete deals
     PERMISSIONS.TASKS_VIEW,
     PERMISSIONS.TASKS_CREATE,
     PERMISSIONS.TASKS_UPDATE,
+    // MANAGER can delete only own tasks (checked in controller)
     PERMISSIONS.FIELDS_VIEW,
     PERMISSIONS.PIPELINES_VIEW,
+    // MANAGER cannot manage pipelines (create/delete)
     PERMISSIONS.USERS_VIEW,
+    // MANAGER cannot manage users (create/update/delete)
     PERMISSIONS.EXPORT,
     PERMISSIONS.INTEGRATIONS_VIEW,
     PERMISSIONS.LOGS_VIEW,

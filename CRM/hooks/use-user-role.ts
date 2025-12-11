@@ -31,8 +31,10 @@ export function useUserRole({ userRole }: UseUserRoleOptions = {}) {
   const isManager = currentRole === 'MANAGER' || isAdmin
   const isViewer = currentRole === 'VIEWER'
   const canEdit = isManager || isAdmin
-  const canDelete = isAdmin
-  const canManageUsers = isAdmin
+  const canDelete = isAdmin // Only admin can delete deals
+  const canManageUsers = isAdmin // Only admin can manage users
+  const canManagePipelines = isAdmin // Only admin can create/delete pipelines
+  const canDeleteTasks = isManager || isAdmin // Manager can delete tasks (but only own tasks - checked in backend)
 
   const hasRole = (roles: UserRole[]): boolean => {
     if (!currentRole) return false
@@ -47,6 +49,8 @@ export function useUserRole({ userRole }: UseUserRoleOptions = {}) {
     canEdit,
     canDelete,
     canManageUsers,
+    canManagePipelines,
+    canDeleteTasks,
     hasRole,
   }
 }

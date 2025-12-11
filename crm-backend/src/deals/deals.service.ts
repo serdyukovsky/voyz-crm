@@ -4,7 +4,7 @@ import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
 import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
-import { Deal, ActivityType } from '@prisma/client';
+import { Deal, ActivityType, UserRole } from '@prisma/client';
 
 @Injectable()
 export class DealsService {
@@ -206,11 +206,11 @@ export class DealsService {
         } : null,
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
-          name: deal.assignedTo.name || deal.assignedTo.fullName || 'Unknown User',
+          name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
         } : null,
         createdBy: deal.createdBy ? {
           id: deal.createdBy.id,
-          name: deal.createdBy.name || deal.createdBy.fullName || 'Unknown User',
+          name: `${deal.createdBy.firstName} ${deal.createdBy.lastName}` || 'Unknown User',
         } : null,
       };
       
@@ -243,6 +243,7 @@ export class DealsService {
   }) {
     const where: any = {};
 
+    // Base filters
     if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
     if (filters?.stageId) where.stageId = filters.stageId;
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
@@ -254,6 +255,8 @@ export class DealsService {
         { description: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
+
+    // Managers can see all deals (no filtering by user)
 
     const deals = await this.prisma.deal.findMany({
       where,
@@ -325,6 +328,8 @@ export class DealsService {
     if (!deal) {
       throw new NotFoundException(`Deal with ID ${id} not found`);
     }
+
+    // Managers can see all deals (no filtering)
 
     return this.formatDealResponse(deal);
   }
@@ -435,7 +440,7 @@ export class DealsService {
     if (result.assignedTo) {
       result.assignedTo = {
         id: result.assignedTo.id,
-        name: result.assignedTo.name || result.assignedTo.fullName || 'Unknown User',
+        name: `${result.assignedTo.firstName} ${result.assignedTo.lastName}` || 'Unknown User',
         avatar: result.assignedTo.avatar || null,
       };
     } else {
@@ -576,7 +581,7 @@ export class DealsService {
         } : null,
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
-          name: deal.assignedTo.name || deal.assignedTo.fullName || 'Unknown User',
+          name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
         } : null,
         stage: deal.stage ? {
           id: deal.stage.id,

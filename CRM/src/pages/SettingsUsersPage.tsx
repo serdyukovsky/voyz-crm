@@ -62,6 +62,10 @@ export default function UsersSettingsPage() {
       const data = await getUsers()
       setUsers(data)
     } catch (error) {
+      // Don't show error if unauthorized - redirect will happen
+      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+        return // Let the redirect happen
+      }
       showError('Failed to load users', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)

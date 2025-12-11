@@ -49,6 +49,17 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'Current user', type: UserResponseDto })
+  async getMe(@CurrentUser() currentUser: any) {
+    const userId = currentUser.userId || currentUser.id;
+    console.log('UsersController.getMe: Current user ID:', userId, 'User object:', currentUser);
+    const user = await this.usersService.findOne(userId);
+    console.log('UsersController.getMe: Returning user data:', user);
+    return user;
+  }
+
   @Get(':id')
   @Permissions(PERMISSIONS.USERS_VIEW)
   @ApiOperation({ summary: 'Get user by ID' })
@@ -57,6 +68,20 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
+  }
+
+  @Patch('me')
+  @ApiOperation({ summary: 'Update own profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated', type: UserResponseDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  updateMe(
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser() currentUser: any,
+  ) {
+    const userId = currentUser.userId || currentUser.id;
+    // Remove role and isActive from update - users can't change these
+    const { role, isActive, ...profileUpdate } = updateUserDto;
+    return this.usersService.update(userId, profileUpdate, currentUser);
   }
 
   @Patch(':id')

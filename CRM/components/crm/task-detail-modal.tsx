@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -57,6 +57,8 @@ import { getUsers, type User as UserType } from '@/lib/api/users'
 import { getDeals, type Deal as DealType } from '@/lib/api/deals'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { useUserRole } from '@/hooks/use-user-role'
+import { cn } from '@/lib/utils'
 
 interface Task {
   id: string
@@ -68,6 +70,7 @@ interface Task {
   dueDate: string
   assignee: string
   assigneeId?: string
+  createdById?: string
   completed: boolean
   status: string
   description?: string
@@ -86,6 +89,33 @@ interface TaskDetailModalProps {
 export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailModalProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
+  const { isAdmin, role } = useUserRole()
+  
+  // Check if current user can edit/delete this task
+  // Admin can edit/delete any task, Manager can only edit/delete own tasks
+  const canEditThisTask = useMemo(() => {
+    if (isAdmin) return true
+    if (role !== 'MANAGER') return false
+    
+    // Get current user ID
+    if (typeof window === 'undefined') return false
+    const userStr = localStorage.getItem('user')
+    if (!userStr) return false
+    
+    try {
+      const user = JSON.parse(userStr)
+      const currentUserId = user.id || user.userId
+      if (!currentUserId) return false
+      
+      // Manager can edit if task is assigned to them or created by them
+      return (task.assigneeId && task.assigneeId === currentUserId) || 
+             (task.createdById && task.createdById === currentUserId)
+    } catch {
+      return false
+    }
+  }, [isAdmin, role, task.assigneeId, task.createdById])
+  
+  const canDeleteThisTask = canEditThisTask
   const [result, setResult] = useState(task.result || "")
   const [dueDate, setDueDate] = useState(task.dueDate)
   const [description, setDescription] = useState(task.description || "")
@@ -142,7 +172,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !canEditThisTask) return
     if (!isEditingTitle && title !== task.title && title.trim()) {
       const timeoutId = setTimeout(() => {
         const updatedTask = {
@@ -153,10 +183,10 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
       }, 500)
       return () => clearTimeout(timeoutId)
     }
-  }, [title, isEditingTitle, isOpen, task.title, task, onUpdate])
+  }, [title, isEditingTitle, isOpen, task.title, task, onUpdate, canEditThisTask])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !canEditThisTask) return
     if (!isEditingDescription && description !== (task.description || "")) {
       const timeoutId = setTimeout(async () => {
         console.log('TaskDetailModal: Auto-saving description:', description)
@@ -171,11 +201,11 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
       }, 500)
       return () => clearTimeout(timeoutId)
     }
-  }, [description, isEditingDescription, isOpen, task.description, task, onUpdate])
+  }, [description, isEditingDescription, isOpen, task.description, task, onUpdate, canEditThisTask])
 
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !canEditThisTask) return
     const current = task.assigneeId ?? null
     const next = assigneeId ?? null
     if (next !== current && users.length > 0) {
@@ -190,10 +220,10 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
         setHistoryRefreshTrigger(prev => prev + 1)
       })
     }
-  }, [assigneeId, users, isOpen, task.assigneeId, task, onUpdate])
+  }, [assigneeId, users, isOpen, task.assigneeId, task, onUpdate, canEditThisTask])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !canEditThisTask) return
     const current = task.dealId ?? null
     const next = dealId ?? null
     if (next !== current && deals.length > 0) {
@@ -208,10 +238,10 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
         setHistoryRefreshTrigger(prev => prev + 1)
       })
     }
-  }, [dealId, deals, isOpen, task.dealId, task, onUpdate])
+  }, [dealId, deals, isOpen, task.dealId, task, onUpdate, canEditThisTask])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || !canEditThisTask) return
     if (result !== (task.result || "")) {
       const timeoutId = setTimeout(async () => {
         const updatedTask = {
@@ -224,7 +254,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
       }, 500)
       return () => clearTimeout(timeoutId)
     }
-  }, [result, isOpen, task.result, task, onUpdate])
+  }, [result, isOpen, task.result, task, onUpdate, canEditThisTask])
 
   const handleTitleDoubleClick = () => {
     setIsEditingTitle(true)
@@ -402,7 +432,11 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                   aria-label={task.completed ? t('tasks.completed') : t('tasks.incomplete')}
                 />
                 <DialogTitle 
-                  className={`text-lg font-semibold cursor-pointer hover:text-primary transition-colors ${task.completed ? 'line-through' : ''}`}
+                  className={cn(
+                    "text-lg font-semibold transition-colors",
+                    task.completed ? 'line-through' : '',
+                    canEditThisTask ? 'cursor-pointer hover:text-primary' : 'cursor-default'
+                  )}
                   onDoubleClick={handleTitleDoubleClick}
                 >
                   {title}
@@ -429,8 +463,16 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                 />
               ) : (
                 <p
-                  className={`text-sm text-muted-foreground whitespace-pre-wrap cursor-pointer hover:text-foreground transition-colors ${task.completed ? 'line-through' : ''}`}
-                  onDoubleClick={() => setIsEditingDescription(true)}
+                  className={cn(
+                    "text-sm text-muted-foreground whitespace-pre-wrap transition-colors",
+                    task.completed ? 'line-through' : '',
+                    canEditThisTask ? 'cursor-pointer hover:text-foreground' : 'cursor-default'
+                  )}
+                  onDoubleClick={() => {
+                    if (canEditThisTask) {
+                      setIsEditingDescription(true)
+                    }
+                  }}
                 >
                   {description || t('tasks.noDescription')}
                 </p>
@@ -465,16 +507,19 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                     </PopoverTrigger>
                     <PopoverContent className="w-[360px] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
+                        <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} disabled={!canEditThisTask} />
                         <CommandList>
                           <CommandEmpty>{t('deals.noDealsFound') || t('common.noData')}</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
                               value="none"
                               onSelect={() => {
-                                setDealId(null)
-                                setIsDealSelectOpen(false)
+                                if (canEditThisTask) {
+                                  setDealId(null)
+                                  setIsDealSelectOpen(false)
+                                }
                               }}
+                              disabled={!canEditThisTask}
                             >
                               <span>{t('tasks.none') || 'Удалить связь'}</span>
                             </CommandItem>
@@ -483,9 +528,12 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                                 key={deal.id}
                                 value={`${deal.title} ${deal.number || ''} ${deal.amount || ''}`}
                                 onSelect={() => {
-                                  setDealId(deal.id)
-                                  setIsDealSelectOpen(false)
+                                  if (canEditThisTask) {
+                                    setDealId(deal.id)
+                                    setIsDealSelectOpen(false)
+                                  }
                                 }}
+                                disabled={!canEditThisTask}
                               >
                                 <div className="flex flex-col w-full">
                                   <span className="font-medium">{deal.title}</span>
@@ -503,12 +551,18 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                 </>
               ) : (
                 <Popover open={isDealSelectOpen} onOpenChange={setIsDealSelectOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors">
-                      <LinkIcon className="h-3.5 w-3.5" />
-                      <span>{t('tasks.selectDeal')}</span>
-                    </button>
-                  </PopoverTrigger>
+                    <PopoverTrigger asChild>
+                      <button 
+                        className={cn(
+                          "flex items-center gap-1.5 text-xs transition-colors",
+                          canEditThisTask ? "hover:text-foreground" : "cursor-default"
+                        )}
+                        disabled={!canEditThisTask}
+                      >
+                        <LinkIcon className="h-3.5 w-3.5" />
+                        <span>{t('tasks.selectDeal')}</span>
+                      </button>
+                    </PopoverTrigger>
                   <PopoverContent className="w-[360px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder={t('deals.searchPlaceholder') || t('common.searchPlaceholder')} />
@@ -518,9 +572,12 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                           <CommandItem
                             value="none"
                             onSelect={() => {
-                              setDealId(null)
-                              setIsDealSelectOpen(false)
+                              if (canEditThisTask) {
+                                setDealId(null)
+                                setIsDealSelectOpen(false)
+                              }
                             }}
+                            disabled={!canEditThisTask}
                           >
                             <span>{t('tasks.none')}</span>
                           </CommandItem>
@@ -529,9 +586,12 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                               key={deal.id}
                               value={`${deal.title} ${deal.number || ''} ${deal.amount || ''}`}
                               onSelect={() => {
-                                setDealId(deal.id)
-                                setIsDealSelectOpen(false)
+                                if (canEditThisTask) {
+                                  setDealId(deal.id)
+                                  setIsDealSelectOpen(false)
+                                }
                               }}
+                              disabled={!canEditThisTask}
                             >
                               <div className="flex flex-col w-full">
                                 <span className="font-medium">{deal.title}</span>
@@ -554,68 +614,70 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                   ? format(safeParseDate(dueDate), "PPP")
                   : t('tasks.notSet')}
               </span>
-              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal>
-                <DropdownMenu open={isRescheduleDropdownOpen} onOpenChange={setIsRescheduleDropdownOpen}>
-                  <PopoverAnchor asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        ref={calendarButtonRef}
-                        title={t('tasks.reschedule')}
-                      >
-                        <CalendarIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </PopoverAnchor>
-                  <DropdownMenuContent align="end" onCloseAutoFocus={(e) => {
-                    if (isCalendarOpen) {
-                      e.preventDefault()
-                    }
-                  }}>
-                    <DropdownMenuItem onClick={() => handleReschedule(1)}>
-                      {t('tasks.tomorrow')} ({format(tomorrow, "MMM d")})
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleReschedule(2)}>
-                      {t('tasks.dayAfterTomorrow')} ({format(dayAfterTomorrow, "MMM d")})
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleReschedule(7)}>
-                      {t('tasks.nextWeek')} ({format(nextWeek, "MMM d")})
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(e) => {
+              {canEditThisTask && (
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen} modal>
+                  <DropdownMenu open={isRescheduleDropdownOpen} onOpenChange={setIsRescheduleDropdownOpen}>
+                    <PopoverAnchor asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          ref={calendarButtonRef}
+                          title={t('tasks.reschedule')}
+                        >
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </PopoverAnchor>
+                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => {
+                      if (isCalendarOpen) {
                         e.preventDefault()
-                        setIsRescheduleDropdownOpen(false)
-                        requestAnimationFrame(() => {
-                          setIsCalendarOpen(true)
-                        })
-                      }}
-                    >
-                      {t('tasks.chooseDate')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      }
+                    }}>
+                      <DropdownMenuItem onClick={() => handleReschedule(1)}>
+                        {t('tasks.tomorrow')} ({format(tomorrow, "MMM d")})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleReschedule(2)}>
+                        {t('tasks.dayAfterTomorrow')} ({format(dayAfterTomorrow, "MMM d")})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleReschedule(7)}>
+                        {t('tasks.nextWeek')} ({format(nextWeek, "MMM d")})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault()
+                          setIsRescheduleDropdownOpen(false)
+                          requestAnimationFrame(() => {
+                            setIsCalendarOpen(true)
+                          })
+                        }}
+                      >
+                        {t('tasks.chooseDate')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                <PopoverContent
-                  className="w-auto p-0"
-                  align="end"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                  onInteractOutside={(e) => {
-                    const target = e.target as Node
-                    if (calendarButtonRef.current && calendarButtonRef.current.contains(target)) {
-                      e.preventDefault()
-                    }
-                  }}
-                >
-                  <Calendar
-                    mode="single"
-                    selected={safeParseDate(dueDate)}
-                    onSelect={handleCustomDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+                  <PopoverContent
+                    className="w-auto p-0"
+                    align="end"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onInteractOutside={(e) => {
+                      const target = e.target as Node
+                      if (calendarButtonRef.current && calendarButtonRef.current.contains(target)) {
+                        e.preventDefault()
+                      }
+                    }}
+                  >
+                    <Calendar
+                      mode="single"
+                      selected={safeParseDate(dueDate)}
+                      onSelect={handleCustomDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </div>
 
@@ -624,38 +686,44 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
               <label htmlFor="result" className="text-sm font-medium">
                 {t('tasks.result')}
               </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="link" className="h-auto p-0 text-xs text-foreground hover:text-primary">
-                    {selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : t('tasks.unassigned')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0">
-                  <Command>
-                    <CommandInput placeholder={t('tasks.searchAssignee')} />
-                    <CommandList>
-                      <CommandEmpty>{t('tasks.noUsersFound')}</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none"
-                          onSelect={() => setAssigneeId(null)}
-                        >
-                          {t('tasks.unassigned')}
-                        </CommandItem>
-                        {users.map((user) => (
+              {canEditThisTask ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="link" className="h-auto p-0 text-xs text-foreground hover:text-primary">
+                      {selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : t('tasks.unassigned')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-0">
+                    <Command>
+                      <CommandInput placeholder={t('tasks.searchAssignee')} />
+                      <CommandList>
+                        <CommandEmpty>{t('tasks.noUsersFound')}</CommandEmpty>
+                        <CommandGroup>
                           <CommandItem
-                            key={user.id}
-                            value={`${user.firstName} ${user.lastName}`}
-                            onSelect={() => setAssigneeId(user.id)}
+                            value="none"
+                            onSelect={() => setAssigneeId(null)}
                           >
-                            {user.firstName} {user.lastName}
+                            {t('tasks.unassigned')}
                           </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                          {users.map((user) => (
+                            <CommandItem
+                              key={user.id}
+                              value={`${user.firstName} ${user.lastName}`}
+                              onSelect={() => setAssigneeId(user.id)}
+                            >
+                              {user.firstName} {user.lastName}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="text-xs text-foreground">
+                  {selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : t('tasks.unassigned')}
+                </span>
+              )}
             </div>
             <div className="relative">
               <Textarea
@@ -663,6 +731,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
                 placeholder={t('tasks.resultPlaceholder')}
                 value={result}
                 onChange={(e) => setResult(e.target.value)}
+                disabled={!canEditThisTask}
                 className="min-h-[140px] resize-none pr-16 pb-14 rounded-br-3xl"
               />
               <Button 
@@ -677,7 +746,7 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
           </div>
 
           <div className="flex items-center justify-start gap-2 text-xs -mt-1.5 -mb-4">
-            {onDelete && (
+            {onDelete && canDeleteThisTask && (
               <Button
                 variant="ghost"
                 size="icon"

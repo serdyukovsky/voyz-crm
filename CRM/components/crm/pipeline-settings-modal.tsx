@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X, Plus, GripVertical, Trash2, Edit2 } from 'lucide-react'
 import { Stage } from "./kanban-board"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface PipelineSettingsModalProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ export function PipelineSettingsModal({
   onAddFunnel,
   onDeleteFunnel,
 }: PipelineSettingsModalProps) {
+  const { canManagePipelines } = useUserRole()
   const [localStages, setLocalStages] = useState<Stage[]>(stages)
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -159,7 +161,7 @@ export function PipelineSettingsModal({
                   onClick={() => onSelectFunnel(funnel.id)}
                 >
                   <span className="text-sm text-foreground">{funnel.name}</span>
-                  {funnel.id !== "default" && (
+                  {funnel.id !== "default" && canManagePipelines && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -173,31 +175,33 @@ export function PipelineSettingsModal({
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="New funnel name..."
-                value={newFunnelName}
-                onChange={(e) => setNewFunnelName(e.target.value)}
-                className="flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isCreatingPipeline) {
-                    handleAddFunnel()
-                  }
-                }}
-                disabled={isCreatingPipeline}
-              />
-              <Button 
-                onClick={handleAddFunnel} 
-                size="sm"
-                disabled={isCreatingPipeline || !newFunnelName.trim()}
-              >
-                {isCreatingPipeline ? (
-                  <span className="text-xs">Creating...</span>
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+            {canManagePipelines && (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New funnel name..."
+                  value={newFunnelName}
+                  onChange={(e) => setNewFunnelName(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isCreatingPipeline) {
+                      handleAddFunnel()
+                    }
+                  }}
+                  disabled={isCreatingPipeline}
+                />
+                <Button 
+                  onClick={handleAddFunnel} 
+                  size="sm"
+                  disabled={isCreatingPipeline || !newFunnelName.trim()}
+                >
+                  {isCreatingPipeline ? (
+                    <span className="text-xs">Creating...</span>
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Stages Section */}
