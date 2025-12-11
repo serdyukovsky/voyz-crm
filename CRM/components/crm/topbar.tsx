@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Search, Bell, Command, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Link } from 'react-router-dom'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useSidebar } from './sidebar-context'
@@ -32,6 +33,15 @@ const initialNotifications: Notification[] = [
   { id: '3', title: 'Deal stage changed', description: 'TechStart moved to "Negotiation" stage' },
 ]
 
+interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role?: string
+  avatar?: string
+}
+
 export function Topbar() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -41,6 +51,39 @@ export function Topbar() {
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [appliedFilters, setAppliedFilters] = useState<DealSearchFilters | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const [user, setUser] = useState<User | null>(null)
+
+  // Load user data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr)
+          setUser(userData)
+        } catch (error) {
+          console.error('Failed to parse user data from localStorage:', error)
+        }
+      }
+    }
+  }, [])
+
+  // Get user initials for avatar
+  const getUserInitials = (user: User | null): string => {
+    if (!user) return 'U'
+    const first = user.firstName?.[0]?.toUpperCase() || ''
+    const last = user.lastName?.[0]?.toUpperCase() || ''
+    return first + last || user.email?.[0]?.toUpperCase() || 'U'
+  }
+
+  // Get user full name
+  const getUserName = (user: User | null): string => {
+    if (!user) return 'User'
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`
+    }
+    return user.email || 'User'
+  }
 
   const handleLogout = async () => {
     try {
@@ -198,16 +241,19 @@ export function Topbar() {
                 className="h-8 w-8 rounded-full p-0 hover:bg-secondary/50"
                 aria-label="User menu"
               >
-                <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
-                  AC
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.avatar} alt={getUserName(user)} />
+                  <AvatarFallback className="bg-primary/20 text-primary text-xs font-medium">
+                    {getUserInitials(user)}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">Alex Chen</p>
-                  <p className="text-xs text-muted-foreground">alex@pipeline.co</p>
+                  <p className="text-sm font-medium">{getUserName(user)}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email || ''}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

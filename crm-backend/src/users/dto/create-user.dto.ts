@@ -21,6 +21,16 @@ export class CreateUserDto {
   @IsString()
   lastName: string;
 
+  @ApiProperty({ example: '+7 (999) 999-99-99', required: false })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({ example: '@username', required: false })
+  @IsOptional()
+  @IsString()
+  telegramUsername?: string;
+
   @ApiProperty({ example: 'MANAGER', enum: UserRole, required: false })
   @IsOptional()
   @IsEnum(UserRole)

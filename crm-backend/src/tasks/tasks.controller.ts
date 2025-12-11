@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
@@ -85,8 +86,21 @@ export class TasksController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete task' })
   @ApiResponse({ status: 200, description: 'Task deleted' })
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.tasksService.remove(id, user.userId || user.id);
+  @ApiResponse({ status: 403, description: 'Forbidden - can only delete own tasks' })
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    const userId = user.userId || user.id;
+    const userRole = user.role;
+    
+    // If user is MANAGER, check if they can delete this task (only own tasks)
+    if (userRole === UserRole.MANAGER) {
+      const task = await this.tasksService.findOne(id);
+      // MANAGER can only delete tasks assigned to them or created by them
+      if (task.assignedToId !== userId && task.createdById !== userId) {
+        throw new ForbiddenException('You can only delete your own tasks');
+      }
+    }
+    
+    return this.tasksService.remove(id, userId);
   }
 }
 

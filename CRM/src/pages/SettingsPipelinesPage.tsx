@@ -53,6 +53,10 @@ export default function PipelinesPage() {
       const data = await getPipelines()
       setPipelines(data)
     } catch (error) {
+      // Don't show error if unauthorized - redirect will happen
+      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+        return // Let the redirect happen
+      }
       showError('Failed to load pipelines', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)
