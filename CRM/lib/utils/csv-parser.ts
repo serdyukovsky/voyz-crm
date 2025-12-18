@@ -96,16 +96,20 @@ export async function parseCsvFile(
           const rawHeaders = parseCsvLine(headerLine, actualDelimiter)
           console.log('Raw headers:', rawHeaders)
           
-          const headers = rawHeaders.map((h) => {
-            // Убираем кавычки в начале и конце, если есть
-            let cleaned = h.trim()
-            if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-              cleaned = cleaned.slice(1, -1)
-            }
-            // Заменяем двойные кавычки на одинарные (если были экранированы)
-            cleaned = cleaned.replace(/""/g, '"')
-            return cleaned.trim()
-          })
+          const headers = rawHeaders
+            .map((h) => {
+              // Убираем кавычки в начале и конце, если есть
+              let cleaned = h.trim()
+              if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                cleaned = cleaned.slice(1, -1)
+              }
+              // Заменяем двойные кавычки на одинарные (если были экранированы)
+              cleaned = cleaned.replace(/""/g, '"')
+              // Исправляем двойные обратные слэши (\\ -> \)
+              cleaned = cleaned.replace(/\\\\/g, '\\')
+              return cleaned.trim()
+            })
+            .filter((h) => h.length > 0) // Убираем пустые заголовки (от лишних разделителей в конце)
           
           console.log('Cleaned headers:', headers)
           console.log('Headers count:', headers.length)
@@ -130,49 +134,53 @@ export async function parseCsvFile(
               const rawValues = parseCsvLine(line, actualDelimiter)
               
               // Очищаем значения от кавычек
-              const values = rawValues.map((v) => {
-                let cleaned = v.trim()
-                // Убираем кавычки в начале и конце, если есть
-                if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-                  cleaned = cleaned.slice(1, -1)
-                }
-                // Заменяем двойные кавычки на одинарные (если были экранированы)
-                cleaned = cleaned.replace(/""/g, '"')
-                return cleaned.trim()
-              })
+              const values = rawValues
+                .map((v) => {
+                  let cleaned = v.trim()
+                  // Убираем кавычки в начале и конце, если есть
+                  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                    cleaned = cleaned.slice(1, -1)
+                  }
+                  // Заменяем двойные кавычки на одинарные (если были экранированы)
+                  cleaned = cleaned.replace(/""/g, '"')
+                  // Исправляем двойные обратные слэши (\\ -> \)
+                  cleaned = cleaned.replace(/\\\\/g, '\\')
+                  return cleaned.trim()
+                })
+                .filter((v, index) => {
+                  // Убираем пустые значения в конце строки (от лишних разделителей)
+                  // Но только если это последние пустые значения
+                  if (v.length === 0 && index >= headers.length) {
+                    return false
+                  }
+                  return true
+                })
 
-              // Если количество колонок не совпадает, пытаемся исправить
+              // Обрезаем значения до количества заголовков (убираем лишние пустые в конце)
+              const adjustedValues = values.slice(0, headers.length)
+              
+              // Если значений меньше - дополняем пустыми
+              while (adjustedValues.length < headers.length) {
+                adjustedValues.push('')
+              }
+
+              // Если количество колонок не совпадает - логируем предупреждение
               if (values.length !== headers.length) {
                 console.warn(
                   `Row ${lineIndex + 2}: Expected ${headers.length} columns, got ${values.length}. ` +
                   `Line preview: ${line.substring(0, 100)}`
                 )
-                console.warn('  Headers:', headers)
-                console.warn('  Values:', values)
-                
-                // Если значений меньше - дополняем пустыми
-                // Если больше - обрезаем
-                const adjustedValues = [...values]
-                while (adjustedValues.length < headers.length) {
-                  adjustedValues.push('')
+                if (values.length > headers.length) {
+                  console.warn(`  Trimming ${values.length - headers.length} extra empty columns`)
                 }
-                while (adjustedValues.length > headers.length) {
-                  adjustedValues.pop()
-                }
-
-                const row: ParsedCsvRow = {}
-                headers.forEach((header, index) => {
-                  row[header] = adjustedValues[index] || ''
-                })
-                rows.push(row)
-              } else {
-                // Количество колонок совпадает - создаем строку
-                const row: ParsedCsvRow = {}
-                headers.forEach((header, index) => {
-                  row[header] = values[index] || ''
-                })
-                rows.push(row)
               }
+
+              // Создаем строку данных
+              const row: ParsedCsvRow = {}
+              headers.forEach((header, index) => {
+                row[header] = adjustedValues[index] || ''
+              })
+              rows.push(row)
             } catch (err) {
               console.error(`Error parsing row ${lineIndex + 2}:`, err)
               // Пропускаем проблемную строку, но продолжаем парсинг
