@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { ImportUploader } from "@/components/crm/import-uploader"
 import { ImportPreviewTable } from "@/components/crm/import-preview-table"
@@ -13,11 +13,12 @@ import { Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { importContacts, importDeals, type ImportResult as ImportResultType } from "@/lib/api/import"
 import { type ParsedCsvRow } from "@/lib/utils/csv-parser"
 import { useToastNotification } from "@/hooks/use-toast-notification"
+import { ErrorBoundary } from "@/components/crm/error-boundary"
 
 type ImportStep = 'upload' | 'preview' | 'mapping' | 'dry-run' | 'result'
 type EntityType = 'contact' | 'deal'
 
-export default function ImportExportPage() {
+function ImportExportContent() {
   const [activeTab, setActiveTab] = useState<"import" | "export">("import")
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
   const [entityType, setEntityType] = useState<EntityType>('contact')
@@ -43,18 +44,45 @@ export default function ImportExportPage() {
   
   const { showSuccess, showError } = useToastNotification()
 
+  // Обработка глобальных ошибок
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('Global error:', event.error)
+      setError(event.error?.message || 'An unexpected error occurred')
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason)
+      setError(event.reason?.message || 'An unexpected error occurred')
+    }
+
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [])
+
   const handleFileUpload = (file: File | null, headers: string[], rows: ParsedCsvRow[]) => {
-    setUploadedFile(file)
-    setCsvHeaders(headers)
-    setCsvRows(rows)
-    setMapping({})
-    setDryRunResult(null)
-    setImportResult(null)
-    setError(null)
-    
-    if (file && headers.length > 0) {
-      setCurrentStep('preview')
-    } else {
+    try {
+      setUploadedFile(file)
+      setCsvHeaders(headers)
+      setCsvRows(rows)
+      setMapping({})
+      setDryRunResult(null)
+      setImportResult(null)
+      setError(null)
+      
+      if (file && headers && headers.length > 0 && rows && rows.length > 0) {
+        setCurrentStep('preview')
+      } else {
+        setCurrentStep('upload')
+      }
+    } catch (err) {
+      console.error('Error in handleFileUpload:', err)
+      setError(err instanceof Error ? err.message : 'Failed to process file upload')
       setCurrentStep('upload')
     }
   }
@@ -226,7 +254,7 @@ export default function ImportExportPage() {
             )}
 
             {/* Step 2: Preview */}
-            {currentStep === 'preview' && csvRows.length > 0 && (
+            {currentStep === 'preview' && csvHeaders.length > 0 && csvRows.length > 0 && (
               <div className="space-y-4">
                 <ImportPreviewTable
                   headers={csvHeaders}
@@ -237,6 +265,31 @@ export default function ImportExportPage() {
                   <Button onClick={handleContinueToMapping}>
                     Continue to Mapping
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback если нет данных для preview */}
+            {currentStep === 'preview' && (csvHeaders.length === 0 || csvRows.length === 0) && (
+              <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                      No data to preview
+                    </p>
+                    <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                      The CSV file appears to be empty or could not be parsed. Please try uploading a different file.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReset}
+                      className="mt-3"
+                    >
+                      Upload Another File
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -314,5 +367,13 @@ export default function ImportExportPage() {
         )}
       </div>
     </CRMLayout>
+  )
+}
+
+export default function ImportExportPage() {
+  return (
+    <ErrorBoundary>
+      <ImportExportContent />
+    </ErrorBoundary>
   )
 }

@@ -54,21 +54,37 @@ export function ImportUploader({ onFileUpload, disabled = false }: ImportUploade
   )
 
   const processFile = async (file: File) => {
-    if (!file.name.endsWith('.csv')) {
-      setError('Only CSV files are supported')
-      return
-    }
-
-    setSelectedFile(file)
-    setError(null)
-    setIsParsing(true)
-
     try {
+      if (!file) {
+        setError('No file selected')
+        return
+      }
+
+      if (!file.name.endsWith('.csv')) {
+        setError('Only CSV files are supported')
+        return
+      }
+
+      setSelectedFile(file)
+      setError(null)
+      setIsParsing(true)
+
       // Парсим первые 20 строк для предпросмотра
       const { headers, rows } = await parseCsvFile(file, ',', 20)
+      
+      if (!headers || headers.length === 0) {
+        throw new Error('CSV file has no headers')
+      }
+
+      if (rows.length === 0) {
+        throw new Error('CSV file has no data rows')
+      }
+
       onFileUpload(file, headers, rows)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse CSV file')
+      console.error('Error processing file:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to parse CSV file'
+      setError(errorMessage)
       setSelectedFile(null)
       onFileUpload(null, [], [])
     } finally {
