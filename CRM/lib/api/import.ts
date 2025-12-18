@@ -51,12 +51,14 @@ export async function getImportMeta(entityType: 'contact' | 'deal'): Promise<Imp
     throw new Error('Not authenticated')
   }
 
-  // Убеждаемся, что URL правильный (добавляем /api если нужно)
-  const url = API_BASE_URL.endsWith('/api') 
-    ? `${API_BASE_URL}/import/meta?entityType=${entityType}`
-    : `${API_BASE_URL}/api/import/meta?entityType=${entityType}`
+  // API_BASE_URL уже должен содержать /api (из-за setGlobalPrefix в main.ts)
+  // Но на всякий случай проверяем и добавляем если нужно
+  let url = `${API_BASE_URL}/import/meta?entityType=${entityType}`
+  if (!API_BASE_URL.includes('/api')) {
+    url = `${API_BASE_URL}/api/import/meta?entityType=${entityType}`
+  }
   
-  console.log('Fetching import meta from:', url)
+  console.log('Fetching import meta from:', url, 'API_BASE_URL:', API_BASE_URL)
   
   const response = await fetch(url, {
     method: 'GET',
@@ -86,10 +88,11 @@ export async function autoMapColumns(
     throw new Error('Not authenticated')
   }
 
-  // Убеждаемся, что URL правильный (добавляем /api если нужно)
-  const url = API_BASE_URL.endsWith('/api') 
-    ? `${API_BASE_URL}/import/auto-map?entityType=${entityType}`
-    : `${API_BASE_URL}/api/import/auto-map?entityType=${entityType}`
+  // API_BASE_URL уже должен содержать /api
+  let url = `${API_BASE_URL}/import/auto-map?entityType=${entityType}`
+  if (!API_BASE_URL.includes('/api')) {
+    url = `${API_BASE_URL}/api/import/auto-map?entityType=${entityType}`
+  }
   
   console.log('Auto-mapping columns:', url)
   
@@ -129,10 +132,11 @@ export async function importContacts(
   formData.append('mapping', JSON.stringify(mapping))
   formData.append('delimiter', delimiter)
 
-  // Убеждаемся, что URL правильный (добавляем /api если нужно)
-  const url = API_BASE_URL.endsWith('/api') 
-    ? `${API_BASE_URL}/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
-    : `${API_BASE_URL}/api/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
+  // API_BASE_URL уже должен содержать /api
+  let url = `${API_BASE_URL}/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
+  if (!API_BASE_URL.includes('/api')) {
+    url = `${API_BASE_URL}/api/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
+  }
   
   const response = await fetch(url, {
     method: 'POST',
@@ -169,10 +173,11 @@ export async function importDeals(
   formData.append('mapping', JSON.stringify(mapping))
   formData.append('delimiter', delimiter)
 
-  // Убеждаемся, что URL правильный (добавляем /api если нужно)
-  const url = API_BASE_URL.endsWith('/api') 
-    ? `${API_BASE_URL}/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
-    : `${API_BASE_URL}/api/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
+  // API_BASE_URL уже должен содержать /api
+  let url = `${API_BASE_URL}/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
+  if (!API_BASE_URL.includes('/api')) {
+    url = `${API_BASE_URL}/api/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
+  }
   
   const response = await fetch(url, {
     method: 'POST',
