@@ -5,6 +5,7 @@
     "tasks": "Задачи",
     "contacts": "Контакты",
     "companies": "Компании",
+    "messages": "Сообщения",
     "analytics": "Аналитика",
     "logs": "Логи",
     "importExport": "Импорт/Экспорт",
@@ -702,6 +703,15 @@
     "failedToUpdate": "Не удалось обновить {{item}}",
     "failedToDelete": "Не удалось удалить {{item}}",
     "failedToLoad": "Не удалось загрузить {{item}}"
+  },
+  "chat": {
+    "messages": "Сообщения",
+    "searchThreads": "Поиск диалогов...",
+    "noThreads": "Пока нет диалогов",
+    "noMessages": "Пока нет сообщений. Начните общение!",
+    "threadNotFound": "Диалог не найден",
+    "selectThread": "Выберите диалог для начала общения",
+    "typeMessage": "Введите сообщение..."
   }
 }
 
