@@ -12,8 +12,9 @@ import {
 import { Button } from '@/components/ui/button'
 
 interface ColumnMappingFormProps {
-  importedColumns: string[]
-  onImport: (mapping: Record<string, string>) => void
+  importedColumns?: string[]
+  columns?: string[] // Альтернативное имя для совместимости
+  onImport?: (mapping: Record<string, string>) => void
 }
 
 const CRM_FIELDS = [
@@ -29,12 +30,23 @@ const CRM_FIELDS = [
   { value: 'skip', label: '— Skip this column —' },
 ]
 
-export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFormProps) {
+export function ColumnMappingForm({ 
+  importedColumns, 
+  columns,
+  onImport 
+}: ColumnMappingFormProps) {
+  // Поддержка обоих вариантов props для совместимости
+  const columnsToUse = importedColumns || columns || []
+  
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const handleMappingChange = (importedCol: string, crmField: string) => {
-    setMapping((prev) => ({ ...prev, [importedCol]: crmField }))
+    try {
+      setMapping((prev) => ({ ...prev, [importedCol]: crmField }))
+    } catch (err) {
+      console.error('Error in handleMappingChange:', err)
+    }
   }
 
   const validateMapping = () => {
@@ -53,9 +65,18 @@ export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFo
   }
 
   const handleImport = () => {
-    if (validateMapping()) {
+    if (validateMapping() && onImport) {
       onImport(mapping)
     }
+  }
+
+  // Если нет колонок, показываем сообщение
+  if (!columnsToUse || columnsToUse.length === 0) {
+    return (
+      <div className="p-4 border border-border rounded-lg">
+        <p className="text-sm text-muted-foreground">No columns to map</p>
+      </div>
+    )
   }
 
   return (
@@ -68,9 +89,9 @@ export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFo
       </div>
 
       <div className="space-y-3">
-        {importedColumns.map((column) => (
+        {columnsToUse.map((column, index) => (
           <div
-            key={column}
+            key={`${column}-${index}`}
             className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/10"
           >
             <div className="flex-1 min-w-0">
@@ -82,7 +103,13 @@ export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFo
             <div className="flex-1">
               <Select
                 value={mapping[column] || ''}
-                onValueChange={(value) => handleMappingChange(column, value)}
+                onValueChange={(value) => {
+                  try {
+                    handleMappingChange(column, value)
+                  } catch (err) {
+                    console.error('Error in Select onValueChange:', err)
+                  }
+                }}
               >
                 <SelectTrigger className="h-9 bg-card border-border">
                   <SelectValue placeholder="Select field..." />
@@ -114,12 +141,14 @@ export function ColumnMappingForm({ importedColumns, onImport }: ColumnMappingFo
         </div>
       )}
 
-      <Button
-        onClick={handleImport}
-        className="w-full bg-[#6B8AFF] hover:bg-[#5A7AEF] text-white"
-      >
-        Import Data
-      </Button>
+      {onImport && (
+        <Button
+          onClick={handleImport}
+          className="w-full bg-[#6B8AFF] hover:bg-[#5A7AEF] text-white"
+        >
+          Import Data
+        </Button>
+      )}
     </div>
   )
 }
