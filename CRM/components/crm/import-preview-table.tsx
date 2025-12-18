@@ -3,8 +3,9 @@
 import { type ParsedCsvRow } from '@/lib/utils/csv-parser'
 
 interface ImportPreviewTableProps {
-  headers: string[]
-  rows: ParsedCsvRow[]
+  headers?: string[]
+  rows?: ParsedCsvRow[]
+  data?: any[] // Для обратной совместимости со старым API
   fileName?: string
   totalRows?: number
 }
@@ -12,14 +13,37 @@ interface ImportPreviewTableProps {
 export function ImportPreviewTable({ 
   headers, 
   rows, 
+  data, // Для обратной совместимости
   fileName,
   totalRows 
 }: ImportPreviewTableProps) {
-  if (!headers || headers.length === 0 || !rows || rows.length === 0) return null
+  // Поддержка старого API (data вместо headers/rows)
+  let finalHeaders: string[] = []
+  let finalRows: ParsedCsvRow[] = []
 
-  const previewRows = rows.slice(0, 20)
+  if (data && data.length > 0) {
+    // Старый формат: data - массив объектов
+    finalHeaders = Object.keys(data[0] || {})
+    finalRows = data.map((row) => {
+      const parsedRow: ParsedCsvRow = {}
+      finalHeaders.forEach((header) => {
+        parsedRow[header] = String(row[header] || '')
+      })
+      return parsedRow
+    })
+  } else if (headers && rows) {
+    // Новый формат: headers и rows отдельно
+    finalHeaders = headers
+    finalRows = rows
+  }
+
+  if (!finalHeaders || finalHeaders.length === 0 || !finalRows || finalRows.length === 0) {
+    return null
+  }
+
+  const previewRows = finalRows.slice(0, 20)
   const displayedCount = previewRows.length
-  const actualTotal = totalRows || rows.length
+  const actualTotal = totalRows || finalRows.length
 
   return (
     <div className="space-y-3">
@@ -40,9 +64,9 @@ export function ImportPreviewTable({
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <tr className="border-b border-border">
-                {headers.map((header, idx) => (
+                {finalHeaders.map((header, idx) => (
                   <th
-                    key={idx}
+                    key={`header-${idx}-${header}`}
                     className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap"
                   >
                     {header}
@@ -53,14 +77,14 @@ export function ImportPreviewTable({
             <tbody>
               {previewRows.map((row, rowIdx) => (
                 <tr
-                  key={rowIdx}
+                  key={`row-${rowIdx}`}
                   className="border-b border-border last:border-0 hover:bg-muted/10 transition-colors"
                 >
-                  {headers.map((header, colIdx) => (
+                  {finalHeaders.map((header, colIdx) => (
                     <td 
-                      key={colIdx} 
+                      key={`cell-${rowIdx}-${colIdx}`} 
                       className="px-4 py-2 text-foreground whitespace-nowrap max-w-[200px] overflow-hidden text-ellipsis"
-                      title={row[header]}
+                      title={String(row[header] || '')}
                     >
                       {row[header] || <span className="text-muted-foreground italic">—</span>}
                     </td>
