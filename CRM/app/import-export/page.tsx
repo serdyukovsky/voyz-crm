@@ -296,35 +296,37 @@ function ImportExportContent() {
 
             {/* Step 3: Mapping */}
             {currentStep === 'mapping' && csvHeaders.length > 0 && (
-              <div className="space-y-4">
-                <AutoMappingForm
-                  csvColumns={csvHeaders}
-                  entityType={entityType}
-                  onMappingChange={handleMappingChange}
-                  initialMapping={mapping}
-                />
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentStep('preview')}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    onClick={handleDryRun}
-                    disabled={!isMappingValid() || isDryRunLoading}
-                  >
-                    {isDryRunLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Checking...
-                      </>
-                    ) : (
-                      'Check Import'
-                    )}
-                  </Button>
+              <ErrorBoundary>
+                <div className="space-y-4">
+                  <AutoMappingForm
+                    csvColumns={csvHeaders}
+                    entityType={entityType}
+                    onMappingChange={handleMappingChange}
+                    initialMapping={mapping}
+                  />
+                  <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('preview')}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleDryRun}
+                      disabled={!isMappingValid() || isDryRunLoading}
+                    >
+                      {isDryRunLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        'Check Import'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </ErrorBoundary>
             )}
 
             {/* Step 4: Dry-run Summary */}

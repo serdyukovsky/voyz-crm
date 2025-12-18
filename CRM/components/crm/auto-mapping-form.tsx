@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { getImportMeta, autoMapColumns, type ImportField, type AutoMappingResult } from '@/lib/api/import'
 import { cn } from '@/lib/utils'
+import { ErrorBoundary } from './error-boundary'
 
 interface AutoMappingFormProps {
   csvColumns: string[]
@@ -79,23 +80,38 @@ export function AutoMappingForm({
   }
 
   const performAutoMapping = async () => {
+    if (!csvColumns || csvColumns.length === 0) {
+      return
+    }
+
     setIsLoadingAutoMap(true)
     try {
       const results = await autoMapColumns(csvColumns, entityType)
-      setAutoMappings(results)
+      if (results && Array.isArray(results)) {
+        setAutoMappings(results)
+      }
     } catch (err) {
       console.error('Auto-mapping failed:', err)
       // Не показываем ошибку пользователю, просто не применяем auto-mapping
+      setAutoMappings([])
     } finally {
       setIsLoadingAutoMap(false)
     }
   }
 
   const handleMappingChange = (csvColumn: string, crmField: string) => {
-    setMapping((prev) => {
-      const newMapping = { ...prev, [csvColumn]: crmField }
-      return newMapping
-    })
+    try {
+      if (!csvColumn || typeof csvColumn !== 'string') {
+        console.warn('Invalid csvColumn:', csvColumn)
+        return
+      }
+      setMapping((prev) => {
+        const newMapping = { ...prev, [csvColumn]: crmField }
+        return newMapping
+      })
+    } catch (err) {
+      console.error('Error in handleMappingChange:', err)
+    }
   }
 
   const getAutoMapping = (columnName: string): AutoMappingResult | undefined => {
@@ -130,8 +146,24 @@ export function AutoMappingForm({
           <div>
             <p className="text-sm font-medium text-destructive">Error loading fields</p>
             <p className="text-xs text-destructive/80 mt-1">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadFields}
+              className="mt-3"
+            >
+              Retry
+            </Button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (!csvColumns || csvColumns.length === 0) {
+    return (
+      <div className="p-4 border border-border rounded-lg">
+        <p className="text-sm text-muted-foreground">No columns to map</p>
       </div>
     )
   }
@@ -154,7 +186,11 @@ export function AutoMappingForm({
       </div>
 
       <div className="space-y-3">
-        {csvColumns.map((column) => {
+        {csvColumns.map((column, index) => {
+          if (!column || typeof column !== 'string') {
+            return null
+          }
+
           const autoMapping = getAutoMapping(column)
           const currentMapping = mapping[column] || ''
           const isAutoMapped = autoMapping?.suggestedField && autoMapping.confidence >= 0.6
@@ -162,7 +198,7 @@ export function AutoMappingForm({
 
           return (
             <div
-              key={column}
+              key={`${column}-${index}`}
               className={cn(
                 "flex items-center gap-3 p-3 border rounded-lg transition-colors",
                 isCurrentAutoMapped && autoMapping?.confidence === 1.0
@@ -196,7 +232,13 @@ export function AutoMappingForm({
               <div className="flex-1 min-w-0">
                 <Select
                   value={currentMapping}
-                  onValueChange={(value) => handleMappingChange(column, value)}
+                  onValueChange={(value) => {
+                    try {
+                      handleMappingChange(column, value)
+                    } catch (err) {
+                      console.error('Error changing mapping:', err)
+                    }
+                  }}
                 >
                   <SelectTrigger className="h-9 bg-card border-border">
                     <SelectValue placeholder="Select field..." />
