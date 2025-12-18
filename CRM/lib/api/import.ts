@@ -51,7 +51,14 @@ export async function getImportMeta(entityType: 'contact' | 'deal'): Promise<Imp
     throw new Error('Not authenticated')
   }
 
-  const response = await fetch(`${API_BASE_URL}/import/meta?entityType=${entityType}`, {
+  // Убеждаемся, что URL правильный (добавляем /api если нужно)
+  const url = API_BASE_URL.endsWith('/api') 
+    ? `${API_BASE_URL}/import/meta?entityType=${entityType}`
+    : `${API_BASE_URL}/api/import/meta?entityType=${entityType}`
+  
+  console.log('Fetching import meta from:', url)
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -79,7 +86,14 @@ export async function autoMapColumns(
     throw new Error('Not authenticated')
   }
 
-  const response = await fetch(`${API_BASE_URL}/import/auto-map?entityType=${entityType}`, {
+  // Убеждаемся, что URL правильный (добавляем /api если нужно)
+  const url = API_BASE_URL.endsWith('/api') 
+    ? `${API_BASE_URL}/import/auto-map?entityType=${entityType}`
+    : `${API_BASE_URL}/api/import/auto-map?entityType=${entityType}`
+  
+  console.log('Auto-mapping columns:', url)
+  
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -115,16 +129,18 @@ export async function importContacts(
   formData.append('mapping', JSON.stringify(mapping))
   formData.append('delimiter', delimiter)
 
-  const response = await fetch(
-    `${API_BASE_URL}/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+  // Убеждаемся, что URL правильный (добавляем /api если нужно)
+  const url = API_BASE_URL.endsWith('/api') 
+    ? `${API_BASE_URL}/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
+    : `${API_BASE_URL}/api/import/contacts?dryRun=${dryRun ? 'true' : 'false'}`
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
     },
-  )
+    body: formData,
+  })
 
   if (!response.ok) {
     const error = await response.text()
@@ -153,16 +169,18 @@ export async function importDeals(
   formData.append('mapping', JSON.stringify(mapping))
   formData.append('delimiter', delimiter)
 
-  const response = await fetch(
-    `${API_BASE_URL}/import/deals?dryRun=${dryRun ? 'true' : 'false'}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+  // Убеждаемся, что URL правильный (добавляем /api если нужно)
+  const url = API_BASE_URL.endsWith('/api') 
+    ? `${API_BASE_URL}/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
+    : `${API_BASE_URL}/api/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
     },
-  )
+    body: formData,
+  })
 
   if (!response.ok) {
     const error = await response.text()
