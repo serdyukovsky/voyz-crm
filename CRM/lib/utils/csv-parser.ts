@@ -19,60 +19,94 @@ export async function parseCsvFile(
   maxRows?: number,
 ): Promise<{ headers: string[]; rows: ParsedCsvRow[] }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+    try {
+      if (!file) {
+        reject(new Error('File is required'))
+        return
+      }
 
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split(/\r?\n/).filter((line) => line.trim())
+      const reader = new FileReader()
 
-        if (lines.length === 0) {
-          reject(new Error('CSV file is empty'))
-          return
-        }
-
-        // Парсинг заголовков
-        const headerLine = lines[0]
-        const headers = headerLine.split(delimiter).map((h) => h.trim().replace(/^"|"$/g, ''))
-
-        if (headers.length === 0) {
-          reject(new Error('CSV file has no headers'))
-          return
-        }
-
-        // Парсинг строк данных
-        const dataLines = maxRows ? lines.slice(1, maxRows + 1) : lines.slice(1)
-        const rows: ParsedCsvRow[] = []
-
-        for (const line of dataLines) {
-          if (!line.trim()) continue
-
-          // Простой парсинг CSV (поддерживает кавычки)
-          const values = parseCsvLine(line, delimiter)
-          
-          if (values.length !== headers.length) {
-            // Пропускаем строки с неверным количеством колонок
-            continue
+      reader.onload = (e) => {
+        try {
+          if (!e.target?.result) {
+            reject(new Error('Failed to read file content'))
+            return
           }
 
-          const row: ParsedCsvRow = {}
-          headers.forEach((header, index) => {
-            row[header] = values[index]?.trim() || ''
-          })
-          rows.push(row)
+          const text = e.target.result as string
+          
+          if (!text || text.trim().length === 0) {
+            reject(new Error('CSV file is empty'))
+            return
+          }
+
+          const lines = text.split(/\r?\n/).filter((line) => line.trim())
+
+          if (lines.length === 0) {
+            reject(new Error('CSV file has no content'))
+            return
+          }
+
+          // Парсинг заголовков
+          const headerLine = lines[0]
+          if (!headerLine || headerLine.trim().length === 0) {
+            reject(new Error('CSV file has no header row'))
+            return
+          }
+
+          const headers = parseCsvLine(headerLine, delimiter).map((h) => h.trim().replace(/^"|"$/g, ''))
+
+          if (headers.length === 0) {
+            reject(new Error('CSV file has no headers'))
+            return
+          }
+
+          // Парсинг строк данных
+          const dataLines = maxRows ? lines.slice(1, maxRows + 1) : lines.slice(1)
+          const rows: ParsedCsvRow[] = []
+
+          for (const line of dataLines) {
+            if (!line.trim()) continue
+
+            // Простой парсинг CSV (поддерживает кавычки)
+            const values = parseCsvLine(line, delimiter)
+            
+            if (values.length !== headers.length) {
+              // Пропускаем строки с неверным количеством колонок
+              console.warn(`Skipping row with ${values.length} columns (expected ${headers.length}):`, line.substring(0, 50))
+              continue
+            }
+
+            const row: ParsedCsvRow = {}
+            headers.forEach((header, index) => {
+              row[header] = values[index]?.trim() || ''
+            })
+            rows.push(row)
+          }
+
+          resolve({ headers, rows })
+        } catch (error) {
+          console.error('Error parsing CSV:', error)
+          reject(error instanceof Error ? error : new Error('Failed to parse CSV file'))
         }
-
-        resolve({ headers, rows })
-      } catch (error) {
-        reject(error)
       }
-    }
 
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'))
-    }
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error)
+        reject(new Error('Failed to read file'))
+      }
 
-    reader.readAsText(file)
+      reader.onabort = () => {
+        reject(new Error('File reading was aborted'))
+      }
+
+      // Читаем файл с кодировкой UTF-8
+      reader.readAsText(file, 'UTF-8')
+    } catch (error) {
+      console.error('Error setting up file reader:', error)
+      reject(error instanceof Error ? error : new Error('Failed to process file'))
+    }
   })
 }
 
