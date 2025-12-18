@@ -70,10 +70,18 @@ export function AutoMappingForm({
     setIsLoading(true)
     setError(null)
     try {
+      console.log('Loading import meta for entity type:', entityType)
       const meta = await getImportMeta(entityType)
+      console.log('Import meta loaded:', meta)
       setCrmFields(meta.fields)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load fields')
+      console.error('Error loading import meta:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load fields'
+      setError(errorMessage)
+      // Показываем более детальную ошибку
+      if (err instanceof Error && err.message.includes('fetch')) {
+        setError('Network error: Failed to fetch. Please check your connection and API URL.')
+      }
     } finally {
       setIsLoading(false)
     }
