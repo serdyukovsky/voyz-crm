@@ -35,6 +35,11 @@ export function LoginForm() {
         localStorage.setItem('refresh_token', response.refresh_token)
       }
       localStorage.setItem('user', JSON.stringify(response.user))
+      // Also save user ID separately for easy access
+      if (response.user?.id) {
+        localStorage.setItem('user_id', response.user.id)
+        localStorage.setItem('userId', response.user.id)
+      }
       
       // Redirect to home page
       navigate("/")

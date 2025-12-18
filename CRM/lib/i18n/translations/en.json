@@ -5,6 +5,7 @@
     "tasks": "Tasks",
     "contacts": "Contacts",
     "companies": "Companies",
+    "messages": "Messages",
     "analytics": "Analytics",
     "logs": "Logs",
     "importExport": "Import/Export",
@@ -588,6 +589,15 @@
     "failedToUpdate": "Failed to update {{item}}",
     "failedToDelete": "Failed to delete {{item}}",
     "failedToLoad": "Failed to load {{item}}"
+  },
+  "chat": {
+    "messages": "Messages",
+    "searchThreads": "Search threads...",
+    "noThreads": "No threads yet",
+    "noMessages": "No messages yet. Start the conversation!",
+    "threadNotFound": "Thread not found",
+    "selectThread": "Select a thread to start chatting",
+    "typeMessage": "Type a message..."
   }
 }
 

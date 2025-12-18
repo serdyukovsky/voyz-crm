@@ -207,6 +207,12 @@ export class RealtimeGateway
     }
   }
 
+  // Chat events
+  emitChatMessage(threadId: string, message: any) {
+    this.server.to(`thread:${threadId}`).emit('chat.message', { threadId, message });
+    this.server.emit('chat.message', { threadId, message }); // Global event for notifications
+  }
+
   // Subscribe to deal updates
   @SubscribeMessage('subscribe:deal')
   handleSubscribeDeal(
@@ -281,6 +287,25 @@ export class RealtimeGateway
   ) {
     client.leave(`company:${data.companyId}`);
     return { event: 'unsubscribed', companyId: data.companyId };
+  }
+
+  // Subscribe to chat thread updates
+  @SubscribeMessage('subscribe:thread')
+  handleSubscribeThread(
+    @MessageBody() data: { threadId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`thread:${data.threadId}`);
+    return { event: 'subscribed', threadId: data.threadId };
+  }
+
+  @SubscribeMessage('unsubscribe:thread')
+  handleUnsubscribeThread(
+    @MessageBody() data: { threadId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.leave(`thread:${data.threadId}`);
+    return { event: 'unsubscribed', threadId: data.threadId };
   }
 }
 

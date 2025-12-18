@@ -24,6 +24,7 @@ export default defineConfig({
   // Кеширование для ускорения сборки
   cacheDir: 'node_modules/.vite',
   server: {
+    host: '0.0.0.0', // Слушать на всех интерфейсах для codespace
     port: 3000,
     open: true,
     // Оптимизация hot-reload
