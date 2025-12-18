@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { SidebarProvider, useSidebar } from "./sidebar-context"
 import { SearchProvider } from "./search-context"
+import { ChatProvider } from "./chat-context"
 import { QuickSearch } from "@/components/shared/quick-search"
 import { cn } from "@/lib/utils"
 
@@ -38,7 +39,9 @@ export function Layout({ children }: LayoutProps) {
   return (
     <SidebarProvider>
       <SearchProvider>
-        <LayoutContent>{children}</LayoutContent>
+        <ChatProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </ChatProvider>
       </SearchProvider>
     </SidebarProvider>
   )

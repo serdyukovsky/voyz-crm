@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native"]
 }
 
@@ -119,32 +119,32 @@ enum FileType {
 // ============================================
 
 model User {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  password        String
-  firstName       String
-  lastName        String
-  avatar          String?
-  phone           String?
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String
+  firstName        String
+  lastName         String
+  avatar           String?
+  phone            String?
   telegramUsername String?
-  role            UserRole @default(MANAGER)
-  isActive        Boolean  @default(true)
-  lastLoginAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  role             UserRole  @default(MANAGER)
+  isActive         Boolean   @default(true)
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  deals         Deal[]            @relation("DealCreator")
-  assignedDeals Deal[]            @relation("DealAssignee")
-  tasks         Task[]            @relation("TaskCreator")
-  assignedTasks Task[]            @relation("TaskAssignee")
+  deals         Deal[]           @relation("DealCreator")
+  assignedDeals Deal[]           @relation("DealAssignee")
+  tasks         Task[]           @relation("TaskCreator")
+  assignedTasks Task[]           @relation("TaskAssignee")
   comments      Comment[]
   activities    Activity[]
   messages      Message[]
   calls         Call[]
   permissions   UserPermission[]
   refreshTokens RefreshToken[]
-  files         File[]            @relation("FileUploader")
+  files         File[]           @relation("FileUploader")
   importJobs    ImportJob[]
   exportJobs    ExportJob[]
 
@@ -154,12 +154,12 @@ model User {
 }
 
 model UserPermission {
-  id        String   @id @default(uuid())
-  userId    String
-  permission String  // e.g., "deals.delete", "fields.manage"
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String
+  permission String // e.g., "deals.delete", "fields.manage"
+  createdAt  DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permission])
   @@index([userId])
@@ -173,7 +173,7 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([userId])
@@ -197,28 +197,28 @@ model Pipeline {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  stages      Stage[]
-  deals       Deal[]
+  stages Stage[]
+  deals  Deal[]
 
   @@index([isDefault])
   @@map("pipelines")
 }
 
 model Stage {
-  id          String   @id @default(uuid())
-  pipelineId  String
-  name        String
-  order       Int
-  color       String   @default("#6B7280")
-  isDefault   Boolean  @default(false)
-  isClosed    Boolean  @default(false) // For closed-won/lost stages
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  pipelineId String
+  name       String
+  order      Int
+  color      String   @default("#6B7280")
+  isDefault  Boolean  @default(false)
+  isClosed   Boolean  @default(false) // For closed-won/lost stages
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Relations
-  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  deals       Deal[]
-  triggers    StageTrigger[]
+  pipeline Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+  triggers StageTrigger[]
 
   @@unique([pipelineId, order])
   @@index([pipelineId])
@@ -228,14 +228,14 @@ model Stage {
 model StageTrigger {
   id          String   @id @default(uuid())
   stageId     String
-  triggerType String   // "on_enter", "on_exit", "on_create"
-  actionType  String   // "create_task", "send_email", "webhook", etc.
-  actionData  Json?    // Action-specific configuration
+  triggerType String // "on_enter", "on_exit", "on_create"
+  actionType  String // "create_task", "send_email", "webhook", etc.
+  actionData  Json? // Action-specific configuration
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  stage       Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
   @@index([stageId])
   @@map("stage_triggers")
@@ -246,35 +246,39 @@ model StageTrigger {
 // ============================================
 
 model Contact {
-  id        String   @id @default(uuid())
-  fullName  String
-  email     String?
-  phone     String?
-  position  String?
-  companyName String? // For now, later can be linked to Company
-  companyId String?
-  tags      String[] @default([])
-  notes     String?
-  social    Json?    // { instagram, telegram, whatsapp, vk }
+  id                 String   @id @default(uuid())
+  fullName           String
+  email              String?
+  phone              String?
+  position           String?
+  companyName        String? // For now, later can be linked to Company
+  companyId          String?
+  tags               String[] @default([])
+  notes              String?
+  social             Json? // { instagram, telegram, whatsapp, vk }
   // New fields
-  link      String?  // Ссылка
-  subscriberCount String? // Кол-во подписчиков
-  directions String[] @default([]) // Направление (множественный выбор)
-  contactMethods String[] @default([]) // Способ связи: Whatsapp, Telegram, Direct
+  link               String? // Ссылка
+  subscriberCount    String? // Кол-во подписчиков
+  directions         String[] @default([]) // Направление (множественный выбор)
+  contactMethods     String[] @default([]) // Способ связи: Whatsapp, Telegram, Direct
   websiteOrTgChannel String? // Сайт, тг канал
-  contactInfo String? // Контакт (номер телефона или никнейм в телеграме)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  contactInfo        String? // Контакт (номер телефона или никнейм в телеграме)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relations
-  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  deals     Deal[]
-  tasks     Task[]
-  comments  Comment[]
-  activities Activity[]
-  files     File[]
+  company           Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  deals             Deal[]
+  tasks             Task[]
+  comments          Comment[]
+  activities        Activity[]
+  files             File[]
   customFieldValues CustomFieldValue[]
 
+  // Unique constraints for CSV import integrity
+  // Note: @@unique on nullable fields allows multiple NULL values but enforces uniqueness for non-NULL values
+  @@unique([email]) // Restored for CSV import: prevents duplicate emails
+  @@unique([phone]) // Restored for CSV import: prevents duplicate phones
   @@index([email])
   @@index([phone])
   @@index([companyName])
@@ -287,12 +291,12 @@ model Contact {
 
 model Company {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique // Restored for CSV import: prevents duplicate company names
   website   String?
   industry  String?
   email     String?
   phone     String?
-  social    Json?    // { instagram, telegram, whatsapp, vk, linkedin }
+  social    Json? // { instagram, telegram, whatsapp, vk, linkedin }
   address   String?
   notes     String?
   employees Int?
@@ -300,9 +304,12 @@ model Company {
   updatedAt DateTime @updatedAt
 
   // Relations
-  contacts  Contact[]
-  deals     Deal[]
+  contacts Contact[]
+  deals    Deal[]
 
+  // Unique constraint for CSV import integrity
+  // Note: @@unique on nullable fields allows multiple NULL values but enforces uniqueness for non-NULL values
+  @@unique([email]) // Restored for CSV import: prevents duplicate emails
   @@index([name])
   @@index([industry])
   @@index([email])
@@ -315,46 +322,49 @@ model Company {
 // ============================================
 
 model Deal {
-  id              String    @id @default(uuid())
-  number          String    @unique
-  title           String
-  amount          Decimal   @default(0) @db.Decimal(12, 2)
-  budget          Decimal?  @db.Decimal(12, 2)
-  pipelineId      String
-  stageId         String
-  assignedToId    String?
-  createdById     String
-  contactId       String?
-  companyId       String?
-  expectedCloseAt DateTime?
-  closedAt        DateTime?
-  description     String?
-  tags            String[]  @default([])
-  rejectionReasons String[] @default([]) // Причина отказа (множественный выбор)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  number           String    @unique
+  title            String
+  amount           Decimal   @default(0) @db.Decimal(12, 2)
+  budget           Decimal?  @db.Decimal(12, 2)
+  pipelineId       String
+  stageId          String
+  assignedToId     String?
+  createdById      String
+  contactId        String?
+  companyId        String?
+  expectedCloseAt  DateTime?
+  closedAt         DateTime?
+  description      String?
+  tags             String[]  @default([])
+  rejectionReasons String[]  @default([]) // Причина отказа (множественный выбор)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  pipeline        Pipeline  @relation(fields: [pipelineId], references: [id])
-  stage           Stage     @relation(fields: [stageId], references: [id])
-  createdBy       User      @relation("DealCreator", fields: [createdById], references: [id])
-  assignedTo      User?     @relation("DealAssignee", fields: [assignedToId], references: [id])
-  contact         Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  tasks           Task[]
-  comments        Comment[]
-  activities      Activity[]
-  files           File[]
+  pipeline          Pipeline           @relation(fields: [pipelineId], references: [id])
+  stage             Stage              @relation(fields: [stageId], references: [id])
+  createdBy         User               @relation("DealCreator", fields: [createdById], references: [id])
+  assignedTo        User?              @relation("DealAssignee", fields: [assignedToId], references: [id])
+  contact           Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  company           Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  tasks             Task[]
+  comments          Comment[]
+  activities        Activity[]
+  files             File[]
   customFieldValues CustomFieldValue[]
-  messages        Message[]
-  calls           Call[]
+  messages          Message[]
+  calls             Call[]
 
   @@index([pipelineId])
   @@index([stageId])
+  @@index([pipelineId, stageId]) // Restored composite index for CSV import: optimizes queries filtering by pipeline and stage
   @@index([assignedToId])
   @@index([createdById])
   @@index([contactId])
+  @@index([companyId]) // Restored for CSV import: optimizes queries filtering by company
   @@index([createdAt])
+  @@index([updatedAt]) // Restored for CSV import: optimizes sorting and filtering by update date
   @@map("deals")
 }
 
@@ -363,24 +373,24 @@ model Deal {
 // ============================================
 
 model CustomField {
-  id          String          @id @default(uuid())
-  name        String
-  key         String          @unique // Unique identifier for the field
-  type        CustomFieldType
-  entityType  String          // "deal", "contact", "company"
-  group       String?         // For grouping fields
-  order       Int             @default(0)
-  isRequired  Boolean         @default(false)
-  isUnique    Boolean         @default(false)
-  defaultValue Json?          // Default value based on type
-  options     Json?           // For select/multi-select: array of options
-  description String?
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String          @id @default(uuid())
+  name         String
+  key          String          @unique // Unique identifier for the field
+  type         CustomFieldType
+  entityType   String // "deal", "contact", "company"
+  group        String? // For grouping fields
+  order        Int             @default(0)
+  isRequired   Boolean         @default(false)
+  isUnique     Boolean         @default(false)
+  defaultValue Json? // Default value based on type
+  options      Json? // For select/multi-select: array of options
+  description  String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   // Relations
-  values      CustomFieldValue[]
+  values CustomFieldValue[]
 
   @@unique([key, entityType])
   @@index([entityType, isActive])
@@ -388,20 +398,20 @@ model CustomField {
 }
 
 model CustomFieldValue {
-  id            String       @id @default(uuid())
+  id            String   @id @default(uuid())
   customFieldId String
   dealId        String?
   contactId     String?
-  entityId      String?      // Generic entity ID for future extensions
-  entityType    String?      // "deal", "contact"
-  value         Json         // Flexible value storage
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  entityId      String? // Generic entity ID for future extensions
+  entityType    String? // "deal", "contact"
+  value         Json // Flexible value storage
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  customField   CustomField  @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
-  deal          Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  deal        Deal?       @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact     Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([customFieldId, dealId])
   @@unique([customFieldId, contactId])
@@ -417,30 +427,30 @@ model CustomFieldValue {
 // ============================================
 
 model Task {
-  id          String       @id @default(uuid())
-  dealId      String?
-  contactId   String?
-  title       String
-  description String?
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  type        TaskType?    @default(OTHER)
-  deadline    DateTime?    // Renamed from dueDate
-  completedAt DateTime?
-  result      String?      // Task result/outcome
-  createdById String
+  id           String       @id @default(uuid())
+  dealId       String?
+  contactId    String?
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  type         TaskType?    @default(OTHER)
+  deadline     DateTime? // Renamed from dueDate
+  completedAt  DateTime?
+  result       String? // Task result/outcome
+  createdById  String
   assignedToId String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Relations
-  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id])
-  assignedTo User          @relation("TaskAssignee", fields: [assignedToId], references: [id])
-  activities  Activity[]
-  comments    Comment[]
-  files       File[]
+  deal       Deal?      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  contact    Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdBy  User       @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedTo User       @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  activities Activity[]
+  comments   Comment[]
+  files      File[]
 
   @@index([dealId])
   @@index([contactId])
@@ -467,11 +477,11 @@ model Comment {
   updatedAt DateTime    @updatedAt
 
   // Relations
-  deal      Deal?       @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  task      Task?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  contact   Contact?    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id])
-  files     File[]
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id])
+  files   File[]
 
   @@index([dealId])
   @@index([taskId])
@@ -492,16 +502,17 @@ model Activity {
   taskId    String?
   contactId String?
   userId    String
-  payload   Json?        // Flexible metadata for different activity types
+  payload   Json? // Flexible metadata for different activity types
   createdAt DateTime     @default(now())
 
   // Relations
-  deal      Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  task      Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id])
 
   @@index([dealId])
+  @@index([dealId, createdAt]) // Restored composite index for CSV import: optimizes queries filtering by deal and sorting by date
   @@index([taskId])
   @@index([contactId])
   @@index([userId])
@@ -515,29 +526,29 @@ model Activity {
 // ============================================
 
 model File {
-  id          String   @id @default(uuid())
-  dealId      String?
-  taskId      String?
-  contactId   String?
-  commentId   String?
-  fileName    String
+  id           String   @id @default(uuid())
+  dealId       String?
+  taskId       String?
+  contactId    String?
+  commentId    String?
+  fileName     String
   originalName String
-  mime        String   // Renamed from mimeType
-  size        Int      // Size in bytes
-  entityType  String   // "deal", "task", "contact", "comment"
-  entityId    String?  // Generic entity ID
-  url         String   // Storage URL or path
+  mime         String // Renamed from mimeType
+  size         Int // Size in bytes
+  entityType   String // "deal", "task", "contact", "comment"
+  entityId     String? // Generic entity ID
+  url          String // Storage URL or path
   thumbnailUrl String? // For images
   uploadedById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  uploadedBy  User     @relation("FileUploader", fields: [uploadedById], references: [id])
+  deal       Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task       Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  contact    Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation("FileUploader", fields: [uploadedById], references: [id])
 
   @@index([dealId])
   @@index([taskId])
@@ -555,21 +566,21 @@ model File {
 model Message {
   id                String           @id @default(uuid())
   dealId            String?
-  externalMessageId String           // ID from external system
+  externalMessageId String // ID from external system
   integrationType   IntegrationType
   direction         MessageDirection
-  sender            String           // Phone, email, username, etc.
-  recipient         String           // Phone, email, username, etc.
+  sender            String // Phone, email, username, etc.
+  recipient         String // Phone, email, username, etc.
   content           String
-  attachments       Json?            // Array of attachment objects
-  metadata          Json?            // Additional integration-specific data
+  attachments       Json? // Array of attachment objects
+  metadata          Json? // Additional integration-specific data
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
   // Relations
-  deal              Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  userId            String?
-  user              User?            @relation(fields: [userId], references: [id])
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([dealId])
   @@index([externalMessageId, integrationType])
@@ -579,21 +590,21 @@ model Message {
 }
 
 model Call {
-  id            String         @id @default(uuid())
-  dealId        String?
-  userId        String?
-  externalCallId String?       // ID from telephony system
-  phone         String
-  direction     CallDirection
-  duration      Int?           // Duration in seconds
-  recordingUrl  String?
-  status        String?        // answered, missed, busy, etc.
-  metadata      Json?          // Additional call data
-  createdAt     DateTime       @default(now())
+  id             String        @id @default(uuid())
+  dealId         String?
+  userId         String?
+  externalCallId String? // ID from telephony system
+  phone          String
+  direction      CallDirection
+  duration       Int? // Duration in seconds
+  recordingUrl   String?
+  status         String? // answered, missed, busy, etc.
+  metadata       Json? // Additional call data
+  createdAt      DateTime      @default(now())
 
   // Relations
-  deal          Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  user          User?          @relation(fields: [userId], references: [id])
+  deal Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id])
 
   @@index([dealId])
   @@index([phone])
@@ -602,14 +613,14 @@ model Call {
 }
 
 model IntegrationSettings {
-  id          String           @id @default(uuid())
-  type        IntegrationType  @unique
-  credentials Json             // Encrypted credentials
-  enabled     Boolean          @default(false)
-  config      Json?            // Additional configuration
+  id          String          @id @default(uuid())
+  type        IntegrationType @unique
+  credentials Json // Encrypted credentials
+  enabled     Boolean         @default(false)
+  config      Json? // Additional configuration
   webhookUrl  String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   @@map("integration_settings")
 }
@@ -619,22 +630,22 @@ model IntegrationSettings {
 // ============================================
 
 model ImportJob {
-  id          String   @id @default(uuid())
-  fileName    String
-  fileType    String   // "csv", "xlsx"
-  entityType  String   // "contact", "deal", "task"
-  status      String   // "pending", "processing", "completed", "failed"
-  progress    Int      @default(0)
-  totalRows   Int?
-  processedRows Int    @default(0)
-  errors      Json?    // Array of errors
-  mapping     Json?    // Column mapping
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  fileName      String
+  fileType      String // "csv", "xlsx"
+  entityType    String // "contact", "deal", "task"
+  status        String // "pending", "processing", "completed", "failed"
+  progress      Int      @default(0)
+  totalRows     Int?
+  processedRows Int      @default(0)
+  errors        Json? // Array of errors
+  mapping       Json? // Column mapping
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
 
   @@index([status])
   @@index([entityType])
@@ -644,18 +655,18 @@ model ImportJob {
 
 model ExportJob {
   id          String   @id @default(uuid())
-  fileType    String   // "csv", "xlsx"
-  entityType  String   // "deal", "contact", "task"
-  status      String   // "pending", "processing", "completed", "failed"
-  filters     Json?    // Export filters
-  fields      Json?    // Selected fields
+  fileType    String // "csv", "xlsx"
+  entityType  String // "deal", "contact", "task"
+  status      String // "pending", "processing", "completed", "failed"
+  filters     Json? // Export filters
+  fields      Json? // Selected fields
   fileUrl     String?
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
 
   @@index([status])
   @@index([entityType])
@@ -669,9 +680,9 @@ model ExportJob {
 
 model Log {
   id        String   @id @default(uuid())
-  level     String   // "info", "warn", "error"
-  action    String   // "create", "update", "delete", "login", etc.
-  entity    String?  // "deal", "task", "user", etc.
+  level     String // "info", "warn", "error"
+  action    String // "create", "update", "delete", "login", etc.
+  entity    String? // "deal", "task", "user", etc.
   entityId  String?
   userId    String?
   message   String

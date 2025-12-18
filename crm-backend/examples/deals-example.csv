@@ -1,0 +1,7 @@
+Номер сделки,Название,Сумма,Pipeline ID,Stage ID,Ответственный,Email контакта,Телефон контакта,Дата закрытия,Описание,Теги
+DEAL-001,Продажа оборудования,100000,pipeline-id-1,stage-id-1,user-id-1,ivan@example.com,,2024-12-31,Крупная сделка,vip
+DEAL-002,Консультация,50000,pipeline-id-1,stage-id-2,user-id-2,petr@example.com,+79997654321,2024-11-30,Консультационные услуги,regular
+DEAL-003,Поддержка,25000,pipeline-id-2,stage-id-3,user-id-1,,+79991234567,,Техническая поддержка,regular
+DEAL-004,Разработка,150000,pipeline-id-1,stage-id-1,user-id-1,anna@example.com,,2025-01-15,Разработка системы,regular
+DEAL-005,Маркетинг,75000,pipeline-id-2,stage-id-2,user-id-2,maria@example.com,,2024-10-20,Маркетинговые услуги,vip
+

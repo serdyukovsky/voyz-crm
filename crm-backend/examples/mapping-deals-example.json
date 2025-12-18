@@ -1,0 +1,17 @@
+{
+  "entityType": "deal",
+  "dealMapping": {
+    "number": "Номер сделки",
+    "title": "Название",
+    "amount": "Сумма",
+    "pipelineId": "Pipeline ID",
+    "stageId": "Stage ID",
+    "assignedToId": "Ответственный",
+    "email": "Email контакта",
+    "phone": "Телефон контакта",
+    "expectedCloseAt": "Дата закрытия",
+    "description": "Описание",
+    "tags": "Теги"
+  }
+}
+

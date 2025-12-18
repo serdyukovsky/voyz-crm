@@ -1,0 +1,19 @@
+{
+  "entityType": "contact",
+  "contactMapping": {
+    "fullName": "Имя",
+    "email": "Email",
+    "phone": "Телефон",
+    "position": "Должность",
+    "companyName": "Компания",
+    "tags": "Теги",
+    "notes": "Заметки",
+    "social": {
+      "instagram": "Instagram",
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "vk": "VK"
+    }
+  }
+}
+
