@@ -70,7 +70,15 @@ export function ImportUploader({ onFileUpload, disabled = false }: ImportUploade
       setIsParsing(true)
 
       // Парсим первые 20 строк для предпросмотра
+      console.log('Starting CSV parsing...')
       const { headers, rows } = await parseCsvFile(file, ',', 20)
+      
+      console.log('Parsing result:', {
+        headersCount: headers.length,
+        headers,
+        rowsCount: rows.length,
+        firstRow: rows[0]
+      })
       
       if (!headers || headers.length === 0) {
         throw new Error('CSV file has no headers')

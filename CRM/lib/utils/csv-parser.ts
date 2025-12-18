@@ -1,10 +1,33 @@
 /**
  * CSV Parser Utility
  * Парсит CSV файл на клиенте для предпросмотра
+ * 
+ * Структура CSV:
+ * - Первая строка: заголовки (названия столбцов)
+ * - Остальные строки: данные
+ * - Разделитель: запятая (,) или точка с запятой (;)
+ * - Кавычки: для значений с запятыми или специальными символами
  */
 
 export interface ParsedCsvRow {
   [key: string]: string
+}
+
+/**
+ * Автоматическое определение разделителя CSV
+ * Анализирует первую строку и определяет наиболее вероятный разделитель
+ */
+function detectDelimiter(firstLine: string): ',' | ';' {
+  const commaCount = (firstLine.match(/,/g) || []).length
+  const semicolonCount = (firstLine.match(/;/g) || []).length
+  
+  // Если точка с запятой встречается чаще - используем её
+  if (semicolonCount > commaCount) {
+    return ';'
+  }
+  
+  // По умолчанию запятая
+  return ','
 }
 
 /**
@@ -73,8 +96,10 @@ export async function parseCsvFile(
             return
           }
 
-          // Парсинг строк данных
-          const dataLines = maxRows ? lines.slice(1, maxRows + 1) : lines.slice(1)
+          // Парсинг строк данных (начинаем со второй непустой строки)
+          const dataLines = maxRows ? nonEmptyLines.slice(1, maxRows + 1) : nonEmptyLines.slice(1)
+          console.log(`Parsing ${dataLines.length} data rows...`)
+          
           const rows: ParsedCsvRow[] = []
 
           for (let lineIndex = 0; lineIndex < dataLines.length; lineIndex++) {
@@ -83,7 +108,7 @@ export async function parseCsvFile(
 
             try {
               // Парсим строку с учетом кавычек и разделителей
-              const rawValues = parseCsvLine(line, delimiter)
+              const rawValues = parseCsvLine(line, actualDelimiter)
               
               // Очищаем значения от кавычек
               const values = rawValues.map((v) => {
@@ -101,8 +126,10 @@ export async function parseCsvFile(
               if (values.length !== headers.length) {
                 console.warn(
                   `Row ${lineIndex + 2}: Expected ${headers.length} columns, got ${values.length}. ` +
-                  `Line: ${line.substring(0, 100)}`
+                  `Line preview: ${line.substring(0, 100)}`
                 )
+                console.warn('  Headers:', headers)
+                console.warn('  Values:', values)
                 
                 // Если значений меньше - дополняем пустыми
                 // Если больше - обрезаем
