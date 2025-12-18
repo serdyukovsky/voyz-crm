@@ -134,27 +134,18 @@ export async function parseCsvFile(
               const rawValues = parseCsvLine(line, actualDelimiter)
               
               // Очищаем значения от кавычек
-              const values = rawValues
-                .map((v) => {
-                  let cleaned = v.trim()
-                  // Убираем кавычки в начале и конце, если есть
-                  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-                    cleaned = cleaned.slice(1, -1)
-                  }
-                  // Заменяем двойные кавычки на одинарные (если были экранированы)
-                  cleaned = cleaned.replace(/""/g, '"')
-                  // Исправляем двойные обратные слэши (\\ -> \)
-                  cleaned = cleaned.replace(/\\\\/g, '\\')
-                  return cleaned.trim()
-                })
-                .filter((v, index) => {
-                  // Убираем пустые значения в конце строки (от лишних разделителей)
-                  // Но только если это последние пустые значения
-                  if (v.length === 0 && index >= headers.length) {
-                    return false
-                  }
-                  return true
-                })
+              const values = rawValues.map((v) => {
+                let cleaned = v.trim()
+                // Убираем кавычки в начале и конце, если есть
+                if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                  cleaned = cleaned.slice(1, -1)
+                }
+                // Заменяем двойные кавычки на одинарные (если были экранированы)
+                cleaned = cleaned.replace(/""/g, '"')
+                // Исправляем двойные обратные слэши (\\ -> \)
+                cleaned = cleaned.replace(/\\\\/g, '\\')
+                return cleaned.trim()
+              })
 
               // Обрезаем значения до количества заголовков (убираем лишние пустые в конце)
               const adjustedValues = values.slice(0, headers.length)
