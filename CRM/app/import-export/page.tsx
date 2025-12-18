@@ -4,19 +4,133 @@ import { useState } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { ImportUploader } from "@/components/crm/import-uploader"
 import { ImportPreviewTable } from "@/components/crm/import-preview-table"
-import { ColumnMappingForm } from "@/components/crm/column-mapping-form"
+import { AutoMappingForm } from "@/components/crm/auto-mapping-form"
+import { DryRunSummary } from "@/components/crm/dry-run-summary"
+import { ImportResult } from "@/components/crm/import-result"
 import { ExportPanel } from "@/components/crm/export-panel"
+import { Button } from "@/components/ui/button"
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react"
+import { importContacts, importDeals, type ImportResult as ImportResultType } from "@/lib/api/import"
+import { type ParsedCsvRow } from "@/lib/utils/csv-parser"
+import { useToastNotification } from "@/hooks/use-toast-notification"
+
+type ImportStep = 'upload' | 'preview' | 'mapping' | 'dry-run' | 'result'
+type EntityType = 'contact' | 'deal'
 
 export default function ImportExportPage() {
   const [activeTab, setActiveTab] = useState<"import" | "export">("import")
+  const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
+  const [entityType, setEntityType] = useState<EntityType>('contact')
+  
+  // File & Data
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [previewData, setPreviewData] = useState<any[]>([])
-  const [showMapping, setShowMapping] = useState(false)
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvRows, setCsvRows] = useState<ParsedCsvRow[]>([])
+  
+  // Mapping
+  const [mapping, setMapping] = useState<Record<string, string>>({})
+  
+  // Dry-run
+  const [dryRunResult, setDryRunResult] = useState<ImportResultType | null>(null)
+  const [isDryRunLoading, setIsDryRunLoading] = useState(false)
+  
+  // Import
+  const [importResult, setImportResult] = useState<ImportResultType | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  
+  // Error
+  const [error, setError] = useState<string | null>(null)
+  
+  const { showSuccess, showError } = useToastNotification()
 
-  const handleFileUpload = (file: File | null, preview: any[]) => {
+  const handleFileUpload = (file: File | null, headers: string[], rows: ParsedCsvRow[]) => {
     setUploadedFile(file)
-    setPreviewData(preview)
-    setShowMapping(preview.length > 0)
+    setCsvHeaders(headers)
+    setCsvRows(rows)
+    setMapping({})
+    setDryRunResult(null)
+    setImportResult(null)
+    setError(null)
+    
+    if (file && headers.length > 0) {
+      setCurrentStep('preview')
+    } else {
+      setCurrentStep('upload')
+    }
+  }
+
+  const handleMappingChange = (newMapping: Record<string, string>) => {
+    setMapping(newMapping)
+  }
+
+  const handleContinueToMapping = () => {
+    setCurrentStep('mapping')
+  }
+
+  const handleDryRun = async () => {
+    if (!uploadedFile) return
+
+    setIsDryRunLoading(true)
+    setError(null)
+
+    try {
+      const result = entityType === 'contact'
+        ? await importContacts(uploadedFile, mapping, ',', true)
+        : await importDeals(uploadedFile, mapping, ',', true)
+
+      setDryRunResult(result)
+      setCurrentStep('dry-run')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to perform dry-run'
+      setError(errorMessage)
+      showError('Dry-run failed', errorMessage)
+    } finally {
+      setIsDryRunLoading(false)
+    }
+  }
+
+  const handleConfirmImport = async () => {
+    if (!uploadedFile || !dryRunResult) return
+
+    setIsImporting(true)
+    setError(null)
+
+    try {
+      const result = entityType === 'contact'
+        ? await importContacts(uploadedFile, mapping, ',', false)
+        : await importDeals(uploadedFile, mapping, ',', false)
+
+      setImportResult(result)
+      setCurrentStep('result')
+      showSuccess(
+        'Import completed',
+        `${result.summary.created + result.summary.updated} records imported successfully`
+      )
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to import'
+      setError(errorMessage)
+      showError('Import failed', errorMessage)
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const handleReset = () => {
+    setUploadedFile(null)
+    setCsvHeaders([])
+    setCsvRows([])
+    setMapping({})
+    setDryRunResult(null)
+    setImportResult(null)
+    setError(null)
+    setCurrentStep('upload')
+  }
+
+  const isMappingValid = () => {
+    // Проверяем что все required поля замаплены
+    // Это будет проверяться на backend, но базовая валидация здесь
+    const mappedFields = Object.values(mapping).filter(v => v && v !== '')
+    return mappedFields.length > 0
   }
 
   return (
@@ -27,7 +141,10 @@ export default function ImportExportPage() {
           <h1 className="text-2xl font-medium text-foreground mb-4">Import/Export</h1>
           <div className="flex gap-2 border-b border-border/50">
             <button
-              onClick={() => setActiveTab("import")}
+              onClick={() => {
+                setActiveTab("import")
+                handleReset()
+              }}
               className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                 activeTab === "import"
                   ? "border-primary text-foreground"
@@ -52,12 +169,144 @@ export default function ImportExportPage() {
         {/* Content */}
         {activeTab === "import" ? (
           <div className="space-y-6">
-            <ImportUploader onFileUpload={handleFileUpload} />
-            {previewData.length > 0 && (
-              <>
-                <ImportPreviewTable data={previewData} fileName={uploadedFile?.name} />
-                {showMapping && <ColumnMappingForm columns={Object.keys(previewData[0] || {})} />}
-              </>
+            {/* Step Indicator */}
+            {currentStep !== 'upload' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className={currentStep === 'upload' ? 'text-foreground font-medium' : ''}>
+                  Upload
+                </span>
+                <span>→</span>
+                <span className={currentStep === 'preview' ? 'text-foreground font-medium' : ''}>
+                  Preview
+                </span>
+                <span>→</span>
+                <span className={currentStep === 'mapping' ? 'text-foreground font-medium' : ''}>
+                  Mapping
+                </span>
+                <span>→</span>
+                <span className={currentStep === 'dry-run' ? 'text-foreground font-medium' : ''}>
+                  Preview
+                </span>
+                <span>→</span>
+                <span className={currentStep === 'result' ? 'text-foreground font-medium' : ''}>
+                  Result
+                </span>
+              </div>
+            )}
+
+            {/* Entity Type Selector */}
+            {currentStep === 'upload' && (
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium text-foreground">Import Type:</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={entityType === 'contact' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEntityType('contact')}
+                  >
+                    Contacts
+                  </Button>
+                  <Button
+                    variant={entityType === 'deal' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEntityType('deal')}
+                  >
+                    Deals
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 1: Upload */}
+            {currentStep === 'upload' && (
+              <ImportUploader
+                onFileUpload={handleFileUpload}
+                disabled={isImporting || isDryRunLoading}
+              />
+            )}
+
+            {/* Step 2: Preview */}
+            {currentStep === 'preview' && csvRows.length > 0 && (
+              <div className="space-y-4">
+                <ImportPreviewTable
+                  headers={csvHeaders}
+                  rows={csvRows}
+                  fileName={uploadedFile?.name}
+                />
+                <div className="flex justify-end">
+                  <Button onClick={handleContinueToMapping}>
+                    Continue to Mapping
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Mapping */}
+            {currentStep === 'mapping' && csvHeaders.length > 0 && (
+              <div className="space-y-4">
+                <AutoMappingForm
+                  csvColumns={csvHeaders}
+                  entityType={entityType}
+                  onMappingChange={handleMappingChange}
+                  initialMapping={mapping}
+                />
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentStep('preview')}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleDryRun}
+                    disabled={!isMappingValid() || isDryRunLoading}
+                  >
+                    {isDryRunLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      'Check Import'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Dry-run Summary */}
+            {currentStep === 'dry-run' && dryRunResult && (
+              <div className="space-y-4">
+                <DryRunSummary
+                  summary={dryRunResult.summary}
+                  errors={dryRunResult.errors}
+                  isLoading={isImporting}
+                  onConfirm={handleConfirmImport}
+                  onCancel={() => setCurrentStep('mapping')}
+                  isConfirmDisabled={!isMappingValid()}
+                />
+              </div>
+            )}
+
+            {/* Step 5: Import Result */}
+            {currentStep === 'result' && importResult && (
+              <ImportResult
+                summary={importResult.summary}
+                errors={importResult.errors}
+                warnings={importResult.warnings}
+                onReset={handleReset}
+              />
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="flex items-start gap-2 p-4 border border-destructive/20 bg-destructive/5 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive mb-1">Error</p>
+                  <p className="text-xs text-destructive/80">{error}</p>
+                </div>
+              </div>
             )}
           </div>
         ) : (

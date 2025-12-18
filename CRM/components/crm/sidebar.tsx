@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Target, CheckSquare, BarChart3, ScrollText, Upload, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, Contact, Building2, Languages } from 'lucide-react'
+import { LayoutDashboard, Target, CheckSquare, BarChart3, ScrollText, Upload, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, Contact, Building2, Languages, MessageSquare } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from "@/lib/utils"
 import { useTheme } from 'next-themes'
 import { useSidebar } from './sidebar-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useChatContext } from './chat-context'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -16,6 +17,7 @@ const navItemsConfig = [
   { href: "/tasks", icon: CheckSquare, key: "common.tasks" },
   { href: "/contacts", icon: Contact, key: "common.contacts" },
   { href: "/companies", icon: Building2, key: "common.companies" },
+  { href: "/messages", icon: MessageSquare, key: "common.messages" },
   { href: "/analytics", icon: BarChart3, key: "common.analytics" },
   { href: "/logs", icon: ScrollText, key: "common.logs" },
   { href: "/import-export", icon: Upload, key: "common.importExport" },
@@ -30,6 +32,7 @@ export function Sidebar() {
   const [mounted, setMounted] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const { t, language, setLanguage } = useTranslation()
+  const chatContext = useChatContext()
 
   useEffect(() => {
     setMounted(true)
@@ -86,12 +89,21 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 space-y-0.5 p-2">
           {navItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href === "/messages" && chatContext.isOpen)
             const Icon = item.icon
+            
+            // Special handling for Messages - open modal instead of navigating
+            const handleClick = (e: React.MouseEvent) => {
+              if (item.href === "/messages") {
+                e.preventDefault()
+                chatContext.openChat()
+              }
+            }
             
             const linkContent = (
               <Link
                 to={item.href}
+                onClick={handleClick}
                 className={cn(
                   "flex items-center rounded-md text-sm font-medium transition-all duration-200",
                   "min-w-0",
