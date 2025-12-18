@@ -64,22 +64,38 @@ export async function parseCsvFile(
             return
           }
 
-          const lines = text.split(/\r?\n/).filter((line) => line.trim())
+          // Разделяем на строки, сохраняя пустые строки для правильного подсчета
+          const lines = text.split(/\r?\n/)
+          
+          // Фильтруем только непустые строки
+          const nonEmptyLines = lines.filter((line) => line.trim().length > 0)
 
-          if (lines.length === 0) {
+          if (nonEmptyLines.length === 0) {
             reject(new Error('CSV file has no content'))
             return
           }
 
-          // Парсинг заголовков (первая строка)
-          const headerLine = lines[0]
+          // Автоматическое определение разделителя, если не указан явно
+          let actualDelimiter = delimiter
+          if (delimiter === ',') {
+            // Пытаемся определить разделитель автоматически
+            actualDelimiter = detectDelimiter(nonEmptyLines[0])
+            console.log('Detected delimiter:', actualDelimiter)
+          }
+
+          // Парсинг заголовков (первая непустая строка)
+          const headerLine = nonEmptyLines[0]
           if (!headerLine || headerLine.trim().length === 0) {
             reject(new Error('CSV file has no header row'))
             return
           }
 
+          console.log('Header line:', headerLine)
+          
           // Парсим заголовки с учетом кавычек и разделителей
-          const rawHeaders = parseCsvLine(headerLine, delimiter)
+          const rawHeaders = parseCsvLine(headerLine, actualDelimiter)
+          console.log('Raw headers:', rawHeaders)
+          
           const headers = rawHeaders.map((h) => {
             // Убираем кавычки в начале и конце, если есть
             let cleaned = h.trim()
@@ -90,6 +106,9 @@ export async function parseCsvFile(
             cleaned = cleaned.replace(/""/g, '"')
             return cleaned.trim()
           })
+          
+          console.log('Cleaned headers:', headers)
+          console.log('Headers count:', headers.length)
 
           if (headers.length === 0) {
             reject(new Error('CSV file has no headers'))
