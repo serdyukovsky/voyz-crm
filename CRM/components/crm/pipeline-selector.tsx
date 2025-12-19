@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, Loader2 } from "lucide-react"
-import { getPipelines } from "@/lib/api/deals"
+import { getPipelines } from "@/lib/api/pipelines"
 
 interface Pipeline {
   id: string
