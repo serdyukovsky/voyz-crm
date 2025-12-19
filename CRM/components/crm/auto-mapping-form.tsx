@@ -110,9 +110,13 @@ export function AutoMappingForm({
       console.log('Loading import meta for entity type:', entityType)
       const meta = await getImportMeta(entityType)
       console.log('Import meta loaded:', meta)
+      console.log('meta.systemFields:', meta.systemFields)
+      console.log('meta.customFields:', meta.customFields)
       setImportMeta(meta)
       // Combine system and custom fields for backward compatibility
       const allFields = getAllFields(meta)
+      console.log('All fields after getAllFields:', allFields)
+      console.log('All fields count:', allFields.length)
       setCrmFields(allFields)
     } catch (err) {
       console.error('Error loading import meta:', err)
