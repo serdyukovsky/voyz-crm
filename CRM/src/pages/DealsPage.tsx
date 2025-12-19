@@ -14,6 +14,7 @@ import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, Check
 import { PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeleton"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { usePipelines, useCreatePipeline } from "@/hooks/use-pipelines"
+import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
@@ -239,7 +240,7 @@ function DealsPageContent() {
   ])
 
   // Используем React Query для загрузки пайплайнов
-  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = usePipelines()
+  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError, refetch: refetchPipelines } = usePipelines()
   const createPipelineMutation = useCreatePipeline()
   const createDealMutation = useCreateDeal()
   const { data: companies = [] } = useCompanies()
@@ -397,7 +398,69 @@ function DealsPageContent() {
     }
   }
 
-  const handleUpdateStages = (updatedStages: Stage[]) => {
+  const handleUpdateStages = async (updatedStages: Stage[]) => {
+    if (!currentFunnelId) return
+    
+    try {
+      // Get current pipeline
+      const currentPipeline = pipelines.find(p => p.id === currentFunnelId)
+      if (!currentPipeline) return
+      
+      // Compare with existing stages to determine what changed
+      const existingStages = currentPipeline.stages || []
+      
+      // Delete removed stages
+      for (const existingStage of existingStages) {
+        const stillExists = updatedStages.find(s => s.id === existingStage.id)
+        if (!stillExists) {
+          try {
+            await deleteStage(existingStage.id)
+          } catch (error) {
+            console.error('Failed to delete stage:', error)
+          }
+        }
+      }
+      
+      // Create or update stages
+      for (let i = 0; i < updatedStages.length; i++) {
+        const stage = updatedStages[i]
+        const isNewStage = stage.id.startsWith('stage-')
+        
+        if (isNewStage) {
+          // Create new stage
+          try {
+            await createStage(currentFunnelId, {
+              name: stage.label,
+              color: stage.color,
+              order: i,
+              isDefault: false,
+              isClosed: stage.label.toLowerCase().includes('closed') || stage.label.toLowerCase().includes('won') || stage.label.toLowerCase().includes('lost'),
+            })
+          } catch (error) {
+            console.error('Failed to create stage:', error)
+          }
+        } else {
+          // Update existing stage
+          try {
+            await updateStage(stage.id, {
+              name: stage.label,
+              color: stage.color,
+              order: i,
+            })
+          } catch (error) {
+            console.error('Failed to update stage:', error)
+          }
+        }
+      }
+      
+      // Reload pipelines to get updated stages
+      await refetchPipelines()
+      showSuccess('Stages updated successfully')
+    } catch (error) {
+      console.error('Failed to update stages:', error)
+      showError('Failed to update stages')
+    }
+    
     setStages(updatedStages)
   }
 
