@@ -364,8 +364,8 @@ export function AutoMappingForm({
                     {/* Sentinel value for "skip" - never use empty string "" */}
                     <SelectItem value={SKIP_COLUMN_VALUE}>— Skip this column —</SelectItem>
                     
-                    {/* Group fields by category if metadata is available */}
-                    {importMeta && 'systemFields' in importMeta && importMeta.systemFields.length > 0 && (
+                    {/* Group fields by category if new metadata structure is available */}
+                    {importMeta && 'systemFields' in importMeta && Array.isArray(importMeta.systemFields) && importMeta.systemFields.length > 0 && (
                       <>
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">System Fields</div>
                         {importMeta.systemFields.map((field) => (
@@ -381,7 +381,7 @@ export function AutoMappingForm({
                       </>
                     )}
                     
-                    {importMeta && 'customFields' in importMeta && importMeta.customFields.length > 0 && (
+                    {importMeta && 'customFields' in importMeta && Array.isArray(importMeta.customFields) && importMeta.customFields.length > 0 && (
                       <>
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Custom Fields</div>
                         {importMeta.customFields.map((field) => (
@@ -397,8 +397,8 @@ export function AutoMappingForm({
                       </>
                     )}
                     
-                    {/* Fallback for legacy structure without groups */}
-                    {!importMeta && crmFields.map((field) => (
+                    {/* Fallback for legacy structure without groups OR when systemFields not available */}
+                    {(!importMeta || !('systemFields' in importMeta) || !Array.isArray(importMeta.systemFields)) && crmFields.map((field) => (
                       <SelectItem key={field.key} value={field.key}>
                         <div className="flex items-center gap-2">
                           <span>{field.label}</span>
