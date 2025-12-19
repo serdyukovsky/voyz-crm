@@ -7,7 +7,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 @Injectable()
 export class ChatService {
   constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService,
     @Inject(forwardRef(() => RealtimeGateway)) private readonly websocketGateway: RealtimeGateway,
   ) {
     console.log('🔧 ChatService constructor called, prisma:', !!this.prisma, typeof this.prisma)

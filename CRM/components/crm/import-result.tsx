@@ -1,8 +1,10 @@
 'use client'
 
-import { CheckCircle2, XCircle, AlertTriangle, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { type ImportSummary, type ImportError } from '@/lib/api/import'
 
 interface ImportResultProps {
@@ -18,9 +20,38 @@ export function ImportResult({
   warnings = [],
   onReset,
 }: ImportResultProps) {
+  const [isErrorsExpanded, setIsErrorsExpanded] = useState(true)
+  const [errorSearchTerm, setErrorSearchTerm] = useState('')
+  const [showAllErrors, setShowAllErrors] = useState(false)
+  
   const hasErrors = errors.length > 0
   const hasWarnings = warnings.length > 0
   const isSuccess = summary.failed === 0 && (summary.created > 0 || summary.updated > 0)
+
+  // Filter errors based on search term
+  const filteredErrors = errors.filter(error => {
+    if (!errorSearchTerm) return true
+    const searchLower = errorSearchTerm.toLowerCase()
+    return (
+      error.row.toString().includes(searchLower) ||
+      error.field?.toLowerCase().includes(searchLower) ||
+      error.value?.toLowerCase().includes(searchLower) ||
+      error.error.toLowerCase().includes(searchLower)
+    )
+  })
+
+  // Group errors by field
+  const errorsByField = filteredErrors.reduce<Record<string, ImportError[]>>((acc, error) => {
+    const fieldKey = error.field || 'General'
+    if (!acc[fieldKey]) {
+      acc[fieldKey] = []
+    }
+    acc[fieldKey].push(error)
+    return acc
+  }, {})
+
+  const displayedErrors = showAllErrors ? filteredErrors : filteredErrors.slice(0, 10)
+  const hasMoreErrors = filteredErrors.length > 10
 
   return (
     <div className="space-y-4">
@@ -122,39 +153,128 @@ export function ImportResult({
 
       {/* Errors */}
       {hasErrors && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-destructive" />
-            <p className="text-sm font-medium text-destructive">
-              {errors.length} error{errors.length !== 1 ? 's' : ''}
-            </p>
+        <div className="space-y-3">
+          {/* Error Header */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setIsErrorsExpanded(!isErrorsExpanded)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              {isErrorsExpanded ? (
+                <ChevronUp className="h-4 w-4 text-destructive" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-destructive" />
+              )}
+              <XCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm font-medium text-destructive">
+                {errors.length} error{errors.length !== 1 ? 's' : ''}
+              </p>
+              {filteredErrors.length < errors.length && (
+                <Badge variant="outline" className="text-xs">
+                  {filteredErrors.length} shown
+                </Badge>
+              )}
+            </button>
+            {errors.length > 5 && (
+              <div className="relative w-48">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search errors..."
+                  value={errorSearchTerm}
+                  onChange={(e) => setErrorSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            )}
           </div>
-          <div className="max-h-[300px] overflow-y-auto border border-destructive/20 rounded-lg">
-            <div className="divide-y divide-border">
-              {errors.map((error, idx) => (
-                <div key={idx} className="p-3 bg-destructive/5">
-                  <div className="flex items-start gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      Row {error.row}
-                    </Badge>
-                    <div className="flex-1 min-w-0">
-                      {error.field && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Field: <span className="font-medium">{error.field}</span>
-                        </p>
-                      )}
-                      {error.value && (
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Value: <span className="font-mono">{error.value}</span>
-                        </p>
-                      )}
-                      <p className="text-xs text-destructive">{error.error}</p>
+
+          {/* Error List */}
+          {isErrorsExpanded && (
+            <div className="border border-destructive/20 rounded-lg overflow-hidden">
+              <div className="max-h-[300px] overflow-y-auto">
+                <div className="divide-y divide-border">
+                  {displayedErrors.map((error, idx) => (
+                    <div key={idx} className="p-3 bg-destructive/5 hover:bg-destructive/10 transition-colors">
+                      <div className="flex items-start gap-3">
+                        {/* Row Badge */}
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs font-mono shrink-0 bg-background"
+                        >
+                          #{error.row}
+                        </Badge>
+                        
+                        {/* Error Content */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          {/* Field */}
+                          {error.field && (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {error.field}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {/* Value */}
+                          {error.value && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide shrink-0">
+                                Value:
+                              </span>
+                              <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded break-all">
+                                {error.value.length > 50 ? `${error.value.substring(0, 50)}...` : error.value}
+                              </code>
+                            </div>
+                          )}
+                          
+                          {/* Error Message */}
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
+                            <p className="text-xs text-destructive leading-relaxed">
+                              {error.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Show More Button */}
+              {hasMoreErrors && !showAllErrors && (
+                <div className="p-3 border-t border-border bg-muted/20">
+                  <button
+                    onClick={() => setShowAllErrors(true)}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Show {filteredErrors.length - 10} more error{filteredErrors.length - 10 !== 1 ? 's' : ''}
+                  </button>
+                </div>
+              )}
+              
+              {/* Error Summary by Field */}
+              {filteredErrors.length > 3 && (
+                <div className="p-3 border-t border-border bg-muted/10">
+                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-2">
+                    Errors by field:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(errorsByField).map(([field, fieldErrors]) => (
+                      <Badge 
+                        key={field} 
+                        variant="outline" 
+                        className="text-xs"
+                      >
+                        {field}: {fieldErrors.length}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

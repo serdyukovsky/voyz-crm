@@ -11,7 +11,7 @@ import {
   sanitizeOptionalTextFields,
 } from '@/common/utils/normalization.utils';
 import { ContactFieldMapping, DealFieldMapping } from './dto/field-mapping.dto';
-import { ImportResultDto, ImportError, ImportSummary } from './dto/import-result.dto';
+import { ImportResultDto, ImportError, ImportSummary, StageToCreate } from './dto/import-result.dto';
 import {
   ImportMetaResponseDto,
   ContactsImportMetaDto,
@@ -41,11 +41,9 @@ export class CsvImportService {
    * Возвращает полную информацию о доступных полях, пайплайнах и пользователях
    */
   async getImportMeta(entityType: 'contact' | 'deal'): Promise<ImportMetaResponseDto> {
-    if (entityType === 'contact') {
-      return this.getContactsImportMeta();
-    } else {
-      return this.getDealsImportMeta();
-    }
+    // ALWAYS return mixed import meta (full list of fields for both contact and deal)
+    // This supports MIXED CSV IMPORT where one file can contain both entities
+    return this.getMixedImportMeta();
   }
 
   /**
@@ -54,23 +52,23 @@ export class CsvImportService {
   private async getContactsImportMeta(): Promise<ContactsImportMetaDto> {
     // Системные поля контактов
     const systemFields: ImportFieldDto[] = [
-      { key: 'fullName', label: 'Full Name', required: true, type: 'string', description: 'Полное имя контакта', group: 'basic' },
-      { key: 'email', label: 'Email', required: false, type: 'email', description: 'Email адрес', group: 'basic' },
-      { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона', group: 'basic' },
-      { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность', group: 'basic' },
-      { key: 'companyName', label: 'Company Name', required: false, type: 'string', description: 'Название компании', group: 'basic' },
-      { key: 'link', label: 'Link', required: false, type: 'string', description: 'Ссылка', group: 'other' },
-      { key: 'subscriberCount', label: 'Subscriber Count', required: false, type: 'string', description: 'Кол-во подписчиков', group: 'other' },
-      { key: 'directions', label: 'Directions', required: false, type: 'string', description: 'Направление (через запятую)', group: 'other' },
-      { key: 'contactMethods', label: 'Contact Methods', required: false, type: 'string', description: 'Способ связи (через запятую): Whatsapp, Telegram, Direct', group: 'other' },
-      { key: 'websiteOrTgChannel', label: 'Website/TG Channel', required: false, type: 'string', description: 'Сайт, тг канал', group: 'other' },
-      { key: 'contactInfo', label: 'Contact Info', required: false, type: 'string', description: 'Контакт (номер телефона или никнейм в телеграме)', group: 'other' },
-      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
-      { key: 'notes', label: 'Notes', required: false, type: 'text', description: 'Заметки', group: 'other' },
-      { key: 'instagram', label: 'Instagram', required: false, type: 'string', description: 'Instagram профиль', group: 'social' },
-      { key: 'telegram', label: 'Telegram', required: false, type: 'string', description: 'Telegram контакт', group: 'social' },
-      { key: 'whatsapp', label: 'WhatsApp', required: false, type: 'string', description: 'WhatsApp номер', group: 'social' },
-      { key: 'vk', label: 'VK', required: false, type: 'string', description: 'VK профиль', group: 'social' },
+      { key: 'fullName', label: 'Full Name', required: true, type: 'string', description: 'Полное имя контакта', group: 'basic', entity: 'contact' },
+      { key: 'email', label: 'Email', required: false, type: 'email', description: 'Email адрес', group: 'basic', entity: 'contact' },
+      { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона', group: 'basic', entity: 'contact' },
+      { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность', group: 'basic', entity: 'contact' },
+      { key: 'companyName', label: 'Company Name', required: false, type: 'string', description: 'Название компании', group: 'basic', entity: 'contact' },
+      { key: 'link', label: 'Link', required: false, type: 'string', description: 'Ссылка', group: 'other', entity: 'contact' },
+      { key: 'subscriberCount', label: 'Subscriber Count', required: false, type: 'string', description: 'Кол-во подписчиков', group: 'other', entity: 'contact' },
+      { key: 'directions', label: 'Directions', required: false, type: 'string', description: 'Направление (через запятую)', group: 'other', entity: 'contact' },
+      { key: 'contactMethods', label: 'Contact Methods', required: false, type: 'string', description: 'Способ связи (через запятую): Whatsapp, Telegram, Direct', group: 'other', entity: 'contact' },
+      { key: 'websiteOrTgChannel', label: 'Website/TG Channel', required: false, type: 'string', description: 'Сайт, тг канал', group: 'other', entity: 'contact' },
+      { key: 'contactInfo', label: 'Contact Info', required: false, type: 'string', description: 'Контакт (номер телефона или никнейм в телеграме)', group: 'other', entity: 'contact' },
+      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other', entity: 'contact' },
+      { key: 'notes', label: 'Notes', required: false, type: 'text', description: 'Заметки', group: 'other', entity: 'contact' },
+      { key: 'instagram', label: 'Instagram', required: false, type: 'string', description: 'Instagram профиль', group: 'social', entity: 'contact' },
+      { key: 'telegram', label: 'Telegram', required: false, type: 'string', description: 'Telegram контакт', group: 'social', entity: 'contact' },
+      { key: 'whatsapp', label: 'WhatsApp', required: false, type: 'string', description: 'WhatsApp номер', group: 'social', entity: 'contact' },
+      { key: 'vk', label: 'VK', required: false, type: 'string', description: 'VK профиль', group: 'social', entity: 'contact' },
     ];
 
     // Получение кастомных полей контактов (если есть в schema)
@@ -92,18 +90,21 @@ export class CsvImportService {
   private async getDealsImportMeta(): Promise<DealsImportMetaDto> {
     // Системные поля сделок
     const systemFields: ImportFieldDto[] = [
-      { key: 'number', label: 'Deal Number', required: true, type: 'string', description: 'Номер сделки', group: 'basic' },
-      { key: 'title', label: 'Title', required: true, type: 'string', description: 'Название сделки', group: 'basic' },
-      { key: 'amount', label: 'Amount', required: false, type: 'number', description: 'Сумма сделки', group: 'basic' },
-      { key: 'pipelineId', label: 'Pipeline', required: false, type: 'select', description: 'Pipeline будет выбран в UI перед импортом', group: 'basic' },
-      { key: 'stageId', label: 'Stage', required: true, type: 'string', description: 'Имя стадии (будет автоматически резолвлено в выбранном pipeline)', group: 'basic' },
-      { key: 'email', label: 'Contact Email', required: false, type: 'email', description: 'Email контакта для связи', group: 'contact' },
-      { key: 'phone', label: 'Contact Phone', required: false, type: 'phone', description: 'Телефон контакта для связи', group: 'contact' },
-      { key: 'assignedToId', label: 'Assigned To', required: false, type: 'string', description: 'Ответственный (имя или email пользователя, будет автоматически резолвлено)', group: 'basic' },
-      { key: 'expectedCloseAt', label: 'Expected Close Date', required: false, type: 'date', description: 'Ожидаемая дата закрытия', group: 'other' },
-      { key: 'description', label: 'Description', required: false, type: 'text', description: 'Описание', group: 'other' },
-      { key: 'rejectionReasons', label: 'Rejection Reasons', required: false, type: 'string', description: 'Причина отказа (через запятую)', group: 'other' },
-      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
+      { key: 'number', label: 'Deal Number', required: false, type: 'string', description: 'Номер сделки', group: 'basic', entity: 'deal' },
+      { key: 'title', label: 'Title', required: true, type: 'string', description: 'Название сделки', group: 'basic', entity: 'deal' },
+      { key: 'stageId', label: 'Stage', required: false, type: 'stage', description: 'Имя стадии (будет автоматически резолвлено в выбранном pipeline)', group: 'basic', entity: 'deal' },
+      { key: 'ownerId', label: 'Owner', required: false, type: 'user', description: 'Владелец сделки (имя или email пользователя, будет автоматически резолвлено)', group: 'basic', entity: 'deal' },
+      { key: 'amount', label: 'Amount', required: false, type: 'number', description: 'Сумма сделки', group: 'basic', entity: 'deal' },
+      { key: 'pipelineId', label: 'Pipeline', required: false, type: 'select', description: 'Pipeline будет выбран в UI перед импортом', group: 'basic', entity: 'deal' },
+      { key: 'email', label: 'Contact Email', required: false, type: 'email', description: 'Email контакта для связи', group: 'contact', entity: 'deal' },
+      { key: 'phone', label: 'Contact Phone', required: false, type: 'phone', description: 'Телефон контакта для связи', group: 'contact', entity: 'deal' },
+      { key: 'assignedToId', label: 'Assigned To', required: false, type: 'user', description: 'Ответственный (имя или email пользователя, будет автоматически резолвлено)', group: 'basic', entity: 'deal' },
+      { key: 'expectedCloseAt', label: 'Expected Close Date', required: false, type: 'date', description: 'Ожидаемая дата закрытия', group: 'other', entity: 'deal' },
+      { key: 'createdAt', label: 'Created Date', required: false, type: 'date', description: 'Дата создания сделки', group: 'other', entity: 'deal' },
+      { key: 'description', label: 'Description', required: false, type: 'text', description: 'Описание', group: 'other', entity: 'deal' },
+      { key: 'reason', label: 'Reason', required: false, type: 'string', description: 'Причина/основание', group: 'other', entity: 'deal' },
+      { key: 'rejectionReasons', label: 'Rejection Reasons', required: false, type: 'string', description: 'Причина отказа (через запятую)', group: 'other', entity: 'deal' },
+      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other', entity: 'deal' },
     ];
 
     // Получение кастомных полей сделок
@@ -121,6 +122,34 @@ export class CsvImportService {
       pipelines,
       users,
     };
+  }
+
+  /**
+   * Получение метаданных для MIXED импорта (контакты + сделки в одном плоском массиве)
+   */
+  private async getMixedImportMeta(): Promise<any> {
+    // Получаем метаданные контактов
+    const contactMeta = await this.getContactsImportMeta();
+    
+    // Получаем метаданные сделок
+    const dealMeta = await this.getDealsImportMeta();
+    
+    // Объединяем все поля в один плоский массив
+    const allFields: ImportFieldDto[] = [
+      ...contactMeta.systemFields,
+      ...contactMeta.customFields,
+      ...dealMeta.systemFields,
+      ...dealMeta.customFields,
+    ];
+    
+    return {
+      fields: allFields, // Flat array with entity property on each field
+      pipelines: dealMeta.pipelines,
+      users: dealMeta.users,
+    };
+
+    // Number опционален
+    const numberValue = getValue(mapping.number);
   }
 
   /**
@@ -150,11 +179,14 @@ export class CsvImportService {
         description: field.description || undefined,
         options: field.options ? this.mapCustomFieldOptions(field.options) : undefined,
         group: 'custom',
+        entity: 'deal' as const,
       }));
     } catch (error) {
       console.error('Error fetching deal custom fields:', error);
       return [];
     }
+
+
   }
 
   /**
@@ -172,6 +204,9 @@ export class CsvImportService {
       email: 'email',
       phone: 'phone',
     };
+
+    // Number опционален
+    const numberValue = getValue(mapping.number);
     return typeMap[type] || 'string';
   }
 
@@ -185,6 +220,8 @@ export class CsvImportService {
         label: typeof opt === 'string' ? opt : opt.label || opt.value || opt,
       }));
     }
+
+
     return [];
   }
 
@@ -266,6 +303,9 @@ export class CsvImportService {
       failed: 0,
       skipped: 0,
     };
+
+    // Number опционален
+    const numberValue = getValue(mapping.number);
 
     const errors: ImportError[] = [];
     const rows: Array<{
@@ -409,6 +449,9 @@ export class CsvImportService {
       skipped: 0,
     };
 
+    // Number опционален
+    const numberValue = getValue(mapping.number);
+
     const errors: ImportError[] = [];
     
     // Загружаем stages для выбранного pipeline для resolution по имени
@@ -418,12 +461,13 @@ export class CsvImportService {
     const usersMap = await this.loadUsersMap();
     
     const rows: Array<{
-      number: string;
+      number?: string;
       title: string;
       amount?: number | string | null;
       budget?: number | string | null;
       pipelineId: string;
-      stageId: string;
+      stageId?: string;
+      stageValue?: string; // Оригинальное значение стадии из CSV (для создания стадий)
       assignedToId?: string | null;
       contactId?: string | null;
       companyId?: string | null;
@@ -457,6 +501,7 @@ export class CsvImportService {
               usersMap,
               defaultAssignedToId,
               contactEmailPhoneMap,
+              csvStagesMap,
             );
             if (dealData) {
               rows.push(dealData);
@@ -482,39 +527,201 @@ export class CsvImportService {
           try {
             // Batch обработка сделок
             if (rows.length > 0) {
-              if (dryRun) {
-                // В режиме dry-run только симулируем импорт
-                // Проверяем существующие сделки по number
-                const numbers = rows.map(r => r.number).filter((n): n is string => Boolean(n));
-                const existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
-                
-                let willCreate = 0;
-                let willUpdate = 0;
-                
-                rows.forEach((row) => {
-                  if (existingDeals.has(row.number)) {
-                    willUpdate++;
-                  } else {
-                    willCreate++;
-                  }
-                });
-                
-                summary.created = willCreate;
-                summary.updated = willUpdate;
-              } else {
-                const result = await this.importBatchService.batchCreateDeals(rows, userId);
-                summary.created += result.created;
-                summary.updated += result.updated;
-                summary.failed += result.errors.length;
-
-                result.errors.forEach((err) => {
-                  errors.push({
-                    row: err.row >= 0 ? err.row : -1,
-                    error: err.error,
-                  });
-                });
+              // Получаем pipeline со стадиями
+              const pipeline = await this.prisma.pipeline.findUnique({
+                where: { id: pipelineId },
+                include: {
+                  stages: {
+                    orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+                  },
+                },
+              });
+              
+              if (!pipeline) {
+                throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
               }
+              
+              const defaultStageId = pipeline.stages.find(s => s.isDefault)?.id || pipeline.stages[0]?.id;
+              
+              // Собираем уникальные стадии из CSV и сравниваем с существующими
+              const existingStageNames = new Set(
+                pipeline.stages.map(s => s.name.toLowerCase())
+              );
+              
+              const stagesToCreate: StageToCreate[] = [];
+              const stagesToCreateMap = new Map<string, number>(); // stageName -> order
+              
+              // Определяем стадии, которые нужно создать
+              csvStagesMap.forEach((firstRowNumber, stageName) => {
+                const normalizedName = stageName.toLowerCase();
+                if (!existingStageNames.has(normalizedName)) {
+                  // Стадия не существует - нужно создать
+                  const order = stagesToCreate.length + pipeline.stages.length;
+                  stagesToCreate.push({
+                    name: stageName.trim(), // Сохраняем оригинальное имя (с учетом регистра)
+                    order: order,
+                  });
+                  stagesToCreateMap.set(stageName.trim(), order);
+                }
+              });
+              
+              // Сортируем стадии по порядку первого появления в CSV
+              stagesToCreate.sort((a, b) => {
+                const aRow = csvStagesMap.get(a.name) || 0;
+                const bRow = csvStagesMap.get(b.name) || 0;
+                return aRow - bRow;
+              });
+              
+              // Обновляем order для стадий с учетом порядка появления
+              stagesToCreate.forEach((stage, index) => {
+                stage.order = pipeline.stages.length + index;
+              });
+              
+              // Создаем недостающие стадии при actual import
+              const createdStagesMap = new Map<string, string>(); // stageName -> stageId
+              
+              if (!dryRun && stagesToCreate.length > 0) {
+                for (const stageToCreate of stagesToCreate) {
+                  try {
+                    const newStage = await this.prisma.stage.create({
+                      data: {
+                        name: stageToCreate.name,
+                        order: stageToCreate.order,
+                        pipelineId: pipelineId,
+                        color: '#6B7280', // Дефолтный цвет
+                        isDefault: false,
+                        isClosed: false,
+                      },
+                    });
+                    createdStagesMap.set(stageToCreate.name, newStage.id);
+                    // Обновляем stagesMap для использования в дальнейшей обработке
+                    stagesMap.set(stageToCreate.name, newStage.id);
+                    stagesMap.set(newStage.id, newStage.id);
+                  } catch (error) {
+                    errors.push({
+                      row: csvStagesMap.get(stageToCreate.name) || -1,
+                      field: 'stageId',
+                      value: stageToCreate.name,
+                      error: `Failed to create stage "${stageToCreate.name}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    });
+                  }
+                }
+              }
+              
+              // Обновляем stageId для строк с созданными стадиями
+              rows.forEach((row) => {
+                // Если stageId не установлен, но есть stageValue, пробуем найти в созданных стадиях
+                if (!row.stageId && row.stageValue) {
+                  // Пробуем найти в созданных стадиях
+                  const createdStageId = createdStagesMap.get(row.stageValue);
+                  if (createdStageId) {
+                    row.stageId = createdStageId;
+                  } else {
+                    // Пробуем найти в обновленном stagesMap
+                    const foundStageId = stagesMap.get(row.stageValue);
+                    if (foundStageId) {
+                      row.stageId = foundStageId;
+                    } else if (defaultStageId) {
+                      // Если не найдено, используем дефолтную стадию
+                      row.stageId = defaultStageId;
+                    }
+                  }
+                } else if (!row.stageId && defaultStageId) {
+                  // Если stageValue нет, но есть дефолтная стадия, используем её
+                  row.stageId = defaultStageId;
+                }
+              });
+              
+              // Устанавливаем дефолтную стадию для строк без stageId
+              rows.forEach((row) => {
+                if (!row.stageId && defaultStageId) {
+                  row.stageId = defaultStageId;
+                }
+              });
+              
+              // Обновляем stageId для строк, где стадия была создана
+              const updatedRows = rows.map((row) => {
+                // Если stageId не установлен, но есть stageValue, пробуем найти в созданных стадиях
+                if (!row.stageId && row.stageValue) {
+                  const createdStageId = createdStagesMap.get(row.stageValue);
+                  if (createdStageId) {
+                    row.stageId = createdStageId;
+                  } else {
+                    // Пробуем найти в обновленном stagesMap
+                    const foundStageId = stagesMap.get(row.stageValue);
+                    if (foundStageId) {
+                      row.stageId = foundStageId;
+                    }
+                  }
+                }
+                return row;
+              });
+              
+              // Проверка наличия stageId на этапе dry-run/import
+              updatedRows.forEach((row, index) => {
+                if (!row.stageId) {
+                  errors.push({
+                    row: index + 2, // +2 потому что rowNumber начинается с 1, а индекс с 0
+                    field: 'stageId',
+                    error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
+                  });
+                  summary.failed++;
+                }
+              });
+              
+              // Фильтруем строки без stageId для дальнейшей обработки
+              const validRows = updatedRows.filter(row => row.stageId);
+              
+              if (validRows.length > 0) {
+                if (dryRun) {
+                  // В режиме dry-run только симулируем импорт
+                  // Проверяем существующие сделки по number
+                  const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
+                  const existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                  
+                  let willCreate = 0;
+                  let willUpdate = 0;
+                  
+                  validRows.forEach((row) => {
+                    if (row.number && existingDeals.has(row.number)) {
+                      willUpdate++;
+                    } else {
+                      willCreate++;
+                    }
+                  });
+                  
+                  summary.created = willCreate;
+                  summary.updated = willUpdate;
+                } else {
+                  const result = await this.importBatchService.batchCreateDeals(validRows, userId);
+                  summary.created += result.created;
+                  summary.updated += result.updated;
+                  summary.failed += result.errors.length;
+
+                  result.errors.forEach((err) => {
+                    errors.push({
+                      row: err.row >= 0 ? err.row : -1,
+                      error: err.error,
+                    });
+                  });
+                }
+              }
+              
+              // Возвращаем результат с информацией о стадиях для создания
+              resolve({
+                summary,
+                errors,
+                stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
+              });
+              return;
             }
+            
+            // Если нет строк для обработки
+            resolve({
+              summary,
+              errors,
+              stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
+            });
 
             resolve({
               summary,
@@ -560,10 +767,18 @@ export class CsvImportService {
   } | null {
     // Получаем значение из CSV по маппингу
     const getValue = (fieldName?: string): string | undefined => {
+
       if (!fieldName) return undefined;
+
       const value = csvRow[fieldName];
+
       return value?.trim() || undefined;
+
     };
+
+    // Number опционален
+    const numberValue = getValue(mapping.number);
+
 
     // FullName обязателен
     const fullNameValue = getValue(mapping.fullName);
@@ -576,6 +791,8 @@ export class CsvImportService {
       return null;
     }
 
+
+
     const fullName = sanitizeTextFields(fullNameValue);
     if (!fullName) {
       errors.push({
@@ -586,6 +803,8 @@ export class CsvImportService {
       });
       return null;
     }
+
+
 
     // Email и phone - хотя бы один должен быть
     const emailValue = getValue(mapping.email);
@@ -598,6 +817,8 @@ export class CsvImportService {
       });
       return null;
     }
+
+
 
     // Нормализация email и phone
     const normalizedEmail = emailValue ? normalizeEmail(emailValue) : null;
@@ -612,6 +833,8 @@ export class CsvImportService {
       });
     }
 
+
+
     if (phoneValue && !normalizedPhone) {
       errors.push({
         row: rowNumber,
@@ -621,6 +844,8 @@ export class CsvImportService {
       });
     }
 
+
+
     // Парсинг tags (разделенные запятой)
     const tags: string[] = [];
     if (mapping.tags) {
@@ -629,6 +854,8 @@ export class CsvImportService {
         tags.push(...tagsValue.split(',').map((t) => t.trim()).filter(Boolean));
       }
     }
+
+
 
     // Social links
     let social: any = undefined;
@@ -660,6 +887,8 @@ export class CsvImportService {
       }
     }
 
+
+
     // Новые поля
     const link = sanitizeOptionalTextFields(getValue(mapping.link));
     const subscriberCount = sanitizeOptionalTextFields(getValue(mapping.subscriberCount));
@@ -675,6 +904,8 @@ export class CsvImportService {
       }
     }
 
+
+
     // Парсинг contactMethods (разделенные запятой)
     const contactMethods: string[] = [];
     if (mapping.contactMethods) {
@@ -683,6 +914,8 @@ export class CsvImportService {
         contactMethods.push(...methodsValue.split(',').map((m) => m.trim()).filter(Boolean));
       }
     }
+
+
 
     return {
       fullName,
@@ -716,13 +949,15 @@ export class CsvImportService {
     usersMap: Map<string, string>, // userName/email -> userId
     defaultAssignedToId?: string,
     contactEmailPhoneMap?: Map<string, string>,
+    csvStagesMap?: Map<string, number>, // stageName -> firstRowNumber (для сбора стадий из CSV)
   ): {
-    number: string;
+    number?: string;
     title: string;
     amount?: number | string | null;
     budget?: number | string | null;
     pipelineId: string;
-    stageId: string;
+    stageId?: string;
+    stageValue?: string; // Оригинальное значение стадии из CSV
     assignedToId?: string | null;
     contactId?: string | null;
     companyId?: string | null;
@@ -732,21 +967,17 @@ export class CsvImportService {
     rejectionReasons?: string[];
   } | null {
     const getValue = (fieldName?: string): string | undefined => {
+
       if (!fieldName) return undefined;
+
       const value = csvRow[fieldName];
+
       return value?.trim() || undefined;
+
     };
 
-    // Number обязателен
+    // Number опционален
     const numberValue = getValue(mapping.number);
-    if (!numberValue) {
-      errors.push({
-        row: rowNumber,
-        field: 'number',
-        error: 'Deal number is required',
-      });
-      return null;
-    }
 
     // Title обязателен
     const titleValue = getValue(mapping.title);
@@ -759,50 +990,50 @@ export class CsvImportService {
       return null;
     }
 
-    // StageId обязателен и резолвится по имени
+
+
+    // StageId опционален - резолвится по имени если указан
     const stageValue = getValue(mapping.stageId);
+    let stageId: string | undefined = undefined;
 
-    if (!stageValue) {
-      errors.push({
-        row: rowNumber,
-        field: 'stageId',
-        error: 'Stage is required',
-      });
-      return null;
-    }
-
-    // Резолвим stage ID по имени (case-insensitive)
-    let stageId = stageValue;
-    
-    // Сначала пробуем найти по точному совпадению ID
-    if (!stagesMap.has(stageValue)) {
-      // Если не ID, ищем по имени (case-insensitive)
-      const stageName = stageValue.toLowerCase().trim();
-      let foundStageId: string | undefined;
-      
-      const entries = Array.from(stagesMap.entries());
-      for (const [name, id] of entries) {
-        if (name.toLowerCase() === stageName) {
-          foundStageId = id;
-          break;
+    if (stageValue) {
+      // Всегда сохраняем stageValue в csvStagesMap для сбора всех стадий из CSV
+      if (csvStagesMap) {
+        const normalizedStageName = stageValue.trim();
+        if (!csvStagesMap.has(normalizedStageName)) {
+          csvStagesMap.set(normalizedStageName, rowNumber);
         }
       }
       
-      if (foundStageId) {
-        stageId = foundStageId;
+      // Резолвим stage ID по имени (case-insensitive)
+      // Сначала пробуем найти по точному совпадению ID
+      if (stagesMap.has(stageValue)) {
+        // Это уже ID стадии
+        stageId = stagesMap.get(stageValue)!;
       } else {
-        errors.push({
-          row: rowNumber,
-          field: 'stageId',
-          value: stageValue,
-          error: `Stage "${stageValue}" not found in pipeline. Available stages: ${Array.from(stagesMap.keys()).join(', ')}`,
-        });
-        return null;
+        // Если не ID, ищем по имени (case-insensitive)
+        const stageName = stageValue.toLowerCase().trim();
+        let foundStageId: string | undefined;
+        
+        const entries = Array.from(stagesMap.entries());
+        for (const [name, id] of entries) {
+          if (name.toLowerCase() === stageName) {
+            foundStageId = id;
+            break;
+          }
+        }
+        
+        if (foundStageId) {
+          stageId = foundStageId;
+        } else {
+          // Stage указан но не найден - сохраняем для возможного создания
+          // Не добавляем ошибку - стадия будет создана при импорте
+        }
       }
-    } else {
-      // Это уже ID стадии
-      stageId = stagesMap.get(stageValue)!;
     }
+    // Если stageValue не указан - stageId остается undefined (опционально)
+
+
 
     // Резолв contactId через email/phone если указан в mapping
     let contactId: string | undefined = undefined;
@@ -829,6 +1060,8 @@ export class CsvImportService {
       }
     }
 
+
+
     // Парсинг даты
     let expectedCloseAt: Date | null = null;
     if (mapping.expectedCloseAt) {
@@ -848,6 +1081,8 @@ export class CsvImportService {
       }
     }
 
+
+
     // Парсинг tags
     const tags: string[] = [];
     if (mapping.tags) {
@@ -857,17 +1092,23 @@ export class CsvImportService {
       }
     }
 
-    // Резолв assignedToId по имени/email или использование дефолтного
+
+
+    // Резолв assignedToId/ownerId по имени/email или использование дефолтного
     let assignedToId: string | null = null;
     
-    if (defaultAssignedToId) {
-      // Если указан дефолтный ответственный, используем его для всех строк
+    // Приоритет: ownerId > assignedToId > defaultAssignedToId
+    const ownerField = mapping.ownerId || mapping.assignedToId;
+    const ownerFieldName = mapping.ownerId ? 'ownerId' : 'assignedToId';
+    
+    if (defaultAssignedToId && !ownerField) {
+      // Если указан дефолтный ответственный и нет маппинга, используем его для всех строк
       assignedToId = defaultAssignedToId;
-    } else if (mapping.assignedToId) {
-      const assignedToValue = getValue(mapping.assignedToId);
-      if (assignedToValue) {
+    } else if (ownerField) {
+      const ownerValue = getValue(ownerField);
+      if (ownerValue) {
         // Пробуем резолвить по имени или email (case-insensitive)
-        const lookupValue = assignedToValue.toLowerCase().trim();
+        const lookupValue = ownerValue.toLowerCase().trim();
         let foundUserId: string | undefined;
         
         const usersEntries = Array.from(usersMap.entries());
@@ -880,20 +1121,25 @@ export class CsvImportService {
         
         if (foundUserId) {
           assignedToId = foundUserId;
-        } else if (usersMap.has(assignedToValue)) {
+        } else if (usersMap.has(ownerValue)) {
           // Возможно это уже ID пользователя
-          assignedToId = usersMap.get(assignedToValue)!;
+          assignedToId = usersMap.get(ownerValue)!;
         } else {
           // Не найден - добавляем предупреждение но не блокируем импорт
           errors.push({
             row: rowNumber,
-            field: 'assignedToId',
-            value: assignedToValue,
-            error: `User "${assignedToValue}" not found. Deal will be created without assignment. Available users: ${Array.from(new Set(usersEntries.map(([k, v]) => k.split('|')[0]))).slice(0, 5).join(', ')}`,
+            field: ownerFieldName,
+            value: ownerValue,
+            error: `User "${ownerValue}" not found. Deal will be created without assignment. Available users: ${Array.from(new Set(usersEntries.map(([k, v]) => k.split('|')[0]))).slice(0, 5).join(', ')}`,
           });
         }
+      } else if (defaultAssignedToId) {
+        // Если ownerField пустой для этой строки, используем дефолт
+        assignedToId = defaultAssignedToId;
       }
     }
+
+
 
     // Парсинг rejectionReasons (разделенные запятой)
     const rejectionReasons: string[] = [];
@@ -904,6 +1150,8 @@ export class CsvImportService {
       }
     }
 
+
+
     return {
       number: numberValue,
       title: titleValue,
@@ -911,6 +1159,7 @@ export class CsvImportService {
       budget: getValue(mapping.budget) || null,
       pipelineId,
       stageId,
+      stageValue: stageValue || undefined, // Сохраняем оригинальное значение для создания стадий
       assignedToId,
       contactId: contactId || null,
       companyId: getValue(mapping.companyId) || null,
@@ -935,6 +1184,8 @@ export class CsvImportService {
     if (!pipeline) {
       throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
     }
+
+
 
     const stagesMap = new Map<string, string>();
     

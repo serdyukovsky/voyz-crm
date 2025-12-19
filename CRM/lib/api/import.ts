@@ -6,10 +6,11 @@ export interface ImportField {
   key: string
   label: string
   required: boolean
-  type: 'string' | 'number' | 'date' | 'email' | 'phone' | 'select' | 'multi-select' | 'boolean' | 'text'
+  type: 'string' | 'number' | 'date' | 'email' | 'phone' | 'select' | 'multi-select' | 'boolean' | 'text' | 'stage' | 'user'
   description?: string
   options?: Array<{ value: string; label: string }>
   group?: string
+  entity?: 'contact' | 'deal' // For mixed import - indicates which entity this field belongs to
 }
 
 export interface PipelineStage {
@@ -51,20 +52,26 @@ export interface DealsImportMeta {
   users: User[]
 }
 
-export type ImportMeta = ContactsImportMeta | DealsImportMeta
+export interface MixedImportMeta {
+  fields: ImportField[] // Flat array with all fields (contact + deal), each has entity property
+  pipelines: Pipeline[]
+  users: User[]
+}
 
-// Legacy compatibility - combine all fields
+export type ImportMeta = ContactsImportMeta | DealsImportMeta | MixedImportMeta
+
+// Combine all fields from import meta (supports multiple structures)
 export function getAllFields(meta: ImportMeta | any): ImportField[] {
-  // Handle new structure with systemFields and/or customFields
+  // Handle new MIXED structure with flat 'fields' array (priority)
+  if (meta.fields && Array.isArray(meta.fields)) {
+    return meta.fields
+  }
+  
+  // Handle legacy structure with systemFields and/or customFields
   if (meta.systemFields !== undefined || meta.customFields !== undefined) {
     const systemFieldsArray = Array.isArray(meta.systemFields) ? meta.systemFields : []
     const customFieldsArray = Array.isArray(meta.customFields) ? meta.customFields : []
     return [...systemFieldsArray, ...customFieldsArray]
-  }
-  
-  // Handle legacy structure with just 'fields'
-  if (meta.fields && Array.isArray(meta.fields)) {
-    return meta.fields
   }
   
   // Fallback to empty array
@@ -93,10 +100,16 @@ export interface ImportError {
   error: string
 }
 
+export interface StageToCreate {
+  name: string
+  order: number
+}
+
 export interface ImportResult {
   summary: ImportSummary
   errors: ImportError[]
   warnings?: string[]
+  stagesToCreate?: StageToCreate[]
 }
 
 /**
@@ -198,9 +211,16 @@ export async function importContacts(
     return acc
   }, {})
 
+  // CRITICAL: Invert mapping format from {csvColumn: crmField} to {crmField: csvColumn}
+  // Frontend uses {csvColumn: crmField}, but backend expects {crmField: csvColumn}
+  const invertedMapping = Object.entries(cleanMapping).reduce<Record<string, string>>((acc, [csvColumn, crmField]) => {
+    acc[crmField] = csvColumn
+    return acc
+  }, {})
+
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('mapping', JSON.stringify(cleanMapping))
+  formData.append('mapping', JSON.stringify(invertedMapping))
   formData.append('delimiter', delimiter)
 
   // API_BASE_URL уже должен содержать /api
@@ -253,9 +273,16 @@ export async function importDeals(
     return acc
   }, {})
 
+  // CRITICAL: Invert mapping format from {csvColumn: crmField} to {crmField: csvColumn}
+  // Frontend uses {csvColumn: crmField}, but backend expects {crmField: csvColumn}
+  const invertedMapping = Object.entries(cleanMapping).reduce<Record<string, string>>((acc, [csvColumn, crmField]) => {
+    acc[crmField] = csvColumn
+    return acc
+  }, {})
+
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('mapping', JSON.stringify(cleanMapping))
+  formData.append('mapping', JSON.stringify(invertedMapping))
   formData.append('pipelineId', pipelineId)
   if (defaultAssignedToId) {
     formData.append('defaultAssignedToId', defaultAssignedToId)

@@ -134,7 +134,11 @@ function ImportExportContent() {
   }
 
   const handleContinueToMapping = () => {
-    // Pipeline будет выбран на этапе mapping перед dry-run
+    // Для deals проверяем, что pipeline выбран
+    if (entityType === 'deal' && !selectedPipelineId) {
+      showError('Pipeline Required', 'Please select a pipeline before continuing to mapping')
+      return
+    }
     setCurrentStep('mapping')
   }
 
@@ -410,7 +414,7 @@ function ImportExportContent() {
             {currentStep === 'mapping' && csvHeaders.length > 0 && (
               <ErrorBoundary>
                 <div className="space-y-6">
-                  {/* Import Settings Section - для Deals (AssignedTo) */}
+                  {/* Import Settings Section - для Deals (только AssignedTo, pipeline уже выбран) */}
                   {entityType === 'deal' && (
                     <div className="space-y-4">
                       <div className="border-l-4 border-primary pl-4">
@@ -421,6 +425,29 @@ function ImportExportContent() {
                           {t('importExport.selectOwner')}
                         </p>
                       </div>
+                      
+                      {/* Показываем выбранный pipeline (read-only) */}
+                      {selectedPipelineId && (
+                        <div className="p-3 border border-border rounded-lg bg-muted/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">
+                                {t('importExport.selectedPipeline')}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {pipelines.find(p => p.id === selectedPipelineId)?.name || selectedPipelineId}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentStep('preview')}
+                            >
+                              {t('importExport.change')}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       
                       <AssignedToSelector
                         selectedUserId={defaultAssignedToId}
@@ -454,40 +481,6 @@ function ImportExportContent() {
                       selectedPipelineId={selectedPipelineId}
                     />
                   </div>
-                  
-                  {/* Pipeline Selection for Deals - перед Dry run */}
-                  {entityType === 'deal' && (
-                    <div className="space-y-4 pt-4 border-t border-border">
-                      <div className="border-l-4 border-primary pl-4">
-                        <h3 className="text-base font-semibold text-foreground mb-1">
-                          {t('importExport.selectPipeline')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {t('importExport.pipelineRequiredForDryRun')}
-                        </p>
-                      </div>
-                      
-                      <PipelineSelector
-                        selectedPipelineId={selectedPipelineId}
-                        onPipelineChange={setSelectedPipelineId}
-                      />
-                      
-                      {/* Подсказка если pipeline не выбран */}
-                      {!selectedPipelineId && (
-                        <div className="flex items-start gap-2 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                              {t('importExport.pipelineRequired')}
-                            </p>
-                            <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
-                              {t('importExport.selectPipelineToRunDryRun')}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                   
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-4 border-t border-border">
@@ -525,7 +518,6 @@ function ImportExportContent() {
                 <DryRunSummary
                   summary={dryRunResult.summary}
                   errors={dryRunResult.errors}
-                  stagesToCreate={dryRunResult.stagesToCreate}
                   isLoading={isImporting}
                   onConfirm={handleConfirmImport}
                   onCancel={() => setCurrentStep('mapping')}

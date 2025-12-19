@@ -38,6 +38,8 @@ interface AutoMappingFormProps {
   onMappingChange: (mapping: Record<string, string | undefined>) => void
   initialMapping?: Record<string, string | undefined>
   csvSampleData?: ParsedCsvRow[]
+  selectedPipelineId?: string
+  onValidationChange?: (isValid: boolean, missingFields: string[]) => void
 }
 
 export function AutoMappingForm({ 
@@ -46,6 +48,8 @@ export function AutoMappingForm({
   onMappingChange,
   initialMapping = {},
   csvSampleData = [],
+  selectedPipelineId,
+  onValidationChange,
 }: AutoMappingFormProps) {
   const { t, language } = useTranslation()
   const [importMeta, setImportMeta] = useState<ImportMeta | null>(null)
@@ -71,11 +75,21 @@ export function AutoMappingForm({
   const [createFieldForColumn, setCreateFieldForColumn] = useState<string | null>(null)
   
   // Helper to get field display name (description for Russian, label otherwise)
+  // Adds entity prefix if field has entity property
   const getFieldLabel = (field: ImportField) => {
+    let label: string
     if (language === 'ru' && field.description) {
-      return field.description
+      label = field.description
+    } else {
+      label = field.label
     }
-    return field.label
+    
+    // Add entity prefix if field has entity property
+    if (field.entity) {
+      return `${field.entity.toUpperCase()}: ${label}`
+    }
+    
+    return label
   }
 
   // Загружаем метаданные полей CRM
@@ -113,20 +127,25 @@ export function AutoMappingForm({
     onMappingChange(mapping)
   }, [mapping])
 
+  // Notify parent about validation state changes
+  useEffect(() => {
+    if (onValidationChange && crmFields.length > 0) {
+      const missingFields = getMissingRequiredFields()
+      const isValid = missingFields.length === 0
+      const missingFieldLabels = missingFields.map(f => getFieldLabel(f))
+      onValidationChange(isValid, missingFieldLabels)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapping, crmFields])
+
   const loadFields = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      console.log('Loading import meta for entity type:', entityType)
       const meta = await getImportMeta(entityType)
-      console.log('Import meta loaded:', meta)
-      console.log('meta.systemFields:', meta.systemFields)
-      console.log('meta.customFields:', meta.customFields)
       setImportMeta(meta)
       // Combine system and custom fields for backward compatibility
       const allFields = getAllFields(meta)
-      console.log('All fields after getAllFields:', allFields)
-      console.log('All fields count:', allFields.length)
       setCrmFields(allFields)
     } catch (err) {
       console.error('Error loading import meta:', err)
@@ -235,6 +254,45 @@ export function AutoMappingForm({
       }
     }
     return samples
+  }
+
+  // Helper to check if a field is a stage field
+  const isStageField = (fieldKey: string | undefined): boolean => {
+    if (!fieldKey) return false
+    const field = crmFields.find(f => f.key === fieldKey)
+    return field?.type === 'stage'
+  }
+
+  // Helper to get stages from the selected pipeline
+  const getSelectedPipelineStages = () => {
+    if (!importMeta || !('pipelines' in importMeta)) return []
+    if (!selectedPipelineId) return []
+    
+    const pipeline = importMeta.pipelines.find(p => p.id === selectedPipelineId)
+    return pipeline?.stages || []
+  }
+
+  // Helper to check if mapping has any stage fields
+  const hasStageFieldMapped = (): boolean => {
+    return Object.values(mapping).some(fieldKey => isStageField(fieldKey))
+  }
+
+  // Helper to get required fields
+  const getRequiredFields = (): ImportField[] => {
+    return crmFields.filter(field => field.required)
+  }
+
+  // Helper to check which required fields are not mapped
+  const getMissingRequiredFields = (): ImportField[] => {
+    const requiredFields = getRequiredFields()
+    const mappedFieldKeys = new Set(Object.values(mapping).filter(v => v !== undefined))
+    
+    return requiredFields.filter(field => !mappedFieldKeys.has(field.key))
+  }
+
+  // Helper to check if all required fields are mapped
+  const isValidMapping = (): boolean => {
+    return getMissingRequiredFields().length === 0
   }
 
   if (error) {
@@ -371,53 +429,90 @@ export function AutoMappingForm({
                     <SelectValue placeholder={t('common.select')} />
                   </SelectTrigger>
                   <SelectContent>
+                    {/* DEBUG: Show if data is loading */}
+                    {isLoading && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        ⏳ Loading fields...
+                      </div>
+                    )}
+                    {!isLoading && !importMeta && (
+                      <div className="px-2 py-1.5 text-xs text-destructive">
+                        ❌ Failed to load import meta!
+                      </div>
+                    )}
+                    {!isLoading && importMeta && (!importMeta.systemFields || importMeta.systemFields.length === 0) && (
+                      <div className="px-2 py-1.5 text-xs text-destructive">
+                        ❌ No system fields found! systemFields: {JSON.stringify(importMeta.systemFields)}
+                      </div>
+                    )}
+                    
                     {/* Sentinel value for "skip" - never use empty string "" */}
                     <SelectItem value={SKIP_COLUMN_VALUE}>{t('importExport.skipColumn')}</SelectItem>
                     
-                    {/* Group fields by category if new metadata structure is available */}
-                    {importMeta && 'systemFields' in importMeta && Array.isArray(importMeta.systemFields) && importMeta.systemFields.length > 0 && (
+                    {/* If current mapping is a stage field, show stages from selected pipeline */}
+                    {isStageField(normalizedMapping) ? (
                       <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{t('importExport.systemFields')}</div>
-                        {importMeta.systemFields.map((field) => (
-                          <SelectItem key={field.key} value={field.key}>
-                            <div className="flex items-center gap-2">
-                              <span>{getFieldLabel(field)}</span>
-                              {field.required && (
-                                <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                              )}
+                        {!selectedPipelineId ? (
+                          <div className="px-3 py-2 text-xs text-destructive bg-destructive/10 rounded-md mx-2 my-1">
+                            <span className="font-medium">⚠️ {t('importExport.pipelineRequired')}</span>
+                            <br/>
+                            <span className="text-destructive/80">{t('importExport.selectPipelineFirst')}</span>
+                          </div>
+                        ) : getSelectedPipelineStages().length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-yellow-600 bg-yellow-50 rounded-md mx-2 my-1">
+                            <span className="font-medium">ℹ️ {t('importExport.noStagesInPipeline')}</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20">
+                              📍 {t('importExport.mapCsvValueToStage')}
                             </div>
-                          </SelectItem>
-                        ))}
+                            {getSelectedPipelineStages().map((stage) => (
+                              <SelectItem key={stage.id} value={stage.name}>
+                                <div className="flex items-center gap-2">
+                                  {stage.color && (
+                                    <div 
+                                      className="w-2 h-2 rounded-full" 
+                                      style={{ backgroundColor: stage.color }}
+                                    />
+                                  )}
+                                  <span>{stage.name}</span>
+                                  {stage.isDefault && (
+                                    <Badge variant="outline" className="text-xs">Default</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* Show regular field mapping - ALL fields from meta without entity filtering */
+                      <>
+                        {/* Show ALL fields from crmFields (which includes all fields from meta) */}
+                        {crmFields.length > 0 && (
+                          <>
+                            {crmFields.map((field) => (
+                              <SelectItem key={field.key} value={field.key}>
+                                <div className="flex items-center gap-2">
+                                  <span>{getFieldLabel(field)}</span>
+                                  {field.required && (
+                                    <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        
+                        {/* Fallback if no fields available */}
+                        {crmFields.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t('importExport.noFieldsAvailable')}
+                          </div>
+                        )}
                       </>
                     )}
-                    
-                    {importMeta && 'customFields' in importMeta && Array.isArray(importMeta.customFields) && importMeta.customFields.length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">{t('importExport.customFields')}</div>
-                        {importMeta.customFields.map((field) => (
-                          <SelectItem key={field.key} value={field.key}>
-                            <div className="flex items-center gap-2">
-                              <span>{getFieldLabel(field)}</span>
-                              {field.required && (
-                                <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    
-                    {/* Fallback for legacy structure without groups OR when systemFields not available */}
-                    {(!importMeta || !('systemFields' in importMeta) || !Array.isArray(importMeta.systemFields)) && crmFields.map((field) => (
-                      <SelectItem key={field.key} value={field.key}>
-                        <div className="flex items-center gap-2">
-                          <span>{getFieldLabel(field)}</span>
-                          {field.required && (
-                            <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -441,11 +536,51 @@ export function AutoMappingForm({
         })}
       </div>
 
+      {/* Validation error if required fields are not mapped */}
+      {!isValidMapping() && (
+        <div className="flex items-start gap-2 p-3 border border-destructive/20 bg-destructive/5 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Required Fields Missing</p>
+            <p className="text-xs text-destructive/80 mt-1">
+              The following required fields must be mapped before you can proceed:
+            </p>
+            <ul className="mt-2 space-y-1">
+              {getMissingRequiredFields().map(field => (
+                <li key={field.key} className="text-xs text-destructive/80 flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-destructive/60" />
+                  <strong>{getFieldLabel(field)}</strong>
+                  {field.description && field.description !== getFieldLabel(field) && (
+                    <span className="text-destructive/60">({field.description})</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Warning if stage field is mapped but no pipeline selected */}
+      {entityType === 'deal' && hasStageFieldMapped() && !selectedPipelineId && (
+        <div className="flex items-start gap-2 p-3 border border-destructive/20 bg-destructive/5 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-destructive">Pipeline Required</p>
+            <p className="text-xs text-destructive/80 mt-1">
+              You have mapped a Stage field, but no pipeline is selected. Please select a pipeline above to see available stages.
+            </p>
+          </div>
+        </div>
+      )}
+
       {crmFields.length > 0 && (
         <div className="p-3 border border-border/50 bg-muted/20 rounded-lg">
           <p className="text-xs text-muted-foreground">
             <strong>Tip:</strong> Fields marked as "Required" must be mapped for the import to succeed.
             Auto-mapped fields with high confidence are pre-selected. Click the <Plus className="inline h-3 w-3 mx-0.5" /> button to create a new custom field.
+            {entityType === 'deal' && hasStageFieldMapped() && selectedPipelineId && (
+              <> When mapping stage fields, CSV values will be matched to stage names in the selected pipeline.</>
+            )}
           </p>
         </div>
       )}

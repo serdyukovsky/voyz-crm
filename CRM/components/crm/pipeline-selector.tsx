@@ -34,10 +34,7 @@ export function PipelineSelector({ selectedPipelineId, onPipelineChange }: Pipel
         const data = await getPipelines()
         setPipelines(data)
         
-        // Автоматически выбираем первый pipeline если еще ничего не выбрано
-        if (!selectedPipelineId && data.length > 0) {
-          onPipelineChange(data[0].id)
-        }
+        // Не выбираем автоматически - пользователь должен явно выбрать pipeline
       } catch (err) {
         console.error('Failed to load pipelines:', err)
         setError(err instanceof Error ? err.message : 'Failed to load pipelines')

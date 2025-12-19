@@ -151,6 +151,7 @@ model User {
   @@index([email])
   @@index([role])
   @@map("users")
+  chatThreadParticipants ChatThreadParticipant[]
 }
 
 model UserPermission {
@@ -366,6 +367,7 @@ model Deal {
   @@index([createdAt])
   @@index([updatedAt]) // Restored for CSV import: optimizes sorting and filtering by update date
   @@map("deals")
+  chatThreads ChatThread[]
 }
 
 // ============================================
@@ -459,6 +461,7 @@ model Task {
   @@index([deadline])
   @@index([type])
   @@map("tasks")
+  chatThreads ChatThread[]
 }
 
 // ============================================
@@ -584,6 +587,9 @@ model Message {
 
   @@index([dealId])
   @@index([externalMessageId, integrationType])
+  thread ChatThread? @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId String?
+
   @@index([integrationType, direction])
   @@index([createdAt])
   @@map("messages")
@@ -697,4 +703,43 @@ model Log {
   @@index([userId])
   @@index([createdAt])
   @@map("logs")
+}
+
+// ============================================
+// CHAT
+// ============================================
+
+model ChatThread {
+  id        String   @id @default(uuid())
+  dealId    String?
+  taskId    String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  deal         Deal?                 @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task         Task?                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  participants ChatThreadParticipant[]
+  messages     Message[]
+
+  @@index([dealId])
+  @@index([taskId])
+  @@map("chat_threads")
+}
+
+model ChatThreadParticipant {
+  id        String   @id @default(uuid())
+  threadId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([threadId])
+  @@index([userId])
+  @@map("chat_thread_participants")
 }
