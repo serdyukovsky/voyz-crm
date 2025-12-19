@@ -59,6 +59,12 @@ export class CsvImportService {
       { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона', group: 'basic' },
       { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность', group: 'basic' },
       { key: 'companyName', label: 'Company Name', required: false, type: 'string', description: 'Название компании', group: 'basic' },
+      { key: 'link', label: 'Link', required: false, type: 'string', description: 'Ссылка', group: 'other' },
+      { key: 'subscriberCount', label: 'Subscriber Count', required: false, type: 'string', description: 'Кол-во подписчиков', group: 'other' },
+      { key: 'directions', label: 'Directions', required: false, type: 'string', description: 'Направление (через запятую)', group: 'other' },
+      { key: 'contactMethods', label: 'Contact Methods', required: false, type: 'string', description: 'Способ связи (через запятую): Whatsapp, Telegram, Direct', group: 'other' },
+      { key: 'websiteOrTgChannel', label: 'Website/TG Channel', required: false, type: 'string', description: 'Сайт, тг канал', group: 'other' },
+      { key: 'contactInfo', label: 'Contact Info', required: false, type: 'string', description: 'Контакт (номер телефона или никнейм в телеграме)', group: 'other' },
       { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
       { key: 'notes', label: 'Notes', required: false, type: 'text', description: 'Заметки', group: 'other' },
       { key: 'instagram', label: 'Instagram', required: false, type: 'string', description: 'Instagram профиль', group: 'social' },
@@ -96,6 +102,7 @@ export class CsvImportService {
       { key: 'assignedToId', label: 'Assigned To', required: false, type: 'string', description: 'Ответственный (имя или email пользователя, будет автоматически резолвлено)', group: 'basic' },
       { key: 'expectedCloseAt', label: 'Expected Close Date', required: false, type: 'date', description: 'Ожидаемая дата закрытия', group: 'other' },
       { key: 'description', label: 'Description', required: false, type: 'text', description: 'Описание', group: 'other' },
+      { key: 'rejectionReasons', label: 'Rejection Reasons', required: false, type: 'string', description: 'Причина отказа (через запятую)', group: 'other' },
       { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
     ];
 
