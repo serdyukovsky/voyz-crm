@@ -1,20 +1,24 @@
 import { getApiBaseUrl } from '@/lib/config'
+import { apiFetch, NetworkError } from './api-client'
 
 export interface LoginDto {
   email: string
   password: string
 }
 
+export interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: string
+  permissions?: string[]
+}
+
 export interface LoginResponse {
   access_token: string
   refresh_token?: string
-  user: {
-    id: string
-    email: string
-    firstName: string
-    lastName: string
-    role: string
-  }
+  user: User
 }
 
 export async function login(credentials: LoginDto): Promise<LoginResponse> {
@@ -67,6 +71,39 @@ export async function login(credentials: LoginDto): Promise<LoginResponse> {
   }
 }
 
+/**
+ * Get current authenticated user
+ * Returns user if token is valid, throws error if token is expired/invalid
+ * Throws NetworkError if backend is unavailable (does not clear auth state)
+ */
+export async function getCurrentUser(): Promise<User> {
+  try {
+    const response = await apiFetch('/auth/me')
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('UNAUTHORIZED')
+      }
+      throw new Error('Failed to get current user')
+    }
+    
+    return response.json()
+  } catch (error) {
+    // Re-throw NetworkError as-is (preserves auth state)
+    if (error instanceof NetworkError) {
+      throw error
+    }
+    
+    // For other errors during fetch (network issues), throw NetworkError
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new NetworkError('Cannot connect to backend server')
+    }
+    
+    // Re-throw other errors
+    throw error
+  }
+}
+
 export async function logout() {
   // Try to call logout API before clearing tokens
   try {
@@ -95,10 +132,12 @@ export async function logout() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('user')
+  localStorage.removeItem('user_id')
+  localStorage.removeItem('userId')
 }
 
+// Legacy function - kept for backward compatibility but should not be used
 export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false
   return !!localStorage.getItem('access_token')
 }
-

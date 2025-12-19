@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -8,6 +8,10 @@ import { Toaster } from '@/components/ui/sonner'
 import { Toaster as ToastToaster } from '@/components/ui/toaster'
 import { queryClient } from '@/lib/query-client'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
+import { AuthProvider, useAuth } from '@/contexts/auth-context'
+import { ProtectedRoute } from '@/components/auth/protected-route'
+import { BackendUnavailableBanner } from '@/components/backend/backend-unavailable-banner'
+import { setGlobalUnauthorizedHandler } from '@/lib/api/api-client'
 // Temporarily disabled Analytics to debug white screen
 // import { Analytics } from '@vercel/analytics/react'
 
@@ -35,6 +39,162 @@ const SettingsProfilePage = lazy(() => import('./pages/SettingsProfilePage'))
 const SettingsShortcutsPage = lazy(() => import('./pages/SettingsShortcutsPage'))
 const SettingsUsersPage = lazy(() => import('./pages/SettingsUsersPage'))
 
+// Component to set up global unauthorized handler
+function UnauthorizedHandler() {
+  const { logout } = useAuth()
+  
+  useEffect(() => {
+    // Set global handler for 401 responses
+    setGlobalUnauthorizedHandler(() => {
+      logout()
+    })
+  }, [logout])
+  
+  return null
+}
+
+function AppRoutes() {
+  return (
+    <>
+      <BackendUnavailableBanner />
+      <Routes>
+      {/* Auth pages - load immediately (not lazy, no Suspense) */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      
+      {/* Protected routes - all require authentication */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <DashboardPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard" element={<Navigate to="/" replace />} />
+      <Route path="/deals" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <DealsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/deals/:id" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <DealDetailPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/tasks" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <TasksPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/contacts" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <ContactsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/contacts/:id" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <ContactDetailPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/companies" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <CompaniesPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/companies/:id" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <CompanyDetailPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/analytics" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <AnalyticsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/logs" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <LogsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/import-export" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <ImportExportPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <UsersPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/pipelines" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsPipelinesPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/preferences" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsPreferencesPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/profile" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsProfilePage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/shortcuts" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsShortcutsPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/users" element={
+        <ProtectedRoute>
+          <Suspense fallback={<PageSkeleton />}>
+            <SettingsUsersPage />
+          </Suspense>
+        </ProtectedRoute>
+      } />
+      </Routes>
+    </>
+  )
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -46,109 +206,15 @@ function App() {
           disableTransitionOnChange
         >
           <BrowserRouter>
-            <Routes>
-              {/* Auth pages - load immediately (not lazy, no Suspense) */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              
-              {/* Other pages - lazy loaded with Suspense */}
-              <Route path="/" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <DashboardPage />
-                </Suspense>
-              } />
-              <Route path="/dashboard" element={<Navigate to="/" replace />} />
-              <Route path="/deals" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <DealsPage />
-                </Suspense>
-              } />
-              <Route path="/deals/:id" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <DealDetailPage />
-                </Suspense>
-              } />
-              <Route path="/tasks" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <TasksPage />
-                </Suspense>
-              } />
-              <Route path="/contacts" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <ContactsPage />
-                </Suspense>
-              } />
-              <Route path="/contacts/:id" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <ContactDetailPage />
-                </Suspense>
-              } />
-              <Route path="/companies" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <CompaniesPage />
-                </Suspense>
-              } />
-              <Route path="/companies/:id" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <CompanyDetailPage />
-                </Suspense>
-              } />
-              <Route path="/analytics" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <AnalyticsPage />
-                </Suspense>
-              } />
-              <Route path="/logs" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <LogsPage />
-                </Suspense>
-              } />
-              <Route path="/import-export" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <ImportExportPage />
-                </Suspense>
-              } />
-              <Route path="/users" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <UsersPage />
-                </Suspense>
-              } />
-              <Route path="/settings" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsPage />
-                </Suspense>
-              } />
-              <Route path="/settings/pipelines" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsPipelinesPage />
-                </Suspense>
-              } />
-              <Route path="/settings/preferences" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsPreferencesPage />
-                </Suspense>
-              } />
-              <Route path="/settings/profile" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsProfilePage />
-                </Suspense>
-              } />
-              <Route path="/settings/shortcuts" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsShortcutsPage />
-                </Suspense>
-              } />
-              <Route path="/settings/users" element={
-                <Suspense fallback={<PageSkeleton />}>
-                  <SettingsUsersPage />
-                </Suspense>
-              } />
-            </Routes>
-        </BrowserRouter>
-        <Toaster />
-        <ToastToaster />
-        {/* <Analytics /> */}
-        <ReactQueryDevtools initialIsOpen={false} />
+            <AuthProvider>
+              <UnauthorizedHandler />
+              <AppRoutes />
+            </AuthProvider>
+          </BrowserRouter>
+          <Toaster />
+          <ToastToaster />
+          {/* <Analytics /> */}
+          <ReactQueryDevtools initialIsOpen={false} />
         </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>
