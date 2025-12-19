@@ -55,10 +55,11 @@ export type ImportMeta = ContactsImportMeta | DealsImportMeta
 
 // Legacy compatibility - combine all fields
 export function getAllFields(meta: ImportMeta | any): ImportField[] {
-  // Handle new structure with systemFields and customFields
-  if (meta.systemFields && meta.customFields) {
-    return [...(Array.isArray(meta.systemFields) ? meta.systemFields : []), 
-            ...(Array.isArray(meta.customFields) ? meta.customFields : [])]
+  // Handle new structure with systemFields and/or customFields
+  if (meta.systemFields !== undefined || meta.customFields !== undefined) {
+    const systemFieldsArray = Array.isArray(meta.systemFields) ? meta.systemFields : []
+    const customFieldsArray = Array.isArray(meta.customFields) ? meta.customFields : []
+    return [...systemFieldsArray, ...customFieldsArray]
   }
   
   // Handle legacy structure with just 'fields'
