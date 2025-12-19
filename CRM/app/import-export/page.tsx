@@ -5,6 +5,8 @@ import { CRMLayout } from "@/components/crm/layout"
 import { ImportUploader } from "@/components/crm/import-uploader"
 import { ImportPreviewTable } from "@/components/crm/import-preview-table"
 import { AutoMappingForm } from "@/components/crm/auto-mapping-form"
+import { PipelineSelector } from "@/components/crm/pipeline-selector"
+import { AssignedToSelector } from "@/components/crm/assigned-to-selector"
 import { DryRunSummary } from "@/components/crm/dry-run-summary"
 import { ImportResult } from "@/components/crm/import-result"
 import { ExportPanel } from "@/components/crm/export-panel"
@@ -30,6 +32,13 @@ function ImportExportContent() {
   
   // Mapping (undefined means "not selected", not empty string)
   const [mapping, setMapping] = useState<Record<string, string | undefined>>({})
+  
+  // Pipeline для deal import (обязательно для resolution stages)
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined)
+  
+  // Default assigned user для deal import (опционально, для "apply to all")
+  const [defaultAssignedToId, setDefaultAssignedToId] = useState<string | undefined>(undefined)
+  const [applyAssignedToAll, setApplyAssignedToAll] = useState(false)
   
   // Dry-run
   const [dryRunResult, setDryRunResult] = useState<ImportResultType | null>(null)
@@ -71,6 +80,9 @@ function ImportExportContent() {
       setCsvHeaders(headers)
       setCsvRows(rows)
       setMapping({})
+      setSelectedPipelineId(undefined)
+      setDefaultAssignedToId(undefined)
+      setApplyAssignedToAll(false)
       setDryRunResult(null)
       setImportResult(null)
       setError(null)
@@ -98,13 +110,28 @@ function ImportExportContent() {
   const handleDryRun = async () => {
     if (!uploadedFile) return
 
+    // Валидация для deals: требуется выбрать pipeline
+    if (entityType === 'deal' && !selectedPipelineId) {
+      const errorMessage = 'Please select a pipeline before performing dry-run'
+      setError(errorMessage)
+      showError('Pipeline required', errorMessage)
+      return
+    }
+
     setIsDryRunLoading(true)
     setError(null)
 
     try {
       const result = entityType === 'contact'
         ? await importContacts(uploadedFile, mapping, ',', true)
-        : await importDeals(uploadedFile, mapping, ',', true)
+        : await importDeals(
+            uploadedFile, 
+            mapping, 
+            selectedPipelineId!, 
+            ',', 
+            true,
+            applyAssignedToAll ? defaultAssignedToId : undefined
+          )
 
       setDryRunResult(result)
       setCurrentStep('dry-run')
@@ -120,13 +147,28 @@ function ImportExportContent() {
   const handleConfirmImport = async () => {
     if (!uploadedFile || !dryRunResult) return
 
+    // Валидация для deals: требуется выбрать pipeline
+    if (entityType === 'deal' && !selectedPipelineId) {
+      const errorMessage = 'Please select a pipeline before confirming import'
+      setError(errorMessage)
+      showError('Pipeline required', errorMessage)
+      return
+    }
+
     setIsImporting(true)
     setError(null)
 
     try {
       const result = entityType === 'contact'
         ? await importContacts(uploadedFile, mapping, ',', false)
-        : await importDeals(uploadedFile, mapping, ',', false)
+        : await importDeals(
+            uploadedFile, 
+            mapping, 
+            selectedPipelineId!, 
+            ',', 
+            false,
+            applyAssignedToAll ? defaultAssignedToId : undefined
+          )
 
       setImportResult(result)
       setCurrentStep('result')
@@ -148,6 +190,9 @@ function ImportExportContent() {
     setCsvHeaders([])
     setCsvRows([])
     setMapping({})
+    setSelectedPipelineId(undefined)
+    setDefaultAssignedToId(undefined)
+    setApplyAssignedToAll(false)
     setDryRunResult(null)
     setImportResult(null)
     setError(null)
@@ -159,6 +204,11 @@ function ImportExportContent() {
     // Это будет проверяться на backend, но базовая валидация здесь
     const mappedFields = Object.values(mapping).filter(v => v !== undefined)
     return mappedFields.length > 0
+  }
+
+  const hasAssignedToMapping = () => {
+    // Проверяем есть ли маппинг для assignedToId
+    return Object.values(mapping).includes('assignedToId')
   }
 
   return (
@@ -298,11 +348,30 @@ function ImportExportContent() {
             {currentStep === 'mapping' && csvHeaders.length > 0 && (
               <ErrorBoundary>
                 <div className="space-y-4">
+                  {/* Pipeline Selector для Deals */}
+                  {entityType === 'deal' && (
+                    <>
+                      <PipelineSelector
+                        selectedPipelineId={selectedPipelineId}
+                        onPipelineChange={setSelectedPipelineId}
+                      />
+                      <AssignedToSelector
+                        selectedUserId={defaultAssignedToId}
+                        applyToAll={applyAssignedToAll}
+                        onUserChange={setDefaultAssignedToId}
+                        onApplyToAllChange={setApplyAssignedToAll}
+                        hasAssignedToMapping={hasAssignedToMapping()}
+                        dryRunErrors={dryRunResult?.errors || []}
+                      />
+                    </>
+                  )}
+                  
                   <AutoMappingForm
                     csvColumns={csvHeaders}
                     entityType={entityType}
                     onMappingChange={handleMappingChange}
                     initialMapping={mapping}
+                    csvSampleData={csvRows}
                   />
                   <div className="flex items-center justify-between pt-4 border-t border-border">
                     <Button
@@ -313,7 +382,11 @@ function ImportExportContent() {
                     </Button>
                     <Button
                       onClick={handleDryRun}
-                      disabled={!isMappingValid() || isDryRunLoading}
+                      disabled={
+                        !isMappingValid() || 
+                        isDryRunLoading || 
+                        (entityType === 'deal' && !selectedPipelineId)
+                      }
                     >
                       {isDryRunLoading ? (
                         <>

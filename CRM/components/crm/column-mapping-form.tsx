@@ -15,10 +15,15 @@ import { normalizeSelectValue, toSelectValue, fromSelectValue } from '@/lib/util
 // Sentinel value for "skip this column" - never use empty string
 const SKIP_COLUMN_VALUE = '__SKIP_COLUMN__' as const
 
+interface ParsedCsvRow {
+  [key: string]: string
+}
+
 interface ColumnMappingFormProps {
   importedColumns?: string[]
   columns?: string[] // Альтернативное имя для совместимости
   onImport?: (mapping: Record<string, string | undefined>) => void
+  csvSampleData?: ParsedCsvRow[]
 }
 
 const CRM_FIELDS = [
@@ -37,13 +42,31 @@ const CRM_FIELDS = [
 export function ColumnMappingForm({ 
   importedColumns, 
   columns,
-  onImport 
+  onImport,
+  csvSampleData = [],
 }: ColumnMappingFormProps) {
   // Поддержка обоих вариантов props для совместимости
   const columnsToUse = importedColumns || columns || []
   
   const [mapping, setMapping] = useState<Record<string, string | undefined>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+
+  // Helper to get sample values for a column
+  const getSampleValues = (columnName: string): string[] => {
+    if (!csvSampleData || csvSampleData.length === 0) {
+      return []
+    }
+    
+    const samples: string[] = []
+    for (const row of csvSampleData) {
+      const value = row[columnName]
+      if (value && value.trim() !== '' && !samples.includes(value)) {
+        samples.push(value)
+        if (samples.length >= 2) break
+      }
+    }
+    return samples
+  }
 
   const handleMappingChange = (importedCol: string, crmField: string | undefined) => {
     try {
@@ -98,16 +121,34 @@ export function ColumnMappingForm({
       </div>
 
       <div className="space-y-3">
-        {columnsToUse.map((column, index) => (
-          <div
-            key={`${column}-${index}`}
-            className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/10"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{column}</p>
-            </div>
-            
-            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        {columnsToUse.map((column, index) => {
+          const sampleValues = getSampleValues(column)
+          
+          return (
+            <div
+              key={`${column}-${index}`}
+              className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/10"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{column}</p>
+                {/* Sample values from CSV */}
+                {sampleValues.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Examples:</span>
+                    {sampleValues.map((sample, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-muted/50 text-foreground/80 border border-border/50 font-mono"
+                        title={sample}
+                      >
+                        {sample.length > 25 ? `${sample.substring(0, 25)}...` : sample}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             
             <div className="flex-1">
               <Select
@@ -136,8 +177,9 @@ export function ColumnMappingForm({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       {validationErrors.length > 0 && (
