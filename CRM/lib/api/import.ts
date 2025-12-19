@@ -54,8 +54,21 @@ export interface DealsImportMeta {
 export type ImportMeta = ContactsImportMeta | DealsImportMeta
 
 // Legacy compatibility - combine all fields
-export function getAllFields(meta: ImportMeta): ImportField[] {
-  return [...meta.systemFields, ...meta.customFields]
+export function getAllFields(meta: ImportMeta | any): ImportField[] {
+  // Handle new structure with systemFields and customFields
+  if (meta.systemFields && meta.customFields) {
+    return [...(Array.isArray(meta.systemFields) ? meta.systemFields : []), 
+            ...(Array.isArray(meta.customFields) ? meta.customFields : [])]
+  }
+  
+  // Handle legacy structure with just 'fields'
+  if (meta.fields && Array.isArray(meta.fields)) {
+    return meta.fields
+  }
+  
+  // Fallback to empty array
+  console.warn('getAllFields: Unexpected meta structure', meta)
+  return []
 }
 
 export interface AutoMappingResult {
