@@ -157,6 +157,14 @@ export class ImportExportController {
           type: 'string',
           description: 'JSON mapping для полей CSV',
         },
+        pipelineId: {
+          type: 'string',
+          description: 'ID пайплайна для resolution стадий',
+        },
+        defaultAssignedToId: {
+          type: 'string',
+          description: 'ID ответственного по умолчанию (применяется ко всем строкам)',
+        },
         delimiter: {
           type: 'string',
           enum: [',', ';'],
@@ -169,6 +177,8 @@ export class ImportExportController {
   async importDeals(
     @UploadedFile() file: Express.Multer.File,
     @Body('mapping') mappingString: string,
+    @Body('pipelineId') pipelineId: string,
+    @Body('defaultAssignedToId') defaultAssignedToId: string | undefined,
     @Body('delimiter') delimiter: ',' | ';' = ',',
     @Query('dryRun') dryRun: string = 'false',
     @CurrentUser() user: any,
@@ -196,8 +206,13 @@ export class ImportExportController {
     }
 
     // Валидация mapping
-    if (!mapping.number || !mapping.title || !mapping.pipelineId || !mapping.stageId) {
-      throw new BadRequestException('Mapping must include number, title, pipelineId, and stageId fields');
+    if (!mapping.number || !mapping.title || !mapping.stageId) {
+      throw new BadRequestException('Mapping must include number, title, and stageId fields');
+    }
+
+    // Валидация pipelineId
+    if (!pipelineId || typeof pipelineId !== 'string') {
+      throw new BadRequestException('pipelineId is required');
     }
 
     // Создаем stream из файла
@@ -209,6 +224,8 @@ export class ImportExportController {
       fileStream,
       mapping,
       user.userId || user.id,
+      pipelineId,
+      defaultAssignedToId, // Дефолтный ответственный для всех строк
       undefined, // contactEmailPhoneMap - опционально
       delimiter,
       isDryRun,

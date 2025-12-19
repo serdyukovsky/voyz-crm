@@ -6,13 +6,56 @@ export interface ImportField {
   key: string
   label: string
   required: boolean
-  type: 'string' | 'number' | 'date' | 'email' | 'phone' | 'select'
+  type: 'string' | 'number' | 'date' | 'email' | 'phone' | 'select' | 'multi-select' | 'boolean' | 'text'
   description?: string
   options?: Array<{ value: string; label: string }>
+  group?: string
 }
 
-export interface ImportMeta {
-  fields: ImportField[]
+export interface PipelineStage {
+  id: string
+  name: string
+  order: number
+  color?: string
+  isDefault?: boolean
+  isClosed?: boolean
+}
+
+export interface Pipeline {
+  id: string
+  name: string
+  description?: string
+  isDefault: boolean
+  isActive: boolean
+  stages: PipelineStage[]
+}
+
+export interface User {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  fullName: string
+}
+
+export interface ContactsImportMeta {
+  systemFields: ImportField[]
+  customFields: ImportField[]
+  users: User[]
+}
+
+export interface DealsImportMeta {
+  systemFields: ImportField[]
+  customFields: ImportField[]
+  pipelines: Pipeline[]
+  users: User[]
+}
+
+export type ImportMeta = ContactsImportMeta | DealsImportMeta
+
+// Legacy compatibility - combine all fields
+export function getAllFields(meta: ImportMeta): ImportField[] {
+  return [...meta.systemFields, ...meta.customFields]
 }
 
 export interface AutoMappingResult {
@@ -168,12 +211,18 @@ export async function importContacts(
 export async function importDeals(
   file: File,
   mapping: Record<string, string | undefined>,
+  pipelineId: string,
   delimiter: ',' | ';' = ',',
   dryRun: boolean = false,
+  defaultAssignedToId?: string,
 ): Promise<ImportResult> {
   const token = localStorage.getItem('access_token')
   if (!token) {
     throw new Error('Not authenticated')
+  }
+
+  if (!pipelineId) {
+    throw new Error('Pipeline is required for deal import')
   }
 
   // Filter out undefined values from mapping before sending to API
@@ -187,6 +236,10 @@ export async function importDeals(
   const formData = new FormData()
   formData.append('file', file)
   formData.append('mapping', JSON.stringify(cleanMapping))
+  formData.append('pipelineId', pipelineId)
+  if (defaultAssignedToId) {
+    formData.append('defaultAssignedToId', defaultAssignedToId)
+  }
   formData.append('delimiter', delimiter)
 
   // API_BASE_URL уже должен содержать /api

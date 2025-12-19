@@ -7,6 +7,7 @@ export interface User {
   email: string
   firstName: string
   lastName: string
+  fullName?: string
   avatar?: string
   phone?: string
   telegramUsername?: string

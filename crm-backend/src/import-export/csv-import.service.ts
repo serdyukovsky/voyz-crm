@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as csv from 'csv-parser';
 import { ImportBatchService } from './import-batch.service';
+import { PrismaService } from '@/common/services/prisma.service';
 import {
   normalizeEmail,
   normalizePhone,
@@ -11,6 +12,14 @@ import {
 } from '@/common/utils/normalization.utils';
 import { ContactFieldMapping, DealFieldMapping } from './dto/field-mapping.dto';
 import { ImportResultDto, ImportError, ImportSummary } from './dto/import-result.dto';
+import {
+  ImportMetaResponseDto,
+  ContactsImportMetaDto,
+  DealsImportMetaDto,
+  ImportFieldDto,
+  PipelineDto,
+  UserDto,
+} from './dto/import-meta.dto';
 
 /**
  * CSV Import Service
@@ -22,50 +31,209 @@ import { ImportResultDto, ImportError, ImportSummary } from './dto/import-result
 export class CsvImportService {
   private readonly BATCH_SIZE = 1000;
 
-  constructor(private readonly importBatchService: ImportBatchService) {}
+  constructor(
+    private readonly importBatchService: ImportBatchService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Получение метаданных полей для импорта
+   * Возвращает полную информацию о доступных полях, пайплайнах и пользователях
    */
-  async getImportMeta(entityType: 'contact' | 'deal'): Promise<{
-    fields: Array<{
-      key: string;
-      label: string;
-      required: boolean;
-      type: 'string' | 'number' | 'date' | 'email' | 'phone' | 'select';
-      description?: string;
-      options?: Array<{ value: string; label: string }>;
-    }>;
-  }> {
+  async getImportMeta(entityType: 'contact' | 'deal'): Promise<ImportMetaResponseDto> {
     if (entityType === 'contact') {
-      return {
-        fields: [
-          { key: 'fullName', label: 'Full Name', required: true, type: 'string', description: 'Полное имя контакта' },
-          { key: 'email', label: 'Email', required: false, type: 'email', description: 'Email адрес' },
-          { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона' },
-          { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность' },
-          { key: 'companyName', label: 'Company Name', required: false, type: 'string', description: 'Название компании' },
-          { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)' },
-          { key: 'notes', label: 'Notes', required: false, type: 'string', description: 'Заметки' },
-        ],
-      };
+      return this.getContactsImportMeta();
     } else {
-      return {
-        fields: [
-          { key: 'number', label: 'Deal Number', required: true, type: 'string', description: 'Номер сделки' },
-          { key: 'title', label: 'Title', required: true, type: 'string', description: 'Название сделки' },
-          { key: 'amount', label: 'Amount', required: false, type: 'number', description: 'Сумма сделки' },
-          { key: 'pipelineId', label: 'Pipeline', required: true, type: 'select', description: 'Воронка продаж' },
-          { key: 'stageId', label: 'Stage', required: true, type: 'select', description: 'Стадия сделки' },
-          { key: 'email', label: 'Contact Email', required: false, type: 'email', description: 'Email контакта для связи' },
-          { key: 'phone', label: 'Contact Phone', required: false, type: 'phone', description: 'Телефон контакта для связи' },
-          { key: 'assignedToId', label: 'Assigned To', required: false, type: 'select', description: 'Ответственный' },
-          { key: 'expectedCloseAt', label: 'Expected Close Date', required: false, type: 'date', description: 'Ожидаемая дата закрытия' },
-          { key: 'description', label: 'Description', required: false, type: 'string', description: 'Описание' },
-          { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)' },
-        ],
-      };
+      return this.getDealsImportMeta();
     }
+  }
+
+  /**
+   * Получение метаданных для импорта контактов
+   */
+  private async getContactsImportMeta(): Promise<ContactsImportMetaDto> {
+    // Системные поля контактов
+    const systemFields: ImportFieldDto[] = [
+      { key: 'fullName', label: 'Full Name', required: true, type: 'string', description: 'Полное имя контакта', group: 'basic' },
+      { key: 'email', label: 'Email', required: false, type: 'email', description: 'Email адрес', group: 'basic' },
+      { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона', group: 'basic' },
+      { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность', group: 'basic' },
+      { key: 'companyName', label: 'Company Name', required: false, type: 'string', description: 'Название компании', group: 'basic' },
+      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
+      { key: 'notes', label: 'Notes', required: false, type: 'text', description: 'Заметки', group: 'other' },
+      { key: 'instagram', label: 'Instagram', required: false, type: 'string', description: 'Instagram профиль', group: 'social' },
+      { key: 'telegram', label: 'Telegram', required: false, type: 'string', description: 'Telegram контакт', group: 'social' },
+      { key: 'whatsapp', label: 'WhatsApp', required: false, type: 'string', description: 'WhatsApp номер', group: 'social' },
+      { key: 'vk', label: 'VK', required: false, type: 'string', description: 'VK профиль', group: 'social' },
+    ];
+
+    // Получение кастомных полей контактов (если есть в schema)
+    const customFields: ImportFieldDto[] = await this.getContactCustomFields();
+
+    // Получение активных пользователей
+    const users: UserDto[] = await this.getActiveUsers();
+
+    return {
+      systemFields,
+      customFields,
+      users,
+    };
+  }
+
+  /**
+   * Получение метаданных для импорта сделок
+   */
+  private async getDealsImportMeta(): Promise<DealsImportMetaDto> {
+    // Системные поля сделок
+    const systemFields: ImportFieldDto[] = [
+      { key: 'number', label: 'Deal Number', required: true, type: 'string', description: 'Номер сделки', group: 'basic' },
+      { key: 'title', label: 'Title', required: true, type: 'string', description: 'Название сделки', group: 'basic' },
+      { key: 'amount', label: 'Amount', required: false, type: 'number', description: 'Сумма сделки', group: 'basic' },
+      { key: 'pipelineId', label: 'Pipeline', required: false, type: 'select', description: 'Pipeline будет выбран в UI перед импортом', group: 'basic' },
+      { key: 'stageId', label: 'Stage', required: true, type: 'string', description: 'Имя стадии (будет автоматически резолвлено в выбранном pipeline)', group: 'basic' },
+      { key: 'email', label: 'Contact Email', required: false, type: 'email', description: 'Email контакта для связи', group: 'contact' },
+      { key: 'phone', label: 'Contact Phone', required: false, type: 'phone', description: 'Телефон контакта для связи', group: 'contact' },
+      { key: 'assignedToId', label: 'Assigned To', required: false, type: 'string', description: 'Ответственный (имя или email пользователя, будет автоматически резолвлено)', group: 'basic' },
+      { key: 'expectedCloseAt', label: 'Expected Close Date', required: false, type: 'date', description: 'Ожидаемая дата закрытия', group: 'other' },
+      { key: 'description', label: 'Description', required: false, type: 'text', description: 'Описание', group: 'other' },
+      { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other' },
+    ];
+
+    // Получение кастомных полей сделок
+    const customFields: ImportFieldDto[] = await this.getDealCustomFields();
+
+    // Получение пайплайнов со стадиями
+    const pipelines: PipelineDto[] = await this.getPipelinesWithStages();
+
+    // Получение активных пользователей
+    const users: UserDto[] = await this.getActiveUsers();
+
+    return {
+      systemFields,
+      customFields,
+      pipelines,
+      users,
+    };
+  }
+
+  /**
+   * Получение кастомных полей контактов
+   */
+  private async getContactCustomFields(): Promise<ImportFieldDto[]> {
+    // TODO: Implement custom fields for contacts when schema supports it
+    // For now, return empty array
+    return [];
+  }
+
+  /**
+   * Получение кастомных полей сделок
+   */
+  private async getDealCustomFields(): Promise<ImportFieldDto[]> {
+    try {
+      const customFields = await this.prisma.dealCustomField.findMany({
+        where: { isActive: true },
+        orderBy: { order: 'asc' },
+      });
+
+      return customFields.map((field) => ({
+        key: `customField_${field.id}`,
+        label: field.name,
+        required: field.isRequired || false,
+        type: this.mapCustomFieldType(field.type),
+        description: field.description || undefined,
+        options: field.options ? this.mapCustomFieldOptions(field.options) : undefined,
+        group: 'custom',
+      }));
+    } catch (error) {
+      console.error('Error fetching deal custom fields:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Маппинг типа кастомного поля в ImportFieldDto type
+   */
+  private mapCustomFieldType(type: string): ImportFieldDto['type'] {
+    const typeMap: Record<string, ImportFieldDto['type']> = {
+      text: 'string',
+      number: 'number',
+      date: 'date',
+      select: 'select',
+      'multi-select': 'multi-select',
+      textarea: 'text',
+      checkbox: 'boolean',
+      email: 'email',
+      phone: 'phone',
+    };
+    return typeMap[type] || 'string';
+  }
+
+  /**
+   * Маппинг опций кастомного поля
+   */
+  private mapCustomFieldOptions(options: any): Array<{ value: string; label: string }> {
+    if (Array.isArray(options)) {
+      return options.map((opt) => ({
+        value: typeof opt === 'string' ? opt : opt.value || opt,
+        label: typeof opt === 'string' ? opt : opt.label || opt.value || opt,
+      }));
+    }
+    return [];
+  }
+
+  /**
+   * Получение всех пайплайнов со стадиями
+   */
+  private async getPipelinesWithStages(): Promise<PipelineDto[]> {
+    const pipelines = await this.prisma.pipeline.findMany({
+      where: { isActive: true },
+      include: {
+        stages: {
+          orderBy: { order: 'asc' },
+        },
+      },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+
+    return pipelines.map((pipeline) => ({
+      id: pipeline.id,
+      name: pipeline.name,
+      description: pipeline.description || undefined,
+      isDefault: pipeline.isDefault,
+      isActive: pipeline.isActive,
+      stages: pipeline.stages.map((stage) => ({
+        id: stage.id,
+        name: stage.name,
+        order: stage.order,
+        color: stage.color || undefined,
+        isDefault: stage.isDefault || false,
+        isClosed: stage.isClosed || false,
+      })),
+    }));
+  }
+
+  /**
+   * Получение активных пользователей
+   */
+  private async getActiveUsers(): Promise<UserDto[]> {
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email,
+      fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+    }));
   }
 
   /**
@@ -205,6 +373,7 @@ export class CsvImportService {
    * @param fileStream - Stream CSV файла
    * @param mapping - Маппинг полей CSV → внутренние поля
    * @param userId - ID пользователя, выполняющего импорт
+   * @param pipelineId - ID пайплайна для resolution стадий по имени
    * @param contactEmailPhoneMap - Map для резолва contactId по email/phone (опционально)
    * @param delimiter - Разделитель CSV (по умолчанию ',', поддерживается ';')
    * @param dryRun - Режим предпросмотра без записи в БД
@@ -213,6 +382,8 @@ export class CsvImportService {
     fileStream: Readable,
     mapping: DealFieldMapping,
     userId: string,
+    pipelineId: string,
+    defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     delimiter: ',' | ';' = ',',
     dryRun: boolean = false,
@@ -226,6 +397,13 @@ export class CsvImportService {
     };
 
     const errors: ImportError[] = [];
+    
+    // Загружаем stages для выбранного pipeline для resolution по имени
+    const stagesMap = await this.loadPipelineStagesMap(pipelineId);
+    
+    // Загружаем users для resolution по имени/email
+    const usersMap = await this.loadUsersMap();
+    
     const rows: Array<{
       number: string;
       title: string;
@@ -260,6 +438,10 @@ export class CsvImportService {
               mapping,
               rowNumber,
               errors,
+              pipelineId,
+              stagesMap,
+              usersMap,
+              defaultAssignedToId,
               contactEmailPhoneMap,
             );
             if (dealData) {
@@ -479,6 +661,10 @@ export class CsvImportService {
     mapping: DealFieldMapping,
     rowNumber: number,
     errors: ImportError[],
+    pipelineId: string,
+    stagesMap: Map<string, string>, // stageName -> stageId
+    usersMap: Map<string, string>, // userName/email -> userId
+    defaultAssignedToId?: string,
     contactEmailPhoneMap?: Map<string, string>,
   ): {
     number: string;
@@ -522,26 +708,49 @@ export class CsvImportService {
       return null;
     }
 
-    // PipelineId и StageId обязательны
-    const pipelineId = getValue(mapping.pipelineId);
-    const stageId = getValue(mapping.stageId);
+    // StageId обязателен и резолвится по имени
+    const stageValue = getValue(mapping.stageId);
 
-    if (!pipelineId) {
+    if (!stageValue) {
       errors.push({
         row: rowNumber,
-        field: 'pipelineId',
-        error: 'Pipeline ID is required',
+        field: 'stageId',
+        error: 'Stage is required',
       });
       return null;
     }
 
-    if (!stageId) {
-      errors.push({
-        row: rowNumber,
-        field: 'stageId',
-        error: 'Stage ID is required',
-      });
-      return null;
+    // Резолвим stage ID по имени (case-insensitive)
+    let stageId = stageValue;
+    
+    // Сначала пробуем найти по точному совпадению ID
+    if (!stagesMap.has(stageValue)) {
+      // Если не ID, ищем по имени (case-insensitive)
+      const stageName = stageValue.toLowerCase().trim();
+      let foundStageId: string | undefined;
+      
+      const entries = Array.from(stagesMap.entries());
+      for (const [name, id] of entries) {
+        if (name.toLowerCase() === stageName) {
+          foundStageId = id;
+          break;
+        }
+      }
+      
+      if (foundStageId) {
+        stageId = foundStageId;
+      } else {
+        errors.push({
+          row: rowNumber,
+          field: 'stageId',
+          value: stageValue,
+          error: `Stage "${stageValue}" not found in pipeline. Available stages: ${Array.from(stagesMap.keys()).join(', ')}`,
+        });
+        return null;
+      }
+    } else {
+      // Это уже ID стадии
+      stageId = stagesMap.get(stageValue)!;
     }
 
     // Резолв contactId через email/phone если указан в mapping
@@ -597,6 +806,44 @@ export class CsvImportService {
       }
     }
 
+    // Резолв assignedToId по имени/email или использование дефолтного
+    let assignedToId: string | null = null;
+    
+    if (defaultAssignedToId) {
+      // Если указан дефолтный ответственный, используем его для всех строк
+      assignedToId = defaultAssignedToId;
+    } else if (mapping.assignedToId) {
+      const assignedToValue = getValue(mapping.assignedToId);
+      if (assignedToValue) {
+        // Пробуем резолвить по имени или email (case-insensitive)
+        const lookupValue = assignedToValue.toLowerCase().trim();
+        let foundUserId: string | undefined;
+        
+        const usersEntries = Array.from(usersMap.entries());
+        for (const [key, id] of usersEntries) {
+          if (key.toLowerCase() === lookupValue) {
+            foundUserId = id;
+            break;
+          }
+        }
+        
+        if (foundUserId) {
+          assignedToId = foundUserId;
+        } else if (usersMap.has(assignedToValue)) {
+          // Возможно это уже ID пользователя
+          assignedToId = usersMap.get(assignedToValue)!;
+        } else {
+          // Не найден - добавляем предупреждение но не блокируем импорт
+          errors.push({
+            row: rowNumber,
+            field: 'assignedToId',
+            value: assignedToValue,
+            error: `User "${assignedToValue}" not found. Deal will be created without assignment. Available users: ${Array.from(new Set(usersEntries.map(([k, v]) => k.split('|')[0]))).slice(0, 5).join(', ')}`,
+          });
+        }
+      }
+    }
+
     return {
       number: numberValue,
       title: titleValue,
@@ -604,13 +851,82 @@ export class CsvImportService {
       budget: getValue(mapping.budget) || null,
       pipelineId,
       stageId,
-      assignedToId: getValue(mapping.assignedToId) || null,
+      assignedToId,
       contactId: contactId || null,
       companyId: getValue(mapping.companyId) || null,
       expectedCloseAt: expectedCloseAt || null,
       description: sanitizeOptionalTextFields(getValue(mapping.description)) || null,
       tags: tags.length > 0 ? tags : undefined,
     };
+  }
+
+  /**
+   * Загрузка map стадий для pipeline (stageName -> stageId)
+   */
+  private async loadPipelineStagesMap(pipelineId: string): Promise<Map<string, string>> {
+    const pipeline = await this.prisma.pipeline.findUnique({
+      where: { id: pipelineId },
+      include: {
+        stages: true,
+      },
+    });
+
+    if (!pipeline) {
+      throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
+    }
+
+    const stagesMap = new Map<string, string>();
+    
+    // Добавляем в map и по имени, и по ID
+    pipeline.stages.forEach((stage) => {
+      stagesMap.set(stage.name, stage.id);
+      stagesMap.set(stage.id, stage.id); // Для поддержки прямого указания ID
+    });
+
+    return stagesMap;
+  }
+
+  /**
+   * Загрузка map пользователей (fullName/email -> userId)
+   */
+  private async loadUsersMap(): Promise<Map<string, string>> {
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+    });
+
+    const usersMap = new Map<string, string>();
+    
+    users.forEach((user) => {
+      const fullName = `${user.firstName} ${user.lastName}`.trim();
+      
+      // Добавляем по полному имени
+      if (fullName) {
+        usersMap.set(fullName, user.id);
+        usersMap.set(`${fullName}|name`, user.id); // Для отображения в errors
+      }
+      
+      // Добавляем по email
+      if (user.email) {
+        usersMap.set(user.email, user.id);
+        usersMap.set(`${user.email}|email`, user.id);
+      }
+      
+      // Добавляем по firstName
+      if (user.firstName) {
+        usersMap.set(user.firstName, user.id);
+      }
+      
+      // Добавляем по ID (для прямого указания)
+      usersMap.set(user.id, user.id);
+    });
+
+    return usersMap;
   }
 }
 
