@@ -129,7 +129,13 @@ export async function getImportMeta(entityType: 'contact' | 'deal'): Promise<Imp
     throw new Error(`Failed to get import meta: ${error}`)
   }
 
-  return response.json()
+  const data = await response.json()
+  console.log('Import meta API response:', JSON.stringify(data, null, 2))
+  console.log('systemFields:', data.systemFields)
+  console.log('customFields:', data.customFields)
+  console.log('systemFields is array?', Array.isArray(data.systemFields))
+  console.log('customFields is array?', Array.isArray(data.customFields))
+  return data
 }
 
 /**
