@@ -16,11 +16,13 @@ import { importContacts, importDeals, type ImportResult as ImportResultType } fr
 import { type ParsedCsvRow } from "@/lib/utils/csv-parser"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { ErrorBoundary } from "@/components/crm/error-boundary"
+import { useTranslation } from "@/lib/i18n/i18n-context"
 
 type ImportStep = 'upload' | 'preview' | 'mapping' | 'dry-run' | 'result'
 type EntityType = 'contact' | 'deal'
 
 function ImportExportContent() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<"import" | "export">("import")
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
   const [entityType, setEntityType] = useState<EntityType>('contact')
@@ -251,23 +253,23 @@ function ImportExportContent() {
             {currentStep !== 'upload' && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className={currentStep === 'upload' ? 'text-foreground font-medium' : ''}>
-                  Upload
+                  {t('importExport.uploadFile')}
                 </span>
                 <span>→</span>
                 <span className={currentStep === 'preview' ? 'text-foreground font-medium' : ''}>
-                  Preview
+                  {t('importExport.preview')}
                 </span>
                 <span>→</span>
                 <span className={currentStep === 'mapping' ? 'text-foreground font-medium' : ''}>
-                  Mapping
+                  {t('importExport.mapping')}
                 </span>
                 <span>→</span>
                 <span className={currentStep === 'dry-run' ? 'text-foreground font-medium' : ''}>
-                  Preview
+                  {t('importExport.dryRun')}
                 </span>
                 <span>→</span>
                 <span className={currentStep === 'result' ? 'text-foreground font-medium' : ''}>
-                  Result
+                  {t('importExport.result')}
                 </span>
               </div>
             )}
@@ -275,21 +277,21 @@ function ImportExportContent() {
             {/* Entity Type Selector */}
             {currentStep === 'upload' && (
               <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-foreground">Import Type:</label>
+                <label className="text-sm font-medium text-foreground">{t('importExport.importType')}</label>
                 <div className="flex gap-2">
                   <Button
                     variant={entityType === 'contact' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setEntityType('contact')}
                   >
-                    Contacts
+                    {t('importExport.contacts')}
                   </Button>
                   <Button
                     variant={entityType === 'deal' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setEntityType('deal')}
                   >
-                    Deals
+                    {t('importExport.deals')}
                   </Button>
                 </div>
               </div>
@@ -313,7 +315,7 @@ function ImportExportContent() {
                 />
                 <div className="flex justify-end">
                   <Button onClick={handleContinueToMapping}>
-                    Continue to Mapping
+                    {t('importExport.continueToMapping')}
                   </Button>
                 </div>
               </div>
@@ -378,7 +380,7 @@ function ImportExportContent() {
                       variant="outline"
                       onClick={() => setCurrentStep('preview')}
                     >
-                      Back
+                      {t('importExport.back')}
                     </Button>
                     <Button
                       onClick={handleDryRun}
@@ -391,10 +393,10 @@ function ImportExportContent() {
                       {isDryRunLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Checking...
+                          {t('importExport.runningDryRun')}
                         </>
                       ) : (
-                        'Check Import'
+                        t('importExport.runDryRun')
                       )}
                     </Button>
                   </div>

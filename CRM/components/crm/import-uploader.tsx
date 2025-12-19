@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { Upload, FileSpreadsheet, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { parseCsvFile, type ParsedCsvRow } from '@/lib/utils/csv-parser'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface ImportUploaderProps {
   onFileUpload: (file: File | null, headers: string[], rows: ParsedCsvRow[]) => void
@@ -11,6 +12,7 @@ interface ImportUploaderProps {
 }
 
 export function ImportUploader({ onFileUpload, disabled = false }: ImportUploaderProps) {
+  const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isParsing, setIsParsing] = useState(false)
@@ -135,7 +137,7 @@ export function ImportUploader({ onFileUpload, disabled = false }: ImportUploade
           {isParsing ? (
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <p className="text-sm text-muted-foreground">Parsing CSV file...</p>
+              <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
             </div>
           ) : selectedFile ? (
             <div className="flex items-center justify-center gap-3">
@@ -164,13 +166,13 @@ export function ImportUploader({ onFileUpload, disabled = false }: ImportUploade
             <>
               <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground mb-1">
-                Drag & drop your CSV file here
+                {t('importExport.dragDropOrClick')}
               </p>
               <p className="text-xs text-muted-foreground mb-4">
-                or click to browse
+                {t('importExport.supportedFormats')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Supports CSV files only
+                {t('importExport.maxFileSize')}
               </p>
             </>
           )}
