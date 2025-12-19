@@ -278,6 +278,12 @@ export class CsvImportService {
       tags?: string[];
       notes?: string | null;
       social?: any;
+      link?: string | null;
+      subscriberCount?: string | null;
+      directions?: string[];
+      contactMethods?: string[];
+      websiteOrTgChannel?: string | null;
+      contactInfo?: string | null;
     }> = [];
 
     return new Promise((resolve, reject) => {
@@ -424,6 +430,7 @@ export class CsvImportService {
       expectedCloseAt?: Date | string | null;
       description?: string | null;
       tags?: string[];
+      rejectionReasons?: string[];
     }> = [];
 
     return new Promise((resolve, reject) => {
