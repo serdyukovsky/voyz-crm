@@ -290,13 +290,39 @@ function DealsPageContent() {
   const currentFunnel = funnelsList.find(f => f.id === currentFunnelId) || funnelsList[0] || null
 
   const handleAddFunnel = async (name: string) => {
+    if (!name.trim()) {
+      showError(t('pipeline.nameRequired'), t('pipeline.pleaseEnterName'))
+      return
+    }
+
     try {
-      const newPipeline = await createPipelineMutation.mutateAsync({ name, isDefault: false })
-      const updatedFunnels = [...funnelsList, { id: newPipeline.id, name: newPipeline.name }]
-      if (updatedFunnels.length === 1) {
-        setCurrentFunnelId(newPipeline.id)
+      // Создаём pipeline
+      const newPipeline = await createPipelineMutation.mutateAsync({ name: name.trim(), isDefault: false })
+      
+      // Создаём дефолтные стадии (кроме Выиграно/Проиграно - они уже созданы бэкендом)
+      const additionalStagesToCreate = [
+        { name: 'Новый лид', color: '#6B8AFF', order: 0, isDefault: true },
+        { name: 'Квалификация', color: '#F59E0B', order: 1, isDefault: false },
+        { name: 'Переговоры', color: '#8B5CF6', order: 2, isDefault: false },
+      ]
+
+      let stagesCreated = 0
+      for (const stageData of additionalStagesToCreate) {
+        try {
+          await createStage(newPipeline.id, stageData)
+          stagesCreated++
+        } catch (stageError) {
+          console.error(`Failed to create stage ${stageData.name}:`, stageError)
+        }
       }
-      showSuccess(t('pipeline.createdSuccess'))
+
+      // Обновляем список pipelines чтобы загрузить созданные стадии
+      await refetchPipelines()
+      
+      // Выбираем созданный pipeline
+      setCurrentFunnelId(newPipeline.id)
+      
+      showSuccess(t('pipeline.createdWithStages', { name: newPipeline.name, count: stagesCreated + 2 }))
     } catch (error) {
       console.error('Failed to create pipeline:', error)
       showError(t('pipeline.createError'), t('messages.pleaseTryAgain'))
