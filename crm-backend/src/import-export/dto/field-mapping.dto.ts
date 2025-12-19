@@ -42,6 +42,7 @@ export interface DealFieldMapping {
   budget?: string;
   pipelineId?: string;
   stageId?: string;
+  ownerId?: string; // CSV column name для резолва владельца по имени/email
   assignedToId?: string;
   contactId?: string; // CSV column name для прямого указания contactId
   email?: string; // CSV column name для резолва contactId по email

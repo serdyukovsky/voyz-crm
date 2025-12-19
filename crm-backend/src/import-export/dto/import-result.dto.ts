@@ -19,9 +19,15 @@ export interface ImportSummary {
   skipped: number; // Пропущено (пустые строки, дубликаты)
 }
 
+export interface StageToCreate {
+  name: string; // Имя стадии из CSV
+  order: number; // Порядок по первому появлению в CSV
+}
+
 export interface ImportResultDto {
   summary: ImportSummary;
   errors: ImportError[];
   warnings?: string[]; // Предупреждения (не критичные)
+  stagesToCreate?: StageToCreate[]; // Стадии, которые будут созданы при импорте
 }
 
