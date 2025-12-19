@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -10,14 +10,25 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
 import { login } from "@/lib/api/auth"
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useAuth } from '@/contexts/auth-context'
 
 export function LoginForm() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login: setAuth, isAuthenticated } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/'
+      navigate(from, { replace: true })
+    }
+  }, [isAuthenticated, navigate, location])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,20 +40,17 @@ export function LoginForm() {
       const response = await login({ email, password })
       console.log('Login successful:', response)
       
-      // Save tokens and user data
-      localStorage.setItem('access_token', response.access_token)
+      // Use auth context to set user and token
+      setAuth(response.user, response.access_token)
+      
+      // Also save refresh token if provided
       if (response.refresh_token) {
         localStorage.setItem('refresh_token', response.refresh_token)
       }
-      localStorage.setItem('user', JSON.stringify(response.user))
-      // Also save user ID separately for easy access
-      if (response.user?.id) {
-        localStorage.setItem('user_id', response.user.id)
-        localStorage.setItem('userId', response.user.id)
-      }
       
-      // Redirect to home page
-      navigate("/")
+      // Redirect to home page or previous location
+      const from = (location.state as any)?.from?.pathname || '/'
+      navigate(from, { replace: true })
     } catch (err) {
       console.error('Login error:', err)
       const errorMessage = err instanceof Error ? err.message : t('auth.loginFailed')

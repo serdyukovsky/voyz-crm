@@ -10,6 +10,7 @@
   },
 
   "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start-backend.sh",
 
   "customizations": {
     "vscode": {
@@ -34,7 +35,8 @@
     },
     "3001": {
       "label": "Backend API",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "visibility": "public"
     },
     "5432": {
       "label": "PostgreSQL",

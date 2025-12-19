@@ -29,9 +29,13 @@ This DevContainer configuration provides a complete development environment for 
 - Tailwind CSS - CSS IntelliSense
 
 ### Port Forwarding
-- `3000` - Frontend (Vite dev server)
-- `3001` - Backend API (NestJS)
-- `5432` - PostgreSQL database
+- `3000` - Frontend (Vite dev server) - Auto-forwarded
+- `3001` - Backend API (NestJS) - **Auto-forwarded and PUBLIC**
+- `5432` - PostgreSQL database - Auto-forwarded (silent)
+
+**Port 3001 is automatically set to PUBLIC** for external access:
+- Public URL: `https://<codespace-name>-3001.app.github.dev`
+- Local URL: `http://localhost:3001`
 
 ## 🚀 Usage
 
@@ -51,20 +55,35 @@ This DevContainer configuration provides a complete development environment for 
 
 ### After Container Starts
 
+#### First Time (postCreateCommand)
 The `setup.sh` script runs automatically and:
+- Starts PostgreSQL
 - Installs all backend dependencies
-- Installs all frontend dependencies
 - Generates Prisma Client
 - Runs database migrations
 - Creates `.env` file
 
+#### Every Time (postStartCommand)
+The `start-backend.sh` script runs automatically and:
+- ✅ **Starts backend server automatically** on port 3001
+- Checks if backend is already running (skips if running)
+- Waits for PostgreSQL to be ready
+- Starts backend in background with watch mode
+
+**Result**: Backend is **already running** when you open the Codespace! 🎉
+
 ### Starting the Application
 
 **Backend:**
+- ✅ **Automatically started** - no action needed!
+- Backend runs in background on port 3001
+- Logs available at: `tail -f /tmp/backend.log`
+- To restart manually: `pkill -f "nest start" && cd crm-backend && npm run start:dev`
+
+**Create Admin User (First Time Only):**
 ```bash
 cd crm-backend
-npm run create:admin  # Create admin user (first time only)
-npm run start:dev     # Start backend
+npm run create:admin
 ```
 
 **Frontend:**
