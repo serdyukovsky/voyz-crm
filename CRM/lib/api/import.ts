@@ -118,7 +118,7 @@ export async function autoMapColumns(
  */
 export async function importContacts(
   file: File,
-  mapping: Record<string, string>,
+  mapping: Record<string, string | undefined>,
   delimiter: ',' | ';' = ',',
   dryRun: boolean = false,
 ): Promise<ImportResult> {
@@ -127,9 +127,17 @@ export async function importContacts(
     throw new Error('Not authenticated')
   }
 
+  // Filter out undefined values from mapping before sending to API
+  const cleanMapping = Object.entries(mapping).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value
+    }
+    return acc
+  }, {})
+
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('mapping', JSON.stringify(mapping))
+  formData.append('mapping', JSON.stringify(cleanMapping))
   formData.append('delimiter', delimiter)
 
   // API_BASE_URL уже должен содержать /api
@@ -159,7 +167,7 @@ export async function importContacts(
  */
 export async function importDeals(
   file: File,
-  mapping: Record<string, string>,
+  mapping: Record<string, string | undefined>,
   delimiter: ',' | ';' = ',',
   dryRun: boolean = false,
 ): Promise<ImportResult> {
@@ -168,9 +176,17 @@ export async function importDeals(
     throw new Error('Not authenticated')
   }
 
+  // Filter out undefined values from mapping before sending to API
+  const cleanMapping = Object.entries(mapping).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value
+    }
+    return acc
+  }, {})
+
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('mapping', JSON.stringify(mapping))
+  formData.append('mapping', JSON.stringify(cleanMapping))
   formData.append('delimiter', delimiter)
 
   // API_BASE_URL уже должен содержать /api

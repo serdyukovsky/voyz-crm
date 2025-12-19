@@ -13,13 +13,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { getImportMeta, autoMapColumns, type ImportField, type AutoMappingResult } from '@/lib/api/import'
 import { cn } from '@/lib/utils'
+import { normalizeSelectValue, toSelectValue, fromSelectValue } from '@/lib/utils/mapping'
 import { ErrorBoundary } from './error-boundary'
+
+// Sentinel value for "skip this column" - never use empty string
+const SKIP_COLUMN_VALUE = '__SKIP_COLUMN__' as const
 
 interface AutoMappingFormProps {
   csvColumns: string[]
   entityType: 'contact' | 'deal'
-  onMappingChange: (mapping: Record<string, string>) => void
-  initialMapping?: Record<string, string>
+  onMappingChange: (mapping: Record<string, string | undefined>) => void
+  initialMapping?: Record<string, string | undefined>
 }
 
 export function AutoMappingForm({ 
@@ -30,7 +34,17 @@ export function AutoMappingForm({
 }: AutoMappingFormProps) {
   const [crmFields, setCrmFields] = useState<ImportField[]>([])
   const [autoMappings, setAutoMappings] = useState<AutoMappingResult[]>([])
-  const [mapping, setMapping] = useState<Record<string, string>>(initialMapping)
+  
+  // Normalize initial mapping for runtime safety (handles empty strings, null from external sources)
+  const normalizedInitialMapping = Object.entries(initialMapping).reduce<Record<string, string | undefined>>(
+    (acc, [key, value]) => {
+      acc[key] = normalizeSelectValue(value)
+      return acc
+    },
+    {}
+  )
+  
+  const [mapping, setMapping] = useState<Record<string, string | undefined>>(normalizedInitialMapping)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingAutoMap, setIsLoadingAutoMap] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,10 +64,14 @@ export function AutoMappingForm({
   // Применяем auto-mapping при получении результатов
   useEffect(() => {
     if (autoMappings.length > 0 && Object.keys(mapping).length === 0) {
-      const autoMapping: Record<string, string> = {}
+      const autoMapping: Record<string, string | undefined> = {}
       autoMappings.forEach((am) => {
+        // Only set mapping if suggestedField exists and confidence is sufficient
+        // Normalize for runtime safety (API might return empty strings or null)
         if (am.suggestedField && am.confidence >= 0.6) {
-          autoMapping[am.columnName] = am.suggestedField
+          autoMapping[am.columnName] = normalizeSelectValue(am.suggestedField)
+        } else {
+          autoMapping[am.columnName] = undefined
         }
       })
       setMapping(autoMapping)
@@ -107,14 +125,18 @@ export function AutoMappingForm({
     }
   }
 
-  const handleMappingChange = (csvColumn: string, crmField: string) => {
+  const handleMappingChange = (csvColumn: string, crmField: string | undefined) => {
     try {
       if (!csvColumn || typeof csvColumn !== 'string') {
         console.warn('Invalid csvColumn:', csvColumn)
         return
       }
       setMapping((prev) => {
-        const newMapping = { ...prev, [csvColumn]: crmField }
+        // Convert sentinel value to undefined, then normalize
+        // This provides runtime safety against empty strings, null, etc.
+        const rawValue = fromSelectValue(crmField, SKIP_COLUMN_VALUE)
+        const actualValue = normalizeSelectValue(rawValue)
+        const newMapping = { ...prev, [csvColumn]: actualValue }
         return newMapping
       })
     } catch (err) {
@@ -200,9 +222,16 @@ export function AutoMappingForm({
           }
 
           const autoMapping = getAutoMapping(column)
-          const currentMapping = mapping[column] || ''
+          const currentMapping = mapping[column]
+          
+          // Normalize mapping value for runtime safety (handles empty strings, null, etc.)
+          // Then convert to Select-compatible value using sentinel
+          // Radix Select requires a string value (never undefined or empty string)
+          const normalizedMapping = normalizeSelectValue(currentMapping)
+          const selectValue = toSelectValue(normalizedMapping, SKIP_COLUMN_VALUE)
+          
           const isAutoMapped = autoMapping?.suggestedField && autoMapping.confidence >= 0.6
-          const isCurrentAutoMapped = currentMapping === autoMapping?.suggestedField
+          const isCurrentAutoMapped = normalizedMapping === autoMapping?.suggestedField
 
           return (
             <div
@@ -239,8 +268,10 @@ export function AutoMappingForm({
               
               <div className="flex-1 min-w-0">
                 <Select
-                  value={currentMapping}
-                  onValueChange={(value) => {
+                  value={selectValue}
+                  onValueChange={(value: string) => {
+                    // onValueChange always returns a string (never undefined)
+                    // We convert sentinel value to undefined in the handler
                     try {
                       handleMappingChange(column, value)
                     } catch (err) {
@@ -249,10 +280,12 @@ export function AutoMappingForm({
                   }}
                 >
                   <SelectTrigger className="h-9 bg-card border-border">
+                    {/* Placeholder shows when value doesn't match any Item */}
                     <SelectValue placeholder="Select field..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— Skip this column —</SelectItem>
+                    {/* Sentinel value for "skip" - never use empty string "" */}
+                    <SelectItem value={SKIP_COLUMN_VALUE}>— Skip this column —</SelectItem>
                     {crmFields.map((field) => (
                       <SelectItem key={field.key} value={field.key}>
                         <div className="flex items-center gap-2">
