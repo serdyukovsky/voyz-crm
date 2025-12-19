@@ -12,6 +12,12 @@ export interface ContactFieldMapping {
   position?: string;
   companyName?: string;
   companyId?: string;
+  link?: string; // Ссылка
+  subscriberCount?: string; // Кол-во подписчиков
+  directions?: string; // Направление (значения будут разделены запятой)
+  contactMethods?: string; // Способ связи (значения будут разделены запятой)
+  websiteOrTgChannel?: string; // Сайт, тг канал
+  contactInfo?: string; // Контакт (номер телефона или никнейм в телеграме)
   tags?: string; // CSV column name, значения будут разделены запятой
   notes?: string;
   
@@ -43,6 +49,7 @@ export interface DealFieldMapping {
   companyId?: string;
   expectedCloseAt?: string;
   description?: string;
+  rejectionReasons?: string; // Причина отказа (значения будут разделены запятой)
   tags?: string;
   
   // Custom fields
