@@ -150,7 +150,11 @@ export class AuthService {
       role,
     });
 
-    const { password: _, ...userResponse } = user;
+    // usersService.create should already exclude password, but ensure it's not included
+    const userResponse = { ...user };
+    if ('password' in userResponse) {
+      delete (userResponse as any).password;
+    }
 
     return {
       message: 'User registered successfully',
@@ -311,6 +315,28 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({
       where: { userId },
     });
+  }
+
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        permissions: true,
+      },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    const userPermissions = this.getUserPermissions(user.role, user.permissions);
+
+    const { password: _, ...userResponse } = user;
+
+    return {
+      ...userResponse,
+      permissions: userPermissions,
+    };
   }
 
   private getUserPermissions(role: UserRole, userPermissions: any[]): string[] {

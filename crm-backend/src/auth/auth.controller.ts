@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   UseGuards,
   Request,
@@ -173,6 +174,27 @@ export class AuthController {
     return {
       access_token: result.access_token,
     };
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get current user',
+    description: 'Returns the currently authenticated user. Returns 401 if token is invalid or expired.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Current user information',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or expired token',
+  })
+  async getCurrentUser(@CurrentUser() user: any) {
+    const userData = await this.authService.getCurrentUser(user.userId || user.id);
+    const { password: _, permissions: __, ...userResponse } = userData;
+    return userResponse;
   }
 
   @Post('logout')
