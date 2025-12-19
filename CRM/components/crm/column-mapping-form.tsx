@@ -10,11 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from '@/components/ui/button'
+import { normalizeSelectValue, toSelectValue, fromSelectValue } from '@/lib/utils/mapping'
+
+// Sentinel value for "skip this column" - never use empty string
+const SKIP_COLUMN_VALUE = '__SKIP_COLUMN__' as const
 
 interface ColumnMappingFormProps {
   importedColumns?: string[]
   columns?: string[] // Альтернативное имя для совместимости
-  onImport?: (mapping: Record<string, string>) => void
+  onImport?: (mapping: Record<string, string | undefined>) => void
 }
 
 const CRM_FIELDS = [
@@ -27,7 +31,7 @@ const CRM_FIELDS = [
   { value: 'assigned_to', label: 'Assigned To' },
   { value: 'created_at', label: 'Created Date' },
   { value: 'notes', label: 'Notes' },
-  { value: 'skip', label: '— Skip this column —' },
+  { value: SKIP_COLUMN_VALUE, label: '— Skip this column —' },
 ]
 
 export function ColumnMappingForm({ 
@@ -38,12 +42,16 @@ export function ColumnMappingForm({
   // Поддержка обоих вариантов props для совместимости
   const columnsToUse = importedColumns || columns || []
   
-  const [mapping, setMapping] = useState<Record<string, string>>({})
+  const [mapping, setMapping] = useState<Record<string, string | undefined>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
 
-  const handleMappingChange = (importedCol: string, crmField: string) => {
+  const handleMappingChange = (importedCol: string, crmField: string | undefined) => {
     try {
-      setMapping((prev) => ({ ...prev, [importedCol]: crmField }))
+      // Convert sentinel value to undefined, then normalize
+      // This provides runtime safety against empty strings, null, etc.
+      const rawValue = fromSelectValue(crmField, SKIP_COLUMN_VALUE)
+      const actualValue = normalizeSelectValue(rawValue)
+      setMapping((prev) => ({ ...prev, [importedCol]: actualValue }))
     } catch (err) {
       console.error('Error in handleMappingChange:', err)
     }
@@ -51,7 +59,8 @@ export function ColumnMappingForm({
 
   const validateMapping = () => {
     const errors: string[] = []
-    const mappedFields = Object.values(mapping).filter(v => v !== 'skip')
+    // Filter out undefined values (skipped columns)
+    const mappedFields = Object.values(mapping).filter(v => v !== undefined)
     
     if (!mappedFields.includes('name')) {
       errors.push('Name field is required')
@@ -102,8 +111,10 @@ export function ColumnMappingForm({
             
             <div className="flex-1">
               <Select
-                value={mapping[column] || ''}
-                onValueChange={(value) => {
+                value={toSelectValue(normalizeSelectValue(mapping[column]), SKIP_COLUMN_VALUE)}
+                onValueChange={(value: string) => {
+                  // onValueChange always returns a string (never undefined)
+                  // We convert sentinel value to undefined in the handler
                   try {
                     handleMappingChange(column, value)
                   } catch (err) {
@@ -112,9 +123,11 @@ export function ColumnMappingForm({
                 }}
               >
                 <SelectTrigger className="h-9 bg-card border-border">
+                  {/* Placeholder shows when value doesn't match any Item */}
                   <SelectValue placeholder="Select field..." />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* Sentinel value always first - never use empty string "" */}
                   {CRM_FIELDS.map((field) => (
                     <SelectItem key={field.value} value={field.value}>
                       {field.label}

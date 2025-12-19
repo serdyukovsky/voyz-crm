@@ -28,8 +28,8 @@ function ImportExportContent() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvRows, setCsvRows] = useState<ParsedCsvRow[]>([])
   
-  // Mapping
-  const [mapping, setMapping] = useState<Record<string, string>>({})
+  // Mapping (undefined means "not selected", not empty string)
+  const [mapping, setMapping] = useState<Record<string, string | undefined>>({})
   
   // Dry-run
   const [dryRunResult, setDryRunResult] = useState<ImportResultType | null>(null)
@@ -87,7 +87,7 @@ function ImportExportContent() {
     }
   }
 
-  const handleMappingChange = (newMapping: Record<string, string>) => {
+  const handleMappingChange = (newMapping: Record<string, string | undefined>) => {
     setMapping(newMapping)
   }
 
@@ -155,9 +155,9 @@ function ImportExportContent() {
   }
 
   const isMappingValid = () => {
-    // Проверяем что все required поля замаплены
+    // Проверяем что хотя бы одно поле замаплено (не undefined)
     // Это будет проверяться на backend, но базовая валидация здесь
-    const mappedFields = Object.values(mapping).filter(v => v && v !== '')
+    const mappedFields = Object.values(mapping).filter(v => v !== undefined)
     return mappedFields.length > 0
   }
 
