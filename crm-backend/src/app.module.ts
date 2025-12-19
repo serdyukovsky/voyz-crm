@@ -23,6 +23,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { EmailsModule } from './emails/emails.module';
 import { StatsModule } from './stats/stats.module';
 import { ChatModule } from './chat/chat.module';
+import { SeedModule } from './seed/seed.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
 import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
@@ -49,6 +50,7 @@ import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
     ImportExportModule,
     MessagesModule,
     WebsocketModule,
+    SeedModule,
     IntegrationsModule,
     LoggingModule,
     AnalyticsModule,
