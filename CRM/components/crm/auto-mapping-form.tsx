@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { normalizeSelectValue, toSelectValue, fromSelectValue } from '@/lib/utils/mapping'
 import { ErrorBoundary } from './error-boundary'
 import { CreateFieldDialog } from './create-field-dialog'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 // Sentinel value for "skip this column" - never use empty string
 const SKIP_COLUMN_VALUE = '__SKIP_COLUMN__' as const
@@ -46,6 +47,7 @@ export function AutoMappingForm({
   initialMapping = {},
   csvSampleData = [],
 }: AutoMappingFormProps) {
+  const { t, language } = useTranslation()
   const [importMeta, setImportMeta] = useState<ImportMeta | null>(null)
   const [crmFields, setCrmFields] = useState<ImportField[]>([])
   const [autoMappings, setAutoMappings] = useState<AutoMappingResult[]>([])
@@ -67,6 +69,14 @@ export function AutoMappingForm({
   // Create field dialog state
   const [isCreateFieldDialogOpen, setIsCreateFieldDialogOpen] = useState(false)
   const [createFieldForColumn, setCreateFieldForColumn] = useState<string | null>(null)
+  
+  // Helper to get field display name (description for Russian, label otherwise)
+  const getFieldLabel = (field: ImportField) => {
+    if (language === 'ru' && field.description) {
+      return field.description
+    }
+    return field.label
+  }
 
   // Загружаем метаданные полей CRM
   useEffect(() => {
@@ -192,11 +202,11 @@ export function AutoMappingForm({
 
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 1.0) {
-      return <Badge variant="default" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">Exact</Badge>
+      return <Badge variant="default" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">{t('importExport.confidence.exact')}</Badge>
     } else if (confidence >= 0.8) {
-      return <Badge variant="default" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">High</Badge>
+      return <Badge variant="default" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">{t('importExport.confidence.high')}</Badge>
     } else if (confidence >= 0.6) {
-      return <Badge variant="default" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20">Medium</Badge>
+      return <Badge variant="default" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20">{t('importExport.confidence.medium')}</Badge>
     }
     return null
   }
@@ -205,7 +215,7 @@ export function AutoMappingForm({
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading fields...</span>
+        <span className="ml-2 text-sm text-muted-foreground">{t('common.loading')}</span>
       </div>
     )
   }
@@ -233,7 +243,7 @@ export function AutoMappingForm({
         <div className="flex items-start gap-2">
           <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-destructive">Error loading fields</p>
+            <p className="text-sm font-medium text-destructive">{t('common.error')}</p>
             <p className="text-xs text-destructive/80 mt-1">{error}</p>
             <Button
               variant="outline"
@@ -241,7 +251,7 @@ export function AutoMappingForm({
               onClick={loadFields}
               className="mt-3"
             >
-              Retry
+              {t('common.back')}
             </Button>
           </div>
         </div>
@@ -261,11 +271,11 @@ export function AutoMappingForm({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-foreground">Map Columns to CRM Fields</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t('importExport.mapColumns')}</h3>
           <p className="text-xs text-muted-foreground">
             {isLoadingAutoMap 
-              ? 'Auto-mapping columns...' 
-              : 'Match your CSV columns to CRM fields. Auto-mapping suggestions are shown with confidence badges.'
+              ? t('importExport.autoMapping')
+              : t('importExport.autoMappingComplete')
             }
           </p>
         </div>
@@ -322,7 +332,7 @@ export function AutoMappingForm({
                 {/* Sample values from CSV */}
                 {sampleValues.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">Examples:</span>
+                    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">{t('importExport.examples')}</span>
                     {sampleValues.map((sample, idx) => (
                       <span
                         key={idx}
@@ -358,22 +368,22 @@ export function AutoMappingForm({
                 >
                   <SelectTrigger className="h-9 bg-card border-border">
                     {/* Placeholder shows when value doesn't match any Item */}
-                    <SelectValue placeholder="Select field..." />
+                    <SelectValue placeholder={t('common.select')} />
                   </SelectTrigger>
                   <SelectContent>
                     {/* Sentinel value for "skip" - never use empty string "" */}
-                    <SelectItem value={SKIP_COLUMN_VALUE}>— Skip this column —</SelectItem>
+                    <SelectItem value={SKIP_COLUMN_VALUE}>{t('importExport.skipColumn')}</SelectItem>
                     
                     {/* Group fields by category if new metadata structure is available */}
                     {importMeta && 'systemFields' in importMeta && Array.isArray(importMeta.systemFields) && importMeta.systemFields.length > 0 && (
                       <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">System Fields</div>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{t('importExport.systemFields')}</div>
                         {importMeta.systemFields.map((field) => (
                           <SelectItem key={field.key} value={field.key}>
                             <div className="flex items-center gap-2">
-                              <span>{field.label}</span>
+                              <span>{getFieldLabel(field)}</span>
                               {field.required && (
-                                <Badge variant="outline" className="text-xs">Required</Badge>
+                                <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
                               )}
                             </div>
                           </SelectItem>
@@ -383,13 +393,13 @@ export function AutoMappingForm({
                     
                     {importMeta && 'customFields' in importMeta && Array.isArray(importMeta.customFields) && importMeta.customFields.length > 0 && (
                       <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Custom Fields</div>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">{t('importExport.customFields')}</div>
                         {importMeta.customFields.map((field) => (
                           <SelectItem key={field.key} value={field.key}>
                             <div className="flex items-center gap-2">
-                              <span>{field.label}</span>
+                              <span>{getFieldLabel(field)}</span>
                               {field.required && (
-                                <Badge variant="outline" className="text-xs">Required</Badge>
+                                <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
                               )}
                             </div>
                           </SelectItem>
@@ -401,9 +411,9 @@ export function AutoMappingForm({
                     {(!importMeta || !('systemFields' in importMeta) || !Array.isArray(importMeta.systemFields)) && crmFields.map((field) => (
                       <SelectItem key={field.key} value={field.key}>
                         <div className="flex items-center gap-2">
-                          <span>{field.label}</span>
+                          <span>{getFieldLabel(field)}</span>
                           {field.required && (
-                            <Badge variant="outline" className="text-xs">Required</Badge>
+                            <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
                           )}
                         </div>
                       </SelectItem>
@@ -421,7 +431,7 @@ export function AutoMappingForm({
                   onClick={() => handleCreateField(column)}
                   disabled={isLoading}
                   className="h-9"
-                  title="Create new custom field"
+                  title={t('importExport.createField')}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
