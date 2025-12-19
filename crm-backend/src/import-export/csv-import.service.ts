@@ -544,6 +544,12 @@ export class CsvImportService {
     tags?: string[];
     notes?: string | null;
     social?: any;
+    link?: string | null;
+    subscriberCount?: string | null;
+    directions?: string[];
+    contactMethods?: string[];
+    websiteOrTgChannel?: string | null;
+    contactInfo?: string | null;
   } | null {
     // Получаем значение из CSV по маппингу
     const getValue = (fieldName?: string): string | undefined => {
@@ -647,6 +653,30 @@ export class CsvImportService {
       }
     }
 
+    // Новые поля
+    const link = sanitizeOptionalTextFields(getValue(mapping.link));
+    const subscriberCount = sanitizeOptionalTextFields(getValue(mapping.subscriberCount));
+    const websiteOrTgChannel = sanitizeOptionalTextFields(getValue(mapping.websiteOrTgChannel));
+    const contactInfo = sanitizeOptionalTextFields(getValue(mapping.contactInfo));
+
+    // Парсинг directions (разделенные запятой)
+    const directions: string[] = [];
+    if (mapping.directions) {
+      const directionsValue = getValue(mapping.directions);
+      if (directionsValue) {
+        directions.push(...directionsValue.split(',').map((d) => d.trim()).filter(Boolean));
+      }
+    }
+
+    // Парсинг contactMethods (разделенные запятой)
+    const contactMethods: string[] = [];
+    if (mapping.contactMethods) {
+      const methodsValue = getValue(mapping.contactMethods);
+      if (methodsValue) {
+        contactMethods.push(...methodsValue.split(',').map((m) => m.trim()).filter(Boolean));
+      }
+    }
+
     return {
       fullName,
       email: normalizedEmail || undefined,
@@ -657,6 +687,12 @@ export class CsvImportService {
       tags: tags.length > 0 ? tags : undefined,
       notes: sanitizeOptionalTextFields(getValue(mapping.notes)),
       social: social || undefined,
+      link: link || undefined,
+      subscriberCount: subscriberCount || undefined,
+      directions: directions.length > 0 ? directions : undefined,
+      contactMethods: contactMethods.length > 0 ? contactMethods : undefined,
+      websiteOrTgChannel: websiteOrTgChannel || undefined,
+      contactInfo: contactInfo || undefined,
     };
   }
 
@@ -686,6 +722,7 @@ export class CsvImportService {
     expectedCloseAt?: Date | string | null;
     description?: string | null;
     tags?: string[];
+    rejectionReasons?: string[];
   } | null {
     const getValue = (fieldName?: string): string | undefined => {
       if (!fieldName) return undefined;
@@ -851,6 +888,15 @@ export class CsvImportService {
       }
     }
 
+    // Парсинг rejectionReasons (разделенные запятой)
+    const rejectionReasons: string[] = [];
+    if (mapping.rejectionReasons) {
+      const reasonsValue = getValue(mapping.rejectionReasons);
+      if (reasonsValue) {
+        rejectionReasons.push(...reasonsValue.split(',').map((r) => r.trim()).filter(Boolean));
+      }
+    }
+
     return {
       number: numberValue,
       title: titleValue,
@@ -864,6 +910,7 @@ export class CsvImportService {
       expectedCloseAt: expectedCloseAt || null,
       description: sanitizeOptionalTextFields(getValue(mapping.description)) || null,
       tags: tags.length > 0 ? tags : undefined,
+      rejectionReasons: rejectionReasons.length > 0 ? rejectionReasons : undefined,
     };
   }
 
