@@ -244,6 +244,23 @@ function DealsPageContent() {
   const createPipelineMutation = useCreatePipeline()
   const createDealMutation = useCreateDeal()
   const { data: companies = [] } = useCompanies()
+
+  // Загружаем stages из выбранного pipeline
+  useEffect(() => {
+    if (currentFunnelId && pipelines.length > 0) {
+      const currentPipeline = pipelines.find(p => p.id === currentFunnelId)
+      if (currentPipeline && currentPipeline.stages && currentPipeline.stages.length > 0) {
+        // Преобразуем API stages в UI format
+        const uiStages: Stage[] = currentPipeline.stages.map(stage => ({
+          id: stage.id,
+          label: stage.name,
+          color: stage.color,
+          isCustom: true,
+        }))
+        setStages(uiStages)
+      }
+    }
+  }, [currentFunnelId, pipelines])
   const { data: contacts = [] } = useContacts()
 
   // Преобразуем пайплайны в воронки
