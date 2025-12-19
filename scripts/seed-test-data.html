@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚀 Создание тестовых данных для CRM</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #1a202c;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #718096;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .info-box {
+      background: #edf2f7;
+      border-left: 4px solid #4299e1;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    
+    .info-box h3 {
+      color: #2d3748;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    
+    .info-box ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    
+    .info-box li {
+      color: #4a5568;
+      padding: 4px 0;
+      font-size: 14px;
+    }
+    
+    .info-box li:before {
+      content: "✓ ";
+      color: #48bb78;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    
+    .button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .button:active {
+      transform: translateY(0);
+    }
+    
+    .button:disabled {
+      background: #cbd5e0;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .log {
+      margin-top: 24px;
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    
+    .log.show {
+      display: block;
+    }
+    
+    .log-line {
+      padding: 4px 0;
+      line-height: 1.5;
+    }
+    
+    .log-success {
+      color: #68d391;
+    }
+    
+    .log-error {
+      color: #fc8181;
+    }
+    
+    .log-info {
+      color: #63b3ed;
+    }
+    
+    .warning-box {
+      background: #fef5e7;
+      border-left: 4px solid #f59e0b;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Создание тестовых данных</h1>
+    <p class="subtitle">Автоматическое создание воронки, этапов и сделок</p>
+    
+    <div class="info-box">
+      <h3>📋 Что будет создано:</h3>
+      <ul>
+        <li>1 Pipeline: "Продажи — Тестовая воронка"</li>
+        <li>6 этапов: от "Новый лид" до "Закрыто-Выиграно/Проиграно"</li>
+        <li>7 тестовых сделок на разных этапах</li>
+      </ul>
+    </div>
+    
+    <div class="warning-box">
+      ⚠️ <strong>Важно:</strong> Откройте эту страницу на том же домене что и CRM (localhost:5173 или ваш Codespace URL)
+    </div>
+    
+    <button class="button" id="createBtn" onclick="createTestData()">
+      Создать тестовые данные
+    </button>
+    
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'https://fictional-capybara-69qpv47gj7rgcrx65-3001.app.github.dev/api';
+    
+    const PIPELINE_CONFIG = {
+      name: '🚀 Продажи — Тестовая воронка',
+      description: 'Тестовая воронка для демонстрации функционала импорта и работы с CRM',
+      isDefault: true,
+    };
+
+    const STAGES_CONFIG = [
+      { name: 'Новый лид', color: '#94a3b8', order: 0, isDefault: true },
+      { name: 'Квалификация', color: '#3b82f6', order: 1 },
+      { name: 'Переговоры', color: '#f59e0b', order: 2 },
+      { name: 'Отправлено КП', color: '#8b5cf6', order: 3 },
+      { name: 'Закрыто-Выиграно', color: '#10b981', order: 4, isClosed: true },
+      { name: 'Закрыто-Проиграно', color: '#ef4444', order: 5, isClosed: true },
+    ];
+
+    const TEST_DEALS = [
+      {
+        title: 'Внедрение CRM системы для ООО "Альфа"',
+        number: 'DEAL-001',
+        amount: 450000,
+        stageName: 'Переговоры',
+        description: 'Крупный клиент, заинтересован во внедрении полного цикла CRM',
+      },
+      {
+        title: 'Консультация по автоматизации — ИП Петров',
+        number: 'DEAL-002',
+        amount: 75000,
+        stageName: 'Квалификация',
+        description: 'Небольшой проект, обсуждаем объем работ',
+      },
+      {
+        title: 'Разработка интеграции с 1С — ООО "Бета"',
+        number: 'DEAL-003',
+        amount: 320000,
+        stageName: 'Отправлено КП',
+        description: 'Коммерческое предложение отправлено 2 дня назад',
+      },
+      {
+        title: 'Техподдержка CRM — ООО "Гамма"',
+        number: 'DEAL-004',
+        amount: 150000,
+        stageName: 'Закрыто-Выиграно',
+        description: 'Контракт подписан, начинаем работу',
+      },
+      {
+        title: 'Обучение персонала — ИП Сидоров',
+        number: 'DEAL-005',
+        amount: 50000,
+        stageName: 'Новый лид',
+        description: 'Входящая заявка, требуется первичная квалификация',
+      },
+      {
+        title: 'Доработка модулей CRM — ООО "Дельта"',
+        number: 'DEAL-006',
+        amount: 280000,
+        stageName: 'Квалификация',
+        description: 'Уточняем требования к доработкам',
+      },
+      {
+        title: 'Консалтинг по процессам — ЗАО "Эпсилон"',
+        number: 'DEAL-007',
+        amount: 95000,
+        stageName: 'Закрыто-Проиграно',
+        description: 'Клиент выбрал другого подрядчика',
+      },
+    ];
+
+    const logContainer = document.getElementById('log');
+    const createBtn = document.getElementById('createBtn');
+
+    function log(message, type = 'info') {
+      logContainer.classList.add('show');
+      const line = document.createElement('div');
+      line.className = `log-line log-${type}`;
+      
+      const timestamp = new Date().toLocaleTimeString('ru-RU');
+      line.textContent = `[${timestamp}] ${message}`;
+      
+      logContainer.appendChild(line);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    async function apiRequest(endpoint, method = 'GET', body = null) {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('Не найден access_token. Пожалуйста, войдите в систему.');
+      }
+
+      const url = `${API_BASE_URL}${endpoint}`;
+      const options = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      };
+
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText}`);
+      }
+
+      return response.json();
+    }
+
+    async function createTestData() {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Создание...';
+      logContainer.innerHTML = '';
+
+      try {
+        log('🎯 Начинаем создание тестовых данных...', 'info');
+        
+        // Шаг 1: Создаём pipeline
+        log('📊 Создание pipeline...', 'info');
+        const pipeline = await apiRequest('/pipelines', 'POST', PIPELINE_CONFIG);
+        log(`✅ Pipeline создан: "${pipeline.name}"`, 'success');
+
+        // Шаг 2: Создаём stages
+        log('🎨 Создание этапов...', 'info');
+        const stages = [];
+        const stageMap = {};
+        
+        for (const stageConfig of STAGES_CONFIG) {
+          const stage = await apiRequest(
+            `/pipelines/${pipeline.id}/stages`,
+            'POST',
+            stageConfig
+          );
+          stages.push(stage);
+          stageMap[stage.name] = stage.id;
+          log(`  ✓ Этап: "${stage.name}"`, 'success');
+        }
+
+        // Шаг 3: Получаем текущего пользователя
+        log('👤 Получение информации о пользователе...', 'info');
+        const user = await apiRequest('/auth/me');
+        log(`✅ Пользователь: ${user.firstName} ${user.lastName}`, 'success');
+
+        // Шаг 4: Создаём тестовые сделки
+        log('💼 Создание тестовых сделок...', 'info');
+        for (const dealData of TEST_DEALS) {
+          const dealPayload = {
+            title: dealData.title,
+            number: dealData.number,
+            amount: dealData.amount,
+            stageId: stageMap[dealData.stageName],
+            description: dealData.description,
+            pipelineId: pipeline.id,
+            assignedToId: user.id,
+          };
+
+          const deal = await apiRequest('/deals', 'POST', dealPayload);
+          log(`  ✓ "${deal.title}" → ${dealData.stageName}`, 'success');
+        }
+
+        log('', 'info');
+        log('🎉 ГОТОВО! Все данные успешно созданы!', 'success');
+        log(`📋 Создано: Pipeline (1), Этапов (${stages.length}), Сделок (${TEST_DEALS.length})`, 'info');
+        log('🌐 Откройте страницу "Сделки" чтобы увидеть результат', 'info');
+        
+        createBtn.textContent = '✓ Данные созданы';
+        createBtn.style.background = '#48bb78';
+        
+      } catch (error) {
+        log(`❌ ОШИБКА: ${error.message}`, 'error');
+        
+        if (error.message.includes('access_token')) {
+          log('🔐 Решение: Войдите в CRM систему и попробуйте снова', 'error');
+        } else if (error.message.includes('401') || error.message.includes('403')) {
+          log('🔐 Похоже, ваш токен устарел. Войдите заново.', 'error');
+        }
+        
+        createBtn.disabled = false;
+        createBtn.textContent = 'Попробовать снова';
+      }
+    }
+  </script>
+</body>
+</html>
+
