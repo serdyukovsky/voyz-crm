@@ -85,13 +85,13 @@ export function PipelineSelector({ selectedPipelineId, onPipelineChange }: Pipel
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId)
 
   return (
-    <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/20">
+    <div className="w-full space-y-3">
       <div className="space-y-2">
-        <Label htmlFor="pipeline-select">
+        <Label htmlFor="pipeline-select" className="text-base font-medium">
           Select Pipeline *
         </Label>
         <Select value={selectedPipelineId ?? undefined} onValueChange={onPipelineChange}>
-          <SelectTrigger id="pipeline-select" className="bg-background">
+          <SelectTrigger id="pipeline-select" className="w-full bg-background h-10">
             <SelectValue placeholder="Select a pipeline" />
           </SelectTrigger>
           <SelectContent>

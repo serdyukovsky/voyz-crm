@@ -120,9 +120,7 @@ export class ImportExportController {
     }
 
     // Валидация mapping
-    if (!mapping.fullName) {
-      throw new BadRequestException('Mapping must include fullName field');
-    }
+    // fullName опционален, email или phone обязательны (проверяется в mapContactRow)
 
     // Создаем stream из файла
     const fileStream = Readable.from(file.buffer);
@@ -183,6 +181,8 @@ export class ImportExportController {
     @Query('dryRun') dryRun: string = 'false',
     @CurrentUser() user: any,
   ): Promise<ImportResultDto> {
+    console.log('USER:', user);
+    console.log('WORKSPACE:', user?.workspaceId);
     if (!file) {
       throw new BadRequestException('CSV file is required');
     }
@@ -206,8 +206,9 @@ export class ImportExportController {
     }
 
     // Валидация mapping
-    if (!mapping.number || !mapping.title || !mapping.stageId) {
-      throw new BadRequestException('Mapping must include number, title, and stageId fields');
+    // title обязателен, number опционален, stageId не обязателен (резолвится автоматически по имени)
+    if (!mapping.title) {
+      throw new BadRequestException('Mapping must include title field');
     }
 
     // Валидация pipelineId
@@ -220,10 +221,12 @@ export class ImportExportController {
 
     // Импорт (с поддержкой dry-run)
     const isDryRun = dryRun === 'true' || dryRun === '1';
+    // Временно удален try/catch для сохранения оригинального stack trace
+    // Ошибки будут обработаны глобальным exception filter
     const result = await this.csvImportService.importDeals(
       fileStream,
       mapping,
-      user.userId || user.id,
+      user, // Передаем весь объект user для валидации
       pipelineId,
       defaultAssignedToId, // Дефолтный ответственный для всех строк
       undefined, // contactEmailPhoneMap - опционально

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getCurrentUser, logout as logoutApi, type User } from '@/lib/api/auth'
 import { UnauthorizedError, NetworkError, setGlobalBackendUnavailableHandler } from '@/lib/api/api-client'
 
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const toastShownRef = useRef(false)
 
   // Set up backend unavailable handler
   useEffect(() => {
@@ -36,6 +38,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsBackendUnavailable(isUnavailable)
     })
   }, [])
+
+  // Handle redirect when backend is unavailable and user is not authenticated
+  useEffect(() => {
+    if (isBackendUnavailable && authStatus === 'unauthenticated' && location.pathname !== '/login') {
+      // Redirect to login if backend is unavailable and user is not authenticated
+      navigate('/login', { replace: true })
+    }
+  }, [isBackendUnavailable, authStatus, navigate, location.pathname])
+
+  // Show toast notification when backend becomes unavailable
+  useEffect(() => {
+    if (isBackendUnavailable && authStatus === 'authenticated' && !toastShownRef.current) {
+      toastShownRef.current = true
+      toast.warning('Backend недоступен', {
+        description: 'Не удается подключиться к серверу. Ваше состояние аутентификации сохранено. Соединение будет восстановлено автоматически.',
+        duration: 5000,
+      })
+    } else if (!isBackendUnavailable) {
+      // Reset toast flag when backend becomes available
+      toastShownRef.current = false
+    }
+  }, [isBackendUnavailable, authStatus])
 
   // Check auth status on mount
   useEffect(() => {
@@ -61,7 +85,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // On 200 → authenticated
       setUser(userData)
       setAuthStatus('authenticated')
+      const wasUnavailable = isBackendUnavailable
       setIsBackendUnavailable(false) // Backend is available
+      
+      // Show success toast if backend was previously unavailable
+      if (wasUnavailable) {
+        toast.success('Соединение восстановлено', {
+          description: 'Сервер снова доступен.',
+          duration: 3000,
+        })
+        toastShownRef.current = false
+      }
       
       // Update localStorage with fresh user data
       localStorage.setItem('user', JSON.stringify(userData))
@@ -69,29 +103,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Distinguish between auth failures and network errors
       if (error instanceof NetworkError) {
         // Network error - backend unavailable
-        // DO NOT clear auth state - user may still be authenticated
-        // Keep current auth state if we have a token
-        console.warn('Auth check: Backend unavailable, preserving auth state')
+        console.warn('Auth check: Backend unavailable')
         setIsBackendUnavailable(true)
         
-        // If we have a token, assume we're still authenticated (optimistic)
-        // Auth state will be re-verified when backend comes back
-        if (token) {
-          // Try to restore user from localStorage
-          const storedUser = localStorage.getItem('user')
-          if (storedUser) {
-            try {
-              setUser(JSON.parse(storedUser))
+        // Try to restore user from localStorage if we have both token and stored user
+        // This allows preserving auth state when backend is temporarily unavailable
+        const storedUser = localStorage.getItem('user')
+        if (token && storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser)
+            // Only preserve auth state if we have valid user data
+            if (parsedUser && parsedUser.id) {
+              setUser(parsedUser)
               setAuthStatus('authenticated')
-              return // Don't clear tokens on network error
-            } catch {
-              // Invalid stored user, fall through
+              return // Don't clear tokens on network error - optimistic auth
             }
+          } catch {
+            // Invalid stored user, fall through to unauthenticated
           }
         }
         
-        // No stored user, but don't clear tokens - backend may come back
+        // No valid stored user data - user is not authenticated
+        // Redirect to login even if backend is unavailable
+        setUser(null)
         setAuthStatus('unauthenticated')
+        // Clear potentially invalid tokens
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        
+        // Show error toast and redirect will happen via useEffect
+        if (location.pathname !== '/login') {
+          toast.error('Требуется авторизация', {
+            description: 'Не удается подключиться к серверу. Пожалуйста, войдите в систему.',
+            duration: 4000,
+          })
+        }
         return
       }
       
@@ -110,19 +157,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('userId')
       } else {
         // Other errors - treat as network error
-        console.warn('Auth check: Network error, preserving auth state')
+        console.warn('Auth check: Network error')
         setIsBackendUnavailable(true)
-        // Preserve auth state
+        
+        // Try to preserve auth state only if we have valid stored user
         const storedUser = localStorage.getItem('user')
         if (storedUser && token) {
           try {
-            setUser(JSON.parse(storedUser))
-            setAuthStatus('authenticated')
+            const parsedUser = JSON.parse(storedUser)
+            // Only preserve auth state if we have valid user data
+            if (parsedUser && parsedUser.id) {
+              setUser(parsedUser)
+              setAuthStatus('authenticated')
+            } else {
+              // Invalid user data - not authenticated
+              setUser(null)
+              setAuthStatus('unauthenticated')
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('refresh_token')
+              localStorage.removeItem('user')
+            }
           } catch {
+            // Invalid stored user - not authenticated
+            setUser(null)
             setAuthStatus('unauthenticated')
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('user')
           }
         } else {
+          // No stored user or token - not authenticated
+          setUser(null)
           setAuthStatus('unauthenticated')
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          localStorage.removeItem('user')
         }
       }
     }

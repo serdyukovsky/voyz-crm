@@ -134,7 +134,8 @@ function ImportExportContent() {
   }
 
   const handleContinueToMapping = () => {
-    // Pipeline будет выбран на этапе mapping перед dry-run
+    // Разрешаем переход к mapping даже без pipeline для deals
+    // Pipeline можно выбрать на экране mapping
     setCurrentStep('mapping')
   }
 
@@ -304,14 +305,28 @@ function ImportExportContent() {
                   <Button
                     variant={entityType === 'contact' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setEntityType('contact')}
+                    onClick={() => {
+                      setEntityType('contact')
+                      setSelectedPipelineId(undefined)
+                      if (currentStep !== 'upload') {
+                        setCurrentStep('upload')
+                        handleReset()
+                      }
+                    }}
                   >
                     {t('importExport.contacts')}
                   </Button>
                   <Button
                     variant={entityType === 'deal' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setEntityType('deal')}
+                    onClick={() => {
+                      setEntityType('deal')
+                      setSelectedPipelineId(undefined)
+                      if (currentStep !== 'upload') {
+                        setCurrentStep('upload')
+                        handleReset()
+                      }
+                    }}
                   >
                     {t('importExport.deals')}
                   </Button>
@@ -373,7 +388,6 @@ function ImportExportContent() {
                 <div className="flex justify-end">
                   <Button 
                     onClick={handleContinueToMapping}
-                    disabled={entityType === 'deal' && !selectedPipelineId}
                   >
                     {t('importExport.continueToMapping')}
                   </Button>
@@ -410,6 +424,42 @@ function ImportExportContent() {
             {currentStep === 'mapping' && csvHeaders.length > 0 && (
               <ErrorBoundary>
                 <div className="space-y-6">
+                  {/* Pipeline Selection for Deals - В САМОМ ВЕРХУ экрана mapping */}
+                  {entityType === 'deal' && (
+                    <div className="w-full p-4 border-2 border-primary/30 rounded-lg bg-muted/30">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">
+                          {t('importExport.selectPipeline')}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {t('importExport.pipelineRequiredForMapping')}
+                        </p>
+                      </div>
+                      
+                      <div className="w-full">
+                        <PipelineSelector
+                          selectedPipelineId={selectedPipelineId}
+                          onPipelineChange={setSelectedPipelineId}
+                        />
+                      </div>
+                      
+                      {/* Подсказка если pipeline не выбран */}
+                      {!selectedPipelineId && (
+                        <div className="flex items-start gap-2 p-3 mt-4 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                              {t('importExport.pipelineRequired')}
+                            </p>
+                            <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                              {t('importExport.selectPipelineToMapStages')}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   {/* Import Settings Section - для Deals (AssignedTo) */}
                   {entityType === 'deal' && (
                     <div className="space-y-4">
@@ -455,39 +505,6 @@ function ImportExportContent() {
                     />
                   </div>
                   
-                  {/* Pipeline Selection for Deals - перед Dry run */}
-                  {entityType === 'deal' && (
-                    <div className="space-y-4 pt-4 border-t border-border">
-                      <div className="border-l-4 border-primary pl-4">
-                        <h3 className="text-base font-semibold text-foreground mb-1">
-                          {t('importExport.selectPipeline')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {t('importExport.pipelineRequiredForDryRun')}
-                        </p>
-                      </div>
-                      
-                      <PipelineSelector
-                        selectedPipelineId={selectedPipelineId}
-                        onPipelineChange={setSelectedPipelineId}
-                      />
-                      
-                      {/* Подсказка если pipeline не выбран */}
-                      {!selectedPipelineId && (
-                        <div className="flex items-start gap-2 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                              {t('importExport.pipelineRequired')}
-                            </p>
-                            <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
-                              {t('importExport.selectPipelineToRunDryRun')}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                   
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-4 border-t border-border">

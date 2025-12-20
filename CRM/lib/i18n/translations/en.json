@@ -703,6 +703,8 @@
     },
     "pipelineRequiredForMapping": "Please select a pipeline before mapping CSV columns. This is required to match deal stages.",
     "selectPipelineToContinue": "Please select a pipeline to continue to the mapping step.",
+    "selectPipelineToMapStages": "Select a pipeline above to map CSV stage values to pipeline stages.",
+    "selectPipelineToSeeStages": "Select a pipeline above to see available stages.",
     "selectedPipeline": "Selected Pipeline",
     "change": "Change",
     "pipelineRequiredForDryRun": "Please select a pipeline before running dry-run",

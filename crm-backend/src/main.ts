@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { BaseExceptionFilter } from '@nestjs/core';
+import { ArgumentsHost } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
@@ -8,6 +10,21 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Global process-level error logging
+  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    console.error('🔥 UNHANDLED REJECTION');
+    console.error('Reason:', reason);
+    if (reason instanceof Error) {
+      console.error('Stack:', reason.stack);
+    }
+  });
+
+  process.on('uncaughtException', (error: Error) => {
+    console.error('🔥 UNCAUGHT EXCEPTION');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
+  });
+
   // CORS Configuration - MUST be before cookie parser and other middleware
   // Allow GitHub Codespaces origins (https://*.app.github.dev)
   // and local development origins (localhost:5173, localhost:3000)
@@ -15,6 +32,7 @@ async function bootstrap() {
     ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
     : ['http://localhost:5173', 'http://localhost:3000'];
 
+  // Enable CORS with proper configuration
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
@@ -37,37 +55,17 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
   });
 
+  // Global prefix - set AFTER CORS
+  app.setGlobalPrefix('api');
+
   // Cookie parser
   app.use(cookieParser());
-
-  // Handle CORS preflight requests BEFORE guards (fallback)
-  app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-      const origin = req.headers.origin;
-      const isAllowedOrigin = !origin || 
-        origin.match(/^https:\/\/.*\.app\.github\.dev$/) ||
-        allowedOrigins.includes(origin);
-
-      // Always respond to OPTIONS, even if origin not explicitly allowed
-      // This prevents CORS errors in browser
-      res.header('Access-Control-Allow-Origin', origin || '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Max-Age', '86400'); // 24 hours
-      res.status(200).end();
-      return;
-    }
-    next();
-  });
-
-  // Global prefix
-  app.setGlobalPrefix('api');
 
   // Validation
   app.useGlobalPipes(
@@ -79,7 +77,17 @@ async function bootstrap() {
   );
 
   // Exception filter
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(
+    new (class extends BaseExceptionFilter {
+      catch(exception: any, host: ArgumentsHost) {
+        console.error('🔥 GLOBAL ERROR');
+        console.error(exception);
+        console.error(exception?.stack);
+        super.catch(exception, host);
+      }
+    })(),
+    new HttpExceptionFilter(),
+  );
 
   // Swagger
   const config = new DocumentBuilder()

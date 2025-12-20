@@ -60,11 +60,15 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   const API_BASE_URL = getApiBaseUrl()
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
   
+  console.log('API Request:', { endpoint, url, API_BASE_URL })
+  
   try {
     const response = await fetch(url, {
       ...options,
       headers,
     })
+    
+    console.log('API Response:', { url, status: response.status, ok: response.ok })
 
     // Notify backend is available if we got a response (even if error status)
     if (globalBackendUnavailableHandler) {
