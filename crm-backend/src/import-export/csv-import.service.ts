@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as csv from 'csv-parser';
 import { ImportBatchService } from './import-batch.service';
@@ -52,7 +52,7 @@ export class CsvImportService {
   private async getContactsImportMeta(): Promise<ContactsImportMetaDto> {
     // Системные поля контактов
     const systemFields: ImportFieldDto[] = [
-      { key: 'fullName', label: 'Full Name', required: true, type: 'string', description: 'Полное имя контакта', group: 'basic', entity: 'contact' },
+      { key: 'fullName', label: 'Full Name', required: false, type: 'string', description: 'Полное имя контакта', group: 'basic', entity: 'contact' },
       { key: 'email', label: 'Email', required: false, type: 'email', description: 'Email адрес', group: 'basic', entity: 'contact' },
       { key: 'phone', label: 'Phone', required: false, type: 'phone', description: 'Номер телефона', group: 'basic', entity: 'contact' },
       { key: 'position', label: 'Position', required: false, type: 'string', description: 'Должность', group: 'basic', entity: 'contact' },
@@ -147,9 +147,6 @@ export class CsvImportService {
       pipelines: dealMeta.pipelines,
       users: dealMeta.users,
     };
-
-    // Number опционален
-    const numberValue = getValue(mapping.number);
   }
 
   /**
@@ -205,8 +202,6 @@ export class CsvImportService {
       phone: 'phone',
     };
 
-    // Number опционален
-    const numberValue = getValue(mapping.number);
     return typeMap[type] || 'string';
   }
 
@@ -303,9 +298,6 @@ export class CsvImportService {
       failed: 0,
       skipped: 0,
     };
-
-    // Number опционален
-    const numberValue = getValue(mapping.number);
 
     const errors: ImportError[] = [];
     const rows: Array<{
@@ -434,13 +426,64 @@ export class CsvImportService {
   async importDeals(
     fileStream: Readable,
     mapping: DealFieldMapping,
-    userId: string,
+    user: any,
     pipelineId: string,
     defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     delimiter: ',' | ';' = ',',
     dryRun: boolean = false,
   ): Promise<ImportResultDto> {
+    // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ В САМОМ НАЧАЛЕ ФУНКЦИИ
+    console.log('=== importDeals START ===');
+    console.log('user:', user);
+    console.log('workspaceId:', user?.workspaceId);
+    console.log('pipelineId:', pipelineId);
+    console.log('mapping:', mapping);
+    console.log('dryRun:', dryRun);
+    console.log('rows length: 0 (not parsed yet)');
+    console.log('=======================');
+
+    // ЗАЩИТНЫЕ ПРОВЕРКИ В САМОМ НАЧАЛЕ - явные ошибки вместо silent crash
+    if (!user) {
+      throw new Error('ImportDeals: user is missing');
+    }
+
+    if (!user.workspaceId) {
+      throw new Error('ImportDeals: user.workspaceId is missing');
+    }
+
+    if (!pipelineId) {
+      throw new Error('ImportDeals: pipelineId is missing');
+    }
+
+    const userId = user.userId || user.id;
+    
+    console.log('importDeals called:', { 
+      pipelineId, 
+      userId, 
+      dryRun, 
+      hasMapping: !!mapping,
+      mappingTitle: mapping?.title 
+    });
+    
+    // Валидация входных параметров - все ошибки валидации возвращают 400
+    if (typeof pipelineId !== 'string' || pipelineId.trim() === '') {
+      console.error('Validation error: pipelineId is invalid', { pipelineId, type: typeof pipelineId });
+      throw new BadRequestException('pipelineId must be a non-empty string');
+    }
+
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      throw new BadRequestException('userId is required and must be a non-empty string');
+    }
+
+    if (!mapping || typeof mapping !== 'object') {
+      throw new BadRequestException('mapping is required and must be an object');
+    }
+
+    if (!mapping.title || typeof mapping.title !== 'string' || mapping.title.trim() === '') {
+      throw new BadRequestException('mapping.title is required and must be a non-empty string');
+    }
+
     const summary: ImportSummary = {
       total: 0,
       created: 0,
@@ -449,16 +492,30 @@ export class CsvImportService {
       skipped: 0,
     };
 
-    // Number опционален
-    const numberValue = getValue(mapping.number);
-
     const errors: ImportError[] = [];
     
     // Загружаем stages для выбранного pipeline для resolution по имени
+    // loadPipelineStagesMap уже проверяет существование pipeline и выбрасывает BadRequestException
+    console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD (loadPipelineStagesMap):', {
+      where: { id: pipelineId },
+      include: { stages: true },
+    });
     const stagesMap = await this.loadPipelineStagesMap(pipelineId);
     
     // Загружаем users для resolution по имени/email
+    console.log('PRISMA USER FIND MANY PAYLOAD (loadUsersMap):', {
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+    });
     const usersMap = await this.loadUsersMap();
+    
+    // Map для сбора всех стадий из CSV (stageName -> firstRowNumber)
+    const csvStagesMap = new Map<string, number>();
     
     const rows: Array<{
       number?: string;
@@ -476,6 +533,11 @@ export class CsvImportService {
       tags?: string[];
       rejectionReasons?: string[];
     }> = [];
+
+    // ЗАЩИТНАЯ ПРОВЕРКА: rows должен быть массивом
+    if (!Array.isArray(rows)) {
+      throw new Error('ImportDeals: rows must be an array');
+    }
 
     return new Promise((resolve, reject) => {
       const parser = csv({
@@ -509,6 +571,8 @@ export class CsvImportService {
               summary.skipped++;
             }
           } catch (error) {
+            console.error(`Error in mapDealRow for row ${rowNumber}:`, error);
+            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
             errors.push({
               row: rowNumber,
               error: error instanceof Error ? error.message : 'Unknown error',
@@ -525,17 +589,27 @@ export class CsvImportService {
         })
         .on('end', async () => {
           try {
+            // Инициализируем stagesToCreate вне блока if для использования в resolve
+            const stagesToCreate: StageToCreate[] = [];
+            
             // Batch обработка сделок
             if (rows.length > 0) {
+              // Дополнительная проверка pipelineId (на случай если он стал undefined)
+              if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
+                throw new BadRequestException('pipelineId is required and must be a non-empty string');
+              }
+
               // Получаем pipeline со стадиями
-              const pipeline = await this.prisma.pipeline.findUnique({
+              const pipelineFindPayload = {
                 where: { id: pipelineId },
                 include: {
                   stages: {
                     orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
                   },
                 },
-              });
+              };
+              console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD:', pipelineFindPayload);
+              const pipeline = await this.prisma.pipeline.findUnique(pipelineFindPayload);
               
               if (!pipeline) {
                 throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
@@ -547,21 +621,26 @@ export class CsvImportService {
               const existingStageNames = new Set(
                 pipeline.stages.map(s => s.name.toLowerCase())
               );
-              
-              const stagesToCreate: StageToCreate[] = [];
               const stagesToCreateMap = new Map<string, number>(); // stageName -> order
               
               // Определяем стадии, которые нужно создать
               csvStagesMap.forEach((firstRowNumber, stageName) => {
-                const normalizedName = stageName.toLowerCase();
+                // Безопасная обработка stageName - проверяем что это строка
+                if (!stageName || typeof stageName !== 'string') {
+                  console.warn(`Invalid stageName in csvStagesMap: ${stageName}, skipping`);
+                  return;
+                }
+                
+                const normalizedName = stageName.toLowerCase().trim();
                 if (!existingStageNames.has(normalizedName)) {
                   // Стадия не существует - нужно создать
                   const order = stagesToCreate.length + pipeline.stages.length;
+                  const trimmedName = stageName.trim();
                   stagesToCreate.push({
-                    name: stageName.trim(), // Сохраняем оригинальное имя (с учетом регистра)
+                    name: trimmedName, // Сохраняем оригинальное имя (с учетом регистра)
                     order: order,
                   });
-                  stagesToCreateMap.set(stageName.trim(), order);
+                  stagesToCreateMap.set(trimmedName, order);
                 }
               });
               
@@ -578,12 +657,12 @@ export class CsvImportService {
               });
               
               // Создаем недостающие стадии при actual import
-              const createdStagesMap = new Map<string, string>(); // stageName -> stageId
+              const createdStagesMap = new Map<string, string>(); // normalizedStageName -> stageId
               
               if (!dryRun && stagesToCreate.length > 0) {
                 for (const stageToCreate of stagesToCreate) {
                   try {
-                    const newStage = await this.prisma.stage.create({
+                    const stageCreatePayload = {
                       data: {
                         name: stageToCreate.name,
                         order: stageToCreate.order,
@@ -592,10 +671,17 @@ export class CsvImportService {
                         isDefault: false,
                         isClosed: false,
                       },
-                    });
-                    createdStagesMap.set(stageToCreate.name, newStage.id);
+                    };
+                    console.log('PRISMA STAGE CREATE PAYLOAD:', stageCreatePayload);
+                    const newStage = await this.prisma.stage.create(stageCreatePayload);
+                    // Сохраняем по нормализованному имени для поиска (case-insensitive)
+                    // Безопасная обработка имени стадии
+                    const stageName = typeof stageToCreate.name === 'string' ? stageToCreate.name : String(stageToCreate.name || '');
+                    const normalizedName = stageName.toLowerCase().trim();
+                    createdStagesMap.set(normalizedName, newStage.id);
                     // Обновляем stagesMap для использования в дальнейшей обработке
                     stagesMap.set(stageToCreate.name, newStage.id);
+                    stagesMap.set(normalizedName, newStage.id);
                     stagesMap.set(newStage.id, newStage.id);
                   } catch (error) {
                     errors.push({
@@ -609,16 +695,38 @@ export class CsvImportService {
               }
               
               // Обновляем stageId для строк с созданными стадиями
-              rows.forEach((row) => {
+              // Используем нормализованное имя для поиска (case-insensitive)
+              const updatedRows = rows.map((row) => {
                 // Если stageId не установлен, но есть stageValue, пробуем найти в созданных стадиях
                 if (!row.stageId && row.stageValue) {
-                  // Пробуем найти в созданных стадиях
-                  const createdStageId = createdStagesMap.get(row.stageValue);
+                  // Безопасная обработка stageValue - проверяем что это строка
+                  const stageValueStr = typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || '');
+                  const normalizedStageName = stageValueStr.trim().toLowerCase();
+                  
+                  // Пробуем найти в созданных стадиях (по нормализованному имени)
+                  let createdStageId: string | undefined;
+                  for (const [name, id] of createdStagesMap.entries()) {
+                    // Безопасная обработка name - проверяем что это строка
+                    const nameStr = typeof name === 'string' ? name : String(name || '');
+                    if (nameStr.toLowerCase().trim() === normalizedStageName) {
+                      createdStageId = id;
+                      break;
+                    }
+                  }
+                  
                   if (createdStageId) {
                     row.stageId = createdStageId;
                   } else {
-                    // Пробуем найти в обновленном stagesMap
-                    const foundStageId = stagesMap.get(row.stageValue);
+                    // Пробуем найти в обновленном stagesMap (по нормализованному имени)
+                    let foundStageId: string | undefined;
+                    for (const [name, id] of stagesMap.entries()) {
+                      // Безопасная обработка name - проверяем что это строка
+                      const nameStr = typeof name === 'string' ? name : String(name || '');
+                      if (nameStr.toLowerCase().trim() === normalizedStageName) {
+                        foundStageId = id;
+                        break;
+                      }
+                    }
                     if (foundStageId) {
                       row.stageId = foundStageId;
                     } else if (defaultStageId) {
@@ -630,54 +738,50 @@ export class CsvImportService {
                   // Если stageValue нет, но есть дефолтная стадия, используем её
                   row.stageId = defaultStageId;
                 }
-              });
-              
-              // Устанавливаем дефолтную стадию для строк без stageId
-              rows.forEach((row) => {
-                if (!row.stageId && defaultStageId) {
-                  row.stageId = defaultStageId;
-                }
-              });
-              
-              // Обновляем stageId для строк, где стадия была создана
-              const updatedRows = rows.map((row) => {
-                // Если stageId не установлен, но есть stageValue, пробуем найти в созданных стадиях
-                if (!row.stageId && row.stageValue) {
-                  const createdStageId = createdStagesMap.get(row.stageValue);
-                  if (createdStageId) {
-                    row.stageId = createdStageId;
-                  } else {
-                    // Пробуем найти в обновленном stagesMap
-                    const foundStageId = stagesMap.get(row.stageValue);
-                    if (foundStageId) {
-                      row.stageId = foundStageId;
-                    }
-                  }
-                }
                 return row;
               });
               
               // Проверка наличия stageId на этапе dry-run/import
+              // Ошибки только если:
+              // 1. Нет pipeline (уже проверено выше)
+              // 2. Стадия пустая И нет default stage
               updatedRows.forEach((row, index) => {
                 if (!row.stageId) {
-                  errors.push({
-                    row: index + 2, // +2 потому что rowNumber начинается с 1, а индекс с 0
-                    field: 'stageId',
-                    error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
-                  });
-                  summary.failed++;
+                  // Если есть stageValue, но нет stageId - это значит стадия будет создана, не ошибка
+                  // Если нет stageValue и нет defaultStageId - это ошибка
+                  if (!row.stageValue && !defaultStageId) {
+                    errors.push({
+                      row: index + 2, // +2 потому что rowNumber начинается с 1, а индекс с 0
+                      field: 'stageId',
+                      error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
+                    });
+                    summary.failed++;
+                  }
                 }
               });
               
               // Фильтруем строки без stageId для дальнейшей обработки
-              const validRows = updatedRows.filter(row => row.stageId);
+              // Но включаем строки с stageValue (стадии будут созданы)
+              const validRows = updatedRows.filter(row => {
+                // Включаем если есть stageId ИЛИ есть stageValue (стадия будет создана)
+                return row.stageId || row.stageValue;
+              });
               
               if (validRows.length > 0) {
                 if (dryRun) {
                   // В режиме dry-run только симулируем импорт
                   // Проверяем существующие сделки по number
                   const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
-                  const existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                  
+                  let existingDeals = new Map<string, { id: string; number: string }>();
+                  if (numbers.length > 0) {
+                    try {
+                      existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                    } catch (error) {
+                      console.error('Error in batchFindDealsByNumbers:', error);
+                      // Продолжаем без проверки существующих сделок
+                    }
+                  }
                   
                   let willCreate = 0;
                   let willUpdate = 0;
@@ -693,6 +797,11 @@ export class CsvImportService {
                   summary.created = willCreate;
                   summary.updated = willUpdate;
                 } else {
+                  console.log('PRISMA DEAL CREATE PAYLOAD (batchCreateDeals):', {
+                    dealsData: validRows,
+                    userId: userId,
+                    dealsCount: validRows.length,
+                  });
                   const result = await this.importBatchService.batchCreateDeals(validRows, userId);
                   summary.created += result.created;
                   summary.updated += result.updated;
@@ -722,13 +831,31 @@ export class CsvImportService {
               errors,
               stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
             });
-
-            resolve({
-              summary,
-              errors,
-            });
           } catch (error) {
-            reject(error);
+            console.error('Error in importDeals on end handler:', error);
+            console.error('Error details:', {
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              rowsLength: rows.length,
+              summary,
+              stagesToCreateLength: stagesToCreate.length,
+              pipelineId,
+            });
+            
+            // Если это уже BadRequestException, просто пробрасываем его (400)
+            if (error instanceof BadRequestException) {
+              reject(error);
+              return;
+            }
+            
+            // Все остальные ошибки оборачиваем в InternalServerError с понятным сообщением
+            // Но лучше преобразовать в BadRequestException если это ошибка валидации
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes('not found') || errorMessage.includes('required') || errorMessage.includes('invalid')) {
+              reject(new BadRequestException(`Import validation error: ${errorMessage}`));
+            } else {
+              reject(error);
+            }
           }
         });
 
@@ -749,7 +876,7 @@ export class CsvImportService {
     rowNumber: number,
     errors: ImportError[],
   ): {
-    fullName: string;
+    fullName?: string | null;
     email?: string | null;
     phone?: string | null;
     position?: string | null;
@@ -767,42 +894,28 @@ export class CsvImportService {
   } | null {
     // Получаем значение из CSV по маппингу
     const getValue = (fieldName?: string): string | undefined => {
-
       if (!fieldName) return undefined;
 
       const value = csvRow[fieldName];
-
-      return value?.trim() || undefined;
-
+      
+      // Безопасная обработка значения - только строки могут иметь trim()
+      if (value === null || value === undefined) {
+        return undefined;
+      }
+      
+      // Преобразуем в строку если это не строка
+      const stringValue = typeof value === 'string' ? value : String(value);
+      
+      // trim() только для строк
+      return stringValue.trim() || undefined;
     };
 
     // Number опционален
     const numberValue = getValue(mapping.number);
 
-
-    // FullName обязателен
+    // FullName опционален
     const fullNameValue = getValue(mapping.fullName);
-    if (!fullNameValue) {
-      errors.push({
-        row: rowNumber,
-        field: 'fullName',
-        error: 'Full name is required',
-      });
-      return null;
-    }
-
-
-
-    const fullName = sanitizeTextFields(fullNameValue);
-    if (!fullName) {
-      errors.push({
-        row: rowNumber,
-        field: 'fullName',
-        value: fullNameValue,
-        error: 'Full name cannot be empty',
-      });
-      return null;
-    }
+    const fullName = fullNameValue ? sanitizeTextFields(fullNameValue) : null;
 
 
 
@@ -967,13 +1080,20 @@ export class CsvImportService {
     rejectionReasons?: string[];
   } | null {
     const getValue = (fieldName?: string): string | undefined => {
-
       if (!fieldName) return undefined;
 
       const value = csvRow[fieldName];
-
-      return value?.trim() || undefined;
-
+      
+      // Безопасная обработка значения - только строки могут иметь trim()
+      if (value === null || value === undefined) {
+        return undefined;
+      }
+      
+      // Преобразуем в строку если это не строка
+      const stringValue = typeof value === 'string' ? value : String(value);
+      
+      // trim() только для строк
+      return stringValue.trim() || undefined;
     };
 
     // Number опционален
@@ -993,31 +1113,53 @@ export class CsvImportService {
 
 
     // StageId опционален - резолвится по имени если указан
-    const stageValue = getValue(mapping.stageId);
+    // БЕЗОПАСНОЕ получение стадии из CSV
+    const rawStage = mapping.stageId ? csvRow[mapping.stageId] : null;
+    
+    const stageName =
+      typeof rawStage === 'string' && rawStage.trim()
+        ? rawStage.trim()
+        : null;
+    
     let stageId: string | undefined = undefined;
 
-    if (stageValue) {
-      // Всегда сохраняем stageValue в csvStagesMap для сбора всех стадий из CSV
+    if (stageName) {
+      // Нормализуем имя стадии (trim + lowercase для сравнения)
+      const normalizedStageName = stageName.toLowerCase();
+      const originalStageName = stageName; // Сохраняем оригинальное имя
+      
+      // Всегда сохраняем stageName в csvStagesMap для сбора всех стадий из CSV
+      // Используем оригинальное имя (не нормализованное) для сохранения регистра
       if (csvStagesMap) {
-        const normalizedStageName = stageValue.trim();
-        if (!csvStagesMap.has(normalizedStageName)) {
-          csvStagesMap.set(normalizedStageName, rowNumber);
+        // Проверяем по нормализованному имени, но сохраняем оригинальное
+        let foundOriginalName = originalStageName;
+        for (const [name] of csvStagesMap.entries()) {
+          // Безопасная обработка name - проверяем что это строка
+          const nameStr = typeof name === 'string' ? name : String(name || '');
+          if (nameStr.toLowerCase() === normalizedStageName) {
+            foundOriginalName = nameStr; // Используем уже сохраненное имя
+            break;
+          }
+        }
+        if (!csvStagesMap.has(foundOriginalName)) {
+          csvStagesMap.set(foundOriginalName, rowNumber);
         }
       }
       
-      // Резолвим stage ID по имени (case-insensitive)
+      // Резолвим stage ID по имени (case-insensitive, trim)
       // Сначала пробуем найти по точному совпадению ID
-      if (stagesMap.has(stageValue)) {
+      if (stagesMap.has(stageName)) {
         // Это уже ID стадии
-        stageId = stagesMap.get(stageValue)!;
+        stageId = stagesMap.get(stageName)!;
       } else {
-        // Если не ID, ищем по имени (case-insensitive)
-        const stageName = stageValue.toLowerCase().trim();
+        // Если не ID, ищем по имени (case-insensitive, trim)
         let foundStageId: string | undefined;
         
         const entries = Array.from(stagesMap.entries());
         for (const [name, id] of entries) {
-          if (name.toLowerCase() === stageName) {
+          // Безопасная обработка name - проверяем что это строка
+          const nameStr = typeof name === 'string' ? name : String(name || '');
+          if (nameStr.toLowerCase().trim() === normalizedStageName) {
             foundStageId = id;
             break;
           }
@@ -1028,10 +1170,11 @@ export class CsvImportService {
         } else {
           // Stage указан но не найден - сохраняем для возможного создания
           // Не добавляем ошибку - стадия будет создана при импорте
+          // stageId остается undefined, но stageName сохраняется
         }
       }
     }
-    // Если stageValue не указан - stageId остается undefined (опционально)
+    // Если stageName === null - используем дефолтную стадию pipeline (если есть) или пропускаем установку stage
 
 
 
@@ -1159,7 +1302,7 @@ export class CsvImportService {
       budget: getValue(mapping.budget) || null,
       pipelineId,
       stageId,
-      stageValue: stageValue || undefined, // Сохраняем оригинальное значение для создания стадий
+      stageValue: stageName || undefined, // Сохраняем оригинальное значение для создания стадий
       assignedToId,
       contactId: contactId || null,
       companyId: getValue(mapping.companyId) || null,
@@ -1174,12 +1317,19 @@ export class CsvImportService {
    * Загрузка map стадий для pipeline (stageName -> stageId)
    */
   private async loadPipelineStagesMap(pipelineId: string): Promise<Map<string, string>> {
-    const pipeline = await this.prisma.pipeline.findUnique({
+    // Валидация pipelineId перед запросом к БД
+    if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
+      throw new BadRequestException('pipelineId is required and must be a non-empty string');
+    }
+
+    const pipelineFindPayload = {
       where: { id: pipelineId },
       include: {
         stages: true,
       },
-    });
+    };
+    console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD (loadPipelineStagesMap):', pipelineFindPayload);
+    const pipeline = await this.prisma.pipeline.findUnique(pipelineFindPayload);
 
     if (!pipeline) {
       throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
@@ -1202,7 +1352,7 @@ export class CsvImportService {
    * Загрузка map пользователей (fullName/email -> userId)
    */
   private async loadUsersMap(): Promise<Map<string, string>> {
-    const users = await this.prisma.user.findMany({
+    const userFindManyPayload = {
       where: { isActive: true },
       select: {
         id: true,
@@ -1210,7 +1360,9 @@ export class CsvImportService {
         lastName: true,
         email: true,
       },
-    });
+    };
+    console.log('PRISMA USER FIND MANY PAYLOAD (loadUsersMap):', userFindManyPayload);
+    const users = await this.prisma.user.findMany(userFindManyPayload);
 
     const usersMap = new Map<string, string>();
     

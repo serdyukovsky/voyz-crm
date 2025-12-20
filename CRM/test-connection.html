@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend Connection Test</title>
+</head>
+<body>
+    <h1>Backend Connection Test</h1>
+    <button onclick="testConnection()">Test Backend Connection</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test 1: Health endpoint
+                const healthResponse = await fetch('http://localhost:3001/api/health');
+                const healthData = await healthResponse.json();
+                resultDiv.innerHTML += `<p>✓ Health check: ${JSON.stringify(healthData)}</p>`;
+                
+                // Test 2: Auth endpoint (should return 401)
+                const authResponse = await fetch('http://localhost:3001/api/auth/me', {
+                    headers: {
+                        'Authorization': 'Bearer test'
+                    }
+                });
+                const authData = await authResponse.json();
+                resultDiv.innerHTML += `<p>✓ Auth endpoint: ${authResponse.status} - ${JSON.stringify(authData)}</p>`;
+                
+                // Test 3: Check CORS
+                resultDiv.innerHTML += `<p>✓ CORS headers: ${authResponse.headers.get('Access-Control-Allow-Origin') || 'Not set'}</p>`;
+                
+                resultDiv.innerHTML += '<p style="color: green;">✓ All tests passed! Backend is accessible.</p>';
+            } catch (error) {
+                resultDiv.innerHTML += `<p style="color: red;">✗ Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
+

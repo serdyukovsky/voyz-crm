@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '@/lib/config'
+import { UnauthorizedError } from './api-client'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -238,6 +239,22 @@ export async function importContacts(
   })
 
   if (!response.ok) {
+    // Handle 401 unauthorized - token expired or invalid
+    if (response.status === 401) {
+      console.warn('Import contacts: Unauthorized (401) - token expired or invalid')
+      // Clear invalid tokens
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('userId')
+      // Redirect to login
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      throw new UnauthorizedError()
+    }
+    
     const error = await response.text()
     throw new Error(`Failed to import contacts: ${error}`)
   }
@@ -304,6 +321,22 @@ export async function importDeals(
   })
 
   if (!response.ok) {
+    // Handle 401 unauthorized - token expired or invalid
+    if (response.status === 401) {
+      console.warn('Import deals: Unauthorized (401) - token expired or invalid')
+      // Clear invalid tokens
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('userId')
+      // Redirect to login
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      throw new UnauthorizedError()
+    }
+    
     const error = await response.text()
     throw new Error(`Failed to import deals: ${error}`)
   }

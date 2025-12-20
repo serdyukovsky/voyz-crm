@@ -138,6 +138,8 @@ export class ChatService {
    */
   async getUserThreads(userId: string) {
     try {
+      console.log('USER:', userId);
+      console.log('WORKSPACE:', (userId as any)?.workspaceId);
       if (!this.prisma) {
         console.error('❌ PrismaService is undefined in getUserThreads!')
         throw new Error('Database service not available')

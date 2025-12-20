@@ -10,7 +10,6 @@ import { queryClient } from '@/lib/query-client'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { AuthProvider, useAuth } from '@/contexts/auth-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { BackendUnavailableBanner } from '@/components/backend/backend-unavailable-banner'
 import { setGlobalUnauthorizedHandler } from '@/lib/api/api-client'
 // Temporarily disabled Analytics to debug white screen
 // import { Analytics } from '@vercel/analytics/react'
@@ -56,7 +55,6 @@ function UnauthorizedHandler() {
 function AppRoutes() {
   return (
     <>
-      <BackendUnavailableBanner />
       <Routes>
       {/* Auth pages - load immediately (not lazy, no Suspense) */}
       <Route path="/login" element={<LoginPage />} />

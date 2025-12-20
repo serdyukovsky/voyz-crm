@@ -264,12 +264,16 @@ export function AutoMappingForm({
   }
 
   // Helper to get stages from the selected pipeline
+  // For deals, pipeline is always selected before mapping, so we can safely access stages
   const getSelectedPipelineStages = () => {
     if (!importMeta || !('pipelines' in importMeta)) return []
-    if (!selectedPipelineId) return []
-    
-    const pipeline = importMeta.pipelines.find(p => p.id === selectedPipelineId)
-    return pipeline?.stages || []
+    // For deals, selectedPipelineId is guaranteed to be set (validated before mapping step)
+    if (entityType === 'deal' && selectedPipelineId) {
+      const pipeline = importMeta.pipelines.find(p => p.id === selectedPipelineId)
+      return pipeline?.stages || []
+    }
+    // For contacts, no pipeline needed
+    return []
   }
 
   // Helper to check if mapping has any stage fields
@@ -283,11 +287,19 @@ export function AutoMappingForm({
   }
 
   // Helper to check which required fields are not mapped
+  // stageId НЕ валидируется на этапе mapping для deals - стадии резолвятся автоматически
   const getMissingRequiredFields = (): ImportField[] => {
     const requiredFields = getRequiredFields()
     const mappedFieldKeys = new Set(Object.values(mapping).filter(v => v !== undefined))
     
-    return requiredFields.filter(field => !mappedFieldKeys.has(field.key))
+    // Исключаем stageId из валидации для deals - стадии резолвятся автоматически
+    return requiredFields.filter(field => {
+      // Для deals, stageId не валидируется - стадии резолвятся автоматически по имени
+      if (entityType === 'deal' && field.key === 'stageId') {
+        return false
+      }
+      return !mappedFieldKeys.has(field.key)
+    })
   }
 
   // Helper to check if all required fields are mapped
@@ -453,10 +465,8 @@ export function AutoMappingForm({
                     {isStageField(normalizedMapping) ? (
                       <>
                         {!selectedPipelineId ? (
-                          <div className="px-3 py-2 text-xs text-destructive bg-destructive/10 rounded-md mx-2 my-1">
-                            <span className="font-medium">⚠️ {t('importExport.pipelineRequired')}</span>
-                            <br/>
-                            <span className="text-destructive/80">{t('importExport.selectPipelineFirst')}</span>
+                          <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/50 rounded-md mx-2 my-1">
+                            <span className="font-medium">ℹ️ {t('importExport.selectPipelineToSeeStages')}</span>
                           </div>
                         ) : getSelectedPipelineStages().length === 0 ? (
                           <div className="px-3 py-2 text-xs text-yellow-600 bg-yellow-50 rounded-md mx-2 my-1">
@@ -492,8 +502,8 @@ export function AutoMappingForm({
                         {/* Show ALL fields from crmFields (which includes all fields from meta) */}
                         {crmFields.length > 0 && (
                           <>
-                            {crmFields.map((field) => (
-                              <SelectItem key={field.key} value={field.key}>
+                            {crmFields.map((field, fieldIdx) => (
+                              <SelectItem key={`${field.entity || 'default'}-${field.key}-${fieldIdx}`} value={field.key}>
                                 <div className="flex items-center gap-2">
                                   <span>{getFieldLabel(field)}</span>
                                   {field.required && (
@@ -546,8 +556,8 @@ export function AutoMappingForm({
               The following required fields must be mapped before you can proceed:
             </p>
             <ul className="mt-2 space-y-1">
-              {getMissingRequiredFields().map(field => (
-                <li key={field.key} className="text-xs text-destructive/80 flex items-center gap-1.5">
+              {getMissingRequiredFields().map((field, fieldIdx) => (
+                <li key={`${field.key}-${fieldIdx}`} className="text-xs text-destructive/80 flex items-center gap-1.5">
                   <span className="w-1 h-1 rounded-full bg-destructive/60" />
                   <strong>{getFieldLabel(field)}</strong>
                   {field.description && field.description !== getFieldLabel(field) && (
@@ -560,25 +570,13 @@ export function AutoMappingForm({
         </div>
       )}
 
-      {/* Warning if stage field is mapped but no pipeline selected */}
-      {entityType === 'deal' && hasStageFieldMapped() && !selectedPipelineId && (
-        <div className="flex items-start gap-2 p-3 border border-destructive/20 bg-destructive/5 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-destructive">Pipeline Required</p>
-            <p className="text-xs text-destructive/80 mt-1">
-              You have mapped a Stage field, but no pipeline is selected. Please select a pipeline above to see available stages.
-            </p>
-          </div>
-        </div>
-      )}
 
       {crmFields.length > 0 && (
         <div className="p-3 border border-border/50 bg-muted/20 rounded-lg">
           <p className="text-xs text-muted-foreground">
             <strong>Tip:</strong> Fields marked as "Required" must be mapped for the import to succeed.
             Auto-mapped fields with high confidence are pre-selected. Click the <Plus className="inline h-3 w-3 mx-0.5" /> button to create a new custom field.
-            {entityType === 'deal' && hasStageFieldMapped() && selectedPipelineId && (
+            {entityType === 'deal' && hasStageFieldMapped() && (
               <> When mapping stage fields, CSV values will be matched to stage names in the selected pipeline.</>
             )}
           </p>

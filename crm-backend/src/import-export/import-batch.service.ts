@@ -159,7 +159,7 @@ export class ImportBatchService {
    */
   async batchCreateContacts(
     contactsData: Array<{
-      fullName: string;
+      fullName?: string | null;
       email?: string | null;
       phone?: string | null;
       position?: string | null;
@@ -195,7 +195,7 @@ export class ImportBatchService {
         return {
           index,
           data: {
-            fullName: sanitizeTextFields(row.fullName)!,
+            fullName: row.fullName ? sanitizeTextFields(row.fullName) : undefined,
             email: normalizedEmail || undefined,
             phone: normalizedPhone || undefined,
             position: sanitizeOptionalTextFields(row.position),
