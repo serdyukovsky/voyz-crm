@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as csv from 'csv-parser';
 import { ImportBatchService } from './import-batch.service';
@@ -417,8 +417,10 @@ export class CsvImportService {
    * 
    * @param fileStream - Stream CSV файла
    * @param mapping - Маппинг полей CSV → внутренние поля
-   * @param userId - ID пользователя, выполняющего импорт
+   * @param user - Пользователь, выполняющий импорт
    * @param pipelineId - ID пайплайна для resolution стадий по имени
+   * @param workspaceId - ID workspace (явный параметр, приоритет над user.workspaceId)
+   * @param defaultAssignedToId - Дефолтный ответственный для всех строк (для "apply to all")
    * @param contactEmailPhoneMap - Map для резолва contactId по email/phone (опционально)
    * @param delimiter - Разделитель CSV (по умолчанию ',', поддерживается ';')
    * @param dryRun - Режим предпросмотра без записи в БД
@@ -428,118 +430,220 @@ export class CsvImportService {
     mapping: DealFieldMapping,
     user: any,
     pipelineId: string,
+    workspaceId: string | undefined, // Explicit workspaceId parameter
     defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     delimiter: ',' | ';' = ',',
     dryRun: boolean = false,
   ): Promise<ImportResultDto> {
-    // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ В САМОМ НАЧАЛЕ ФУНКЦИИ
-    console.log('=== importDeals START ===');
-    console.log('user:', user);
-    console.log('workspaceId:', user?.workspaceId);
-    console.log('pipelineId:', pipelineId);
-    console.log('mapping:', mapping);
-    console.log('dryRun:', dryRun);
-    console.log('rows length: 0 (not parsed yet)');
-    console.log('=======================');
+    // CRITICAL: Top-level try/catch to prevent 500 errors
+    try {
+      // Resolve workspaceId: explicit parameter > user.workspaceId
+      const resolvedWorkspaceId = workspaceId || user?.workspaceId;
+      
+      console.log('[IMPORT CONTEXT]', { 
+        workspaceId: resolvedWorkspaceId, 
+        dryRun, 
+        pipelineId,
+        hasUser: !!user,
+        userWorkspaceId: user?.workspaceId 
+      });
 
-    // ЗАЩИТНЫЕ ПРОВЕРКИ В САМОМ НАЧАЛЕ - явные ошибки вместо silent crash
-    if (!user) {
-      throw new Error('ImportDeals: user is missing');
-    }
+      const summary: ImportSummary = {
+        total: 0,
+        created: 0,
+        updated: 0,
+        failed: 0,
+        skipped: 0,
+      };
 
-    if (!user.workspaceId) {
-      throw new Error('ImportDeals: user.workspaceId is missing');
-    }
+      const errors: ImportError[] = [];
+      const warnings: string[] = [];
 
-    if (!pipelineId) {
-      throw new Error('ImportDeals: pipelineId is missing');
-    }
+      // Defensive guards - collect errors instead of throwing
+      // BUT: Never early-return before CSV processing - allow validation even without workspaceId
+      if (!user) {
+        errors.push({
+          row: -1,
+          error: 'User is missing',
+        });
+        // Continue to CSV processing - errors will be shown in preview
+      }
 
-    const userId = user.userId || user.id;
-    
-    console.log('importDeals called:', { 
-      pipelineId, 
-      userId, 
-      dryRun, 
-      hasMapping: !!mapping,
-      mappingTitle: mapping?.title 
-    });
-    
-    // Валидация входных параметров - все ошибки валидации возвращают 400
-    if (typeof pipelineId !== 'string' || pipelineId.trim() === '') {
-      console.error('Validation error: pipelineId is invalid', { pipelineId, type: typeof pipelineId });
-      throw new BadRequestException('pipelineId must be a non-empty string');
-    }
+      // workspaceId is required for DB operations, but NOT for CSV parsing/validation
+      if (!resolvedWorkspaceId) {
+        if (dryRun) {
+          // In dry-run, allow CSV processing but skip DB checks
+          warnings.push('Workspace not resolved, DB checks skipped');
+        } else {
+          // In actual import, workspaceId is required
+          errors.push({
+            row: -1,
+            error: 'Workspace is required for import',
+          });
+        }
+      }
 
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      throw new BadRequestException('userId is required and must be a non-empty string');
-    }
+      if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
+        errors.push({
+          row: -1,
+          error: 'Pipeline ID is required',
+        });
+        return { summary, errors };
+      }
 
-    if (!mapping || typeof mapping !== 'object') {
-      throw new BadRequestException('mapping is required and must be an object');
-    }
+      const userId = user.userId || user.id;
+      
+      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        errors.push({
+          row: -1,
+          error: 'User ID is required',
+        });
+        return { summary, errors };
+      }
 
-    if (!mapping.title || typeof mapping.title !== 'string' || mapping.title.trim() === '') {
-      throw new BadRequestException('mapping.title is required and must be a non-empty string');
-    }
+      if (!mapping || typeof mapping !== 'object') {
+        errors.push({
+          row: -1,
+          error: 'Mapping is required and must be an object',
+        });
+        return { summary, errors };
+      }
 
-    const summary: ImportSummary = {
-      total: 0,
-      created: 0,
-      updated: 0,
-      failed: 0,
-      skipped: 0,
-    };
+      if (!mapping.title || typeof mapping.title !== 'string' || mapping.title.trim() === '') {
+        errors.push({
+          row: -1,
+          error: 'Mapping must include title field',
+        });
+        return { summary, errors };
+      }
 
-    const errors: ImportError[] = [];
-    
-    // Загружаем stages для выбранного pipeline для resolution по имени
-    // loadPipelineStagesMap уже проверяет существование pipeline и выбрасывает BadRequestException
-    console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD (loadPipelineStagesMap):', {
-      where: { id: pipelineId },
-      include: { stages: true },
-    });
-    const stagesMap = await this.loadPipelineStagesMap(pipelineId);
-    
-    // Загружаем users для resolution по имени/email
-    console.log('PRISMA USER FIND MANY PAYLOAD (loadUsersMap):', {
-      where: { isActive: true },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-      },
-    });
-    const usersMap = await this.loadUsersMap();
-    
-    // Map для сбора всех стадий из CSV (stageName -> firstRowNumber)
-    const csvStagesMap = new Map<string, number>();
-    
-    const rows: Array<{
-      number?: string;
-      title: string;
-      amount?: number | string | null;
-      budget?: number | string | null;
-      pipelineId: string;
-      stageId?: string;
-      stageValue?: string; // Оригинальное значение стадии из CSV (для создания стадий)
-      assignedToId?: string | null;
-      contactId?: string | null;
-      companyId?: string | null;
-      expectedCloseAt?: Date | string | null;
-      description?: string | null;
-      tags?: string[];
-      rejectionReasons?: string[];
-    }> = [];
+      // Load pipeline stages - wrap in try/catch for dry-run safety
+      // In dry-run without workspaceId, skip DB operations but allow CSV processing
+      let stagesMap: Map<string, string>;
+      let defaultStageId: string | undefined;
+      let pipeline: any;
+      
+      try {
+        // Only load pipeline if we have workspaceId (for DB operations)
+        // In dry-run without workspaceId, we'll skip this and process CSV rows anyway
+        if (!resolvedWorkspaceId && dryRun) {
+          // Skip DB load, but initialize empty maps for CSV processing
+          stagesMap = new Map<string, string>();
+          defaultStageId = undefined;
+          pipeline = null;
+          warnings.push('Pipeline stages not loaded (workspaceId missing), stage validation skipped');
+        } else {
+          pipeline = await this.prisma.pipeline.findUnique({
+            where: { id: pipelineId },
+            include: {
+              stages: {
+                orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
+              },
+            },
+          });
+          
+          if (!pipeline) {
+            errors.push({
+              row: -1,
+              error: `Pipeline with ID "${pipelineId}" not found`,
+            });
+            // Continue to CSV processing - errors will be shown
+            stagesMap = new Map<string, string>();
+            defaultStageId = undefined;
+          } else {
+            defaultStageId = pipeline.stages.find((s: any) => s.isDefault)?.id || pipeline.stages[0]?.id;
+            stagesMap = new Map<string, string>();
+            
+            // Build stages map: stageName (normalized) -> stageId, stageId -> stageId
+            pipeline.stages.forEach((stage: any) => {
+              const normalizedName = stage.name.toLowerCase().trim();
+              stagesMap.set(normalizedName, stage.id);
+              stagesMap.set(stage.name, stage.id);
+              stagesMap.set(stage.id, stage.id);
+            });
+          }
+        }
+        
+        defaultStageId = pipeline.stages.find((s: any) => s.isDefault)?.id || pipeline.stages[0]?.id;
+        stagesMap = new Map<string, string>();
+        
+        // Build stages map: stageName (normalized) -> stageId, stageId -> stageId
+        pipeline.stages.forEach((stage: any) => {
+          const normalizedName = stage.name.toLowerCase().trim();
+          stagesMap.set(normalizedName, stage.id);
+          stagesMap.set(stage.name, stage.id);
+          stagesMap.set(stage.id, stage.id);
+        });
+      } catch (error) {
+        console.error('[IMPORT DEALS DRY RUN ERROR] Failed to load pipeline:', error);
+        errors.push({
+          row: -1,
+          error: `Failed to load pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+        // Continue to CSV processing - errors will be shown
+        stagesMap = new Map<string, string>();
+        defaultStageId = undefined;
+        pipeline = null;
+      }
+      
+      // Load users for resolution - wrap in try/catch for dry-run safety
+      // In dry-run without workspaceId, skip DB operations
+      let usersMap: Map<string, string>;
+      try {
+        if (!resolvedWorkspaceId && dryRun) {
+          // Skip DB load in dry-run without workspaceId
+          usersMap = new Map<string, string>();
+          warnings.push('Users not loaded (workspaceId missing), owner resolution skipped');
+        } else {
+          const users = await this.prisma.user.findMany({
+            where: { isActive: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          });
+          
+          usersMap = new Map<string, string>();
+          users.forEach((user) => {
+            if (user.email) {
+              usersMap.set(`email:${user.email.toLowerCase()}`, user.id);
+            }
+            if (user.firstName && user.lastName) {
+              const fullName = `${user.firstName} ${user.lastName}`.toLowerCase().trim();
+              usersMap.set(`name:${fullName}`, user.id);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[IMPORT DEALS DRY RUN ERROR] Failed to load users:', error);
+        // Don't fail - owner resolution will just not work
+        usersMap = new Map<string, string>();
+      }
+      
+      // Map для сбора всех стадий из CSV (stageName -> firstRowNumber)
+      const csvStagesMap = new Map<string, number>();
+      
+      const rows: Array<{
+        number?: string;
+        title: string;
+        amount?: number | string | null;
+        budget?: number | string | null;
+        pipelineId: string;
+        stageId?: string;
+        stageValue?: string; // Оригинальное значение стадии из CSV (для создания стадий)
+        assignedToId?: string | null;
+        contactId?: string | null;
+        companyId?: string | null;
+        expectedCloseAt?: Date | string | null;
+        description?: string | null;
+        tags?: string[];
+        rejectionReasons?: string[];
+      }> = [];
 
-    // ЗАЩИТНАЯ ПРОВЕРКА: rows должен быть массивом
-    if (!Array.isArray(rows)) {
-      throw new Error('ImportDeals: rows must be an array');
-    }
-
-    return new Promise((resolve, reject) => {
+      return new Promise((resolve, reject) => {
       const parser = csv({
         separator: delimiter,
         headers: true,
@@ -552,7 +656,38 @@ export class CsvImportService {
           rowNumber++;
           summary.total++;
 
+          // CRITICAL: Wrap EACH row processing in try/catch - NEVER throw
           try {
+            // Defensive guards for each row
+            const rowErrors: ImportError[] = [];
+            
+            // Guard 1: Pipeline ID check
+            if (!pipelineId || typeof pipelineId !== 'string') {
+              rowErrors.push({
+                row: rowNumber,
+                field: 'pipelineId',
+                error: 'Pipeline ID is required',
+              });
+            }
+            
+            // Guard 2: Deal title check
+            const titleValue = mapping.title ? (csvRow[mapping.title] || '').trim() : '';
+            if (!titleValue) {
+              rowErrors.push({
+                row: rowNumber,
+                field: 'title',
+                error: 'Deal title is required',
+              });
+            }
+            
+            // If critical errors, skip row
+            if (rowErrors.length > 0) {
+              errors.push(...rowErrors);
+              summary.failed++;
+              return;
+            }
+            
+            // Process row with mapDealRow (it also handles errors internally)
             const dealData = this.mapDealRow(
               csvRow,
               mapping,
@@ -565,17 +700,29 @@ export class CsvImportService {
               contactEmailPhoneMap,
               csvStagesMap,
             );
+            
             if (dealData) {
+              // Guard 3: Stage check (if no stageValue and no defaultStage)
+              if (!dealData.stageId && !dealData.stageValue && !defaultStageId) {
+                errors.push({
+                  row: rowNumber,
+                  field: 'stageId',
+                  error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
+                });
+                summary.failed++;
+                return;
+              }
+              
               rows.push(dealData);
             } else {
               summary.skipped++;
             }
           } catch (error) {
-            console.error(`Error in mapDealRow for row ${rowNumber}:`, error);
-            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+            // NEVER throw - always collect error
+            console.error(`[IMPORT DEALS DRY RUN ERROR] Error in row ${rowNumber}:`, error);
             errors.push({
               row: rowNumber,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: error instanceof Error ? error.message : 'Unknown error processing row',
             });
             summary.failed++;
           }
@@ -588,102 +735,102 @@ export class CsvImportService {
           summary.failed++;
         })
         .on('end', async () => {
+          // CRITICAL: Wrap entire end handler in try/catch
           try {
-            // Инициализируем stagesToCreate вне блока if для использования в resolve
             const stagesToCreate: StageToCreate[] = [];
             
-            // Batch обработка сделок
             if (rows.length > 0) {
-              // Дополнительная проверка pipelineId (на случай если он стал undefined)
-              if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
-                throw new BadRequestException('pipelineId is required and must be a non-empty string');
-              }
-
-              // Получаем pipeline со стадиями
-              const pipelineFindPayload = {
-                where: { id: pipelineId },
-                include: {
-                  stages: {
-                    orderBy: [{ isDefault: 'desc' }, { order: 'asc' }],
-                  },
-                },
-              };
-              console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD:', pipelineFindPayload);
-              const pipeline = await this.prisma.pipeline.findUnique(pipelineFindPayload);
-              
-              if (!pipeline) {
-                throw new BadRequestException(`Pipeline with ID "${pipelineId}" not found`);
+              // Pipeline already loaded above, use it
+              // In dry-run without workspaceId, pipeline may be null - skip stage creation logic
+              if (!pipeline && resolvedWorkspaceId) {
+                errors.push({
+                  row: -1,
+                  error: `Pipeline with ID "${pipelineId}" not found`,
+                });
+                // Continue - return result with errors
               }
               
-              const defaultStageId = pipeline.stages.find(s => s.isDefault)?.id || pipeline.stages[0]?.id;
+              // Only process stages if we have pipeline and workspaceId
+              if (pipeline && resolvedWorkspaceId) {
               
-              // Собираем уникальные стадии из CSV и сравниваем с существующими
-              const existingStageNames = new Set(
-                pipeline.stages.map(s => s.name.toLowerCase())
-              );
-              const stagesToCreateMap = new Map<string, number>(); // stageName -> order
-              
-              // Определяем стадии, которые нужно создать
-              csvStagesMap.forEach((firstRowNumber, stageName) => {
-                // Безопасная обработка stageName - проверяем что это строка
-                if (!stageName || typeof stageName !== 'string') {
-                  console.warn(`Invalid stageName in csvStagesMap: ${stageName}, skipping`);
-                  return;
-                }
+                // Собираем уникальные стадии из CSV и сравниваем с существующими
+                const existingStageNames = new Set(
+                  pipeline.stages.map(s => s.name.toLowerCase())
+                );
+                const stagesToCreateMap = new Map<string, number>(); // stageName -> order
                 
-                const normalizedName = stageName.toLowerCase().trim();
-                if (!existingStageNames.has(normalizedName)) {
-                  // Стадия не существует - нужно создать
-                  const order = stagesToCreate.length + pipeline.stages.length;
-                  const trimmedName = stageName.trim();
-                  stagesToCreate.push({
-                    name: trimmedName, // Сохраняем оригинальное имя (с учетом регистра)
-                    order: order,
-                  });
-                  stagesToCreateMap.set(trimmedName, order);
-                }
-              });
+                // Определяем стадии, которые нужно создать
+                csvStagesMap.forEach((firstRowNumber, stageName) => {
+                  // Безопасная обработка stageName - проверяем что это строка
+                  if (!stageName || typeof stageName !== 'string') {
+                    console.warn(`Invalid stageName in csvStagesMap: ${stageName}, skipping`);
+                    return;
+                  }
+                  
+                  const normalizedName = stageName.toLowerCase().trim();
+                  if (!existingStageNames.has(normalizedName)) {
+                    // Стадия не существует - нужно создать
+                    const order = stagesToCreate.length + pipeline.stages.length;
+                    const trimmedName = stageName.trim();
+                    stagesToCreate.push({
+                      name: trimmedName, // Сохраняем оригинальное имя (с учетом регистра)
+                      order: order,
+                    });
+                    stagesToCreateMap.set(trimmedName, order);
+                  }
+                });
+                
+                // Сортируем стадии по порядку первого появления в CSV
+                stagesToCreate.sort((a, b) => {
+                  const aRow = csvStagesMap.get(a.name) || 0;
+                  const bRow = csvStagesMap.get(b.name) || 0;
+                  return aRow - bRow;
+                });
+                
+                // Обновляем order для стадий с учетом порядка появления
+                stagesToCreate.forEach((stage, index) => {
+                  stage.order = pipeline.stages.length + index;
+                });
+              } else if (!resolvedWorkspaceId && dryRun) {
+                // In dry-run without workspaceId, collect stages from CSV for preview
+                csvStagesMap.forEach((firstRowNumber, stageName) => {
+                  if (stageName && typeof stageName === 'string') {
+                    const trimmedName = stageName.trim();
+                    if (!stagesToCreate.find(s => s.name.toLowerCase() === trimmedName.toLowerCase())) {
+                      stagesToCreate.push({
+                        name: trimmedName,
+                        order: stagesToCreate.length,
+                      });
+                    }
+                  }
+                });
+              }
               
-              // Сортируем стадии по порядку первого появления в CSV
-              stagesToCreate.sort((a, b) => {
-                const aRow = csvStagesMap.get(a.name) || 0;
-                const bRow = csvStagesMap.get(b.name) || 0;
-                return aRow - bRow;
-              });
-              
-              // Обновляем order для стадий с учетом порядка появления
-              stagesToCreate.forEach((stage, index) => {
-                stage.order = pipeline.stages.length + index;
-              });
-              
-              // Создаем недостающие стадии при actual import
+              // CRITICAL: In dry-run, NEVER create stages - only collect them
+              // Also require workspaceId and pipeline for stage creation
               const createdStagesMap = new Map<string, string>(); // normalizedStageName -> stageId
               
-              if (!dryRun && stagesToCreate.length > 0) {
+              if (!dryRun && stagesToCreate.length > 0 && resolvedWorkspaceId && pipeline) {
+                // Only create stages in actual import mode with workspaceId and pipeline
                 for (const stageToCreate of stagesToCreate) {
                   try {
-                    const stageCreatePayload = {
+                    const newStage = await this.prisma.stage.create({
                       data: {
                         name: stageToCreate.name,
                         order: stageToCreate.order,
                         pipelineId: pipelineId,
-                        color: '#6B7280', // Дефолтный цвет
+                        color: '#6B7280',
                         isDefault: false,
                         isClosed: false,
                       },
-                    };
-                    console.log('PRISMA STAGE CREATE PAYLOAD:', stageCreatePayload);
-                    const newStage = await this.prisma.stage.create(stageCreatePayload);
-                    // Сохраняем по нормализованному имени для поиска (case-insensitive)
-                    // Безопасная обработка имени стадии
-                    const stageName = typeof stageToCreate.name === 'string' ? stageToCreate.name : String(stageToCreate.name || '');
-                    const normalizedName = stageName.toLowerCase().trim();
+                    });
+                    const normalizedName = stageToCreate.name.toLowerCase().trim();
                     createdStagesMap.set(normalizedName, newStage.id);
-                    // Обновляем stagesMap для использования в дальнейшей обработке
                     stagesMap.set(stageToCreate.name, newStage.id);
                     stagesMap.set(normalizedName, newStage.id);
                     stagesMap.set(newStage.id, newStage.id);
                   } catch (error) {
+                    // Collect error, don't throw
                     errors.push({
                       row: csvStagesMap.get(stageToCreate.name) || -1,
                       field: 'stageId',
@@ -692,21 +839,25 @@ export class CsvImportService {
                     });
                   }
                 }
+              } else if (!dryRun && stagesToCreate.length > 0 && !resolvedWorkspaceId) {
+                // In actual import without workspaceId, cannot create stages
+                errors.push({
+                  row: -1,
+                  error: 'Cannot create stages: workspaceId is required',
+                });
               }
+              // In dry-run, stagesToCreate is already populated for reporting
               
-              // Обновляем stageId для строк с созданными стадиями
-              // Используем нормализованное имя для поиска (case-insensitive)
+              // Update stageId for rows with created stages or apply default
               const updatedRows = rows.map((row) => {
-                // Если stageId не установлен, но есть stageValue, пробуем найти в созданных стадиях
+                // If stageId not set but stageValue exists, try to find in created stages
                 if (!row.stageId && row.stageValue) {
-                  // Безопасная обработка stageValue - проверяем что это строка
                   const stageValueStr = typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || '');
                   const normalizedStageName = stageValueStr.trim().toLowerCase();
                   
-                  // Пробуем найти в созданных стадиях (по нормализованному имени)
+                  // Try to find in created stages (from actual import, not dry-run)
                   let createdStageId: string | undefined;
                   for (const [name, id] of createdStagesMap.entries()) {
-                    // Безопасная обработка name - проверяем что это строка
                     const nameStr = typeof name === 'string' ? name : String(name || '');
                     if (nameStr.toLowerCase().trim() === normalizedStageName) {
                       createdStageId = id;
@@ -717,10 +868,9 @@ export class CsvImportService {
                   if (createdStageId) {
                     row.stageId = createdStageId;
                   } else {
-                    // Пробуем найти в обновленном stagesMap (по нормализованному имени)
+                    // Try to find in existing stages map
                     let foundStageId: string | undefined;
                     for (const [name, id] of stagesMap.entries()) {
-                      // Безопасная обработка name - проверяем что это строка
                       const nameStr = typeof name === 'string' ? name : String(name || '');
                       if (nameStr.toLowerCase().trim() === normalizedStageName) {
                         foundStageId = id;
@@ -730,141 +880,216 @@ export class CsvImportService {
                     if (foundStageId) {
                       row.stageId = foundStageId;
                     } else if (defaultStageId) {
-                      // Если не найдено, используем дефолтную стадию
                       row.stageId = defaultStageId;
                     }
                   }
-                } else if (!row.stageId && defaultStageId) {
-                  // Если stageValue нет, но есть дефолтная стадия, используем её
+                } else if (!row.stageId && !row.stageValue && defaultStageId) {
+                  // No stageValue, apply default stage
                   row.stageId = defaultStageId;
                 }
                 return row;
               });
               
-              // Проверка наличия stageId на этапе dry-run/import
-              // Ошибки только если:
-              // 1. Нет pipeline (уже проверено выше)
-              // 2. Стадия пустая И нет default stage
-              updatedRows.forEach((row, index) => {
-                if (!row.stageId) {
-                  // Если есть stageValue, но нет stageId - это значит стадия будет создана, не ошибка
-                  // Если нет stageValue и нет defaultStageId - это ошибка
-                  if (!row.stageValue && !defaultStageId) {
-                    errors.push({
-                      row: index + 2, // +2 потому что rowNumber начинается с 1, а индекс с 0
-                      field: 'stageId',
-                      error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
-                    });
-                    summary.failed++;
-                  }
-                }
-              });
-              
-              // Фильтруем строки без stageId для дальнейшей обработки
-              // Но включаем строки с stageValue (стадии будут созданы)
+              // Filter valid rows (must have stageId or stageValue)
               const validRows = updatedRows.filter(row => {
-                // Включаем если есть stageId ИЛИ есть stageValue (стадия будет создана)
                 return row.stageId || row.stageValue;
               });
               
               if (validRows.length > 0) {
                 if (dryRun) {
-                  // В режиме dry-run только симулируем импорт
-                  // Проверяем существующие сделки по number
-                  const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
-                  
-                  let existingDeals = new Map<string, { id: string; number: string }>();
-                  if (numbers.length > 0) {
+                  // CRITICAL: In dry-run, ONLY simulate - NO DB operations
+                  // If workspaceId is missing, skip DB checks but still count rows
+                  if (!resolvedWorkspaceId) {
+                    // No DB checks - just count all as "would create"
+                    validRows.forEach(() => {
+                      summary.created++;
+                    });
+                  } else {
+                    // Normal dry-run with workspaceId - check existing deals
+                    const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
+                    
+                    let existingDeals = new Map<string, { id: string; number: string }>();
+                    if (numbers.length > 0) {
+                      try {
+                        // Only read operation - safe for dry-run
+                        existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                      } catch (error) {
+                        console.error('[IMPORT DEALS DRY RUN ERROR] Error checking existing deals:', error);
+                        // Continue without checking - not fatal
+                      }
+                    }
+                    
+                    // Simulate import
+                    validRows.forEach((row) => {
+                      if (row.number && existingDeals.has(row.number)) {
+                        summary.updated++;
+                      } else {
+                        summary.created++;
+                      }
+                    });
+                  }
+                } else {
+                  // Actual import - create/update deals
+                  // workspaceId is required for actual import
+                  if (!resolvedWorkspaceId) {
+                    errors.push({
+                      row: -1,
+                      error: 'Workspace is required for import',
+                    });
+                    summary.failed += validRows.length;
+                  } else {
                     try {
-                      existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                      const result = await this.importBatchService.batchCreateDeals(validRows, userId);
+                      summary.created += result.created;
+                      summary.updated += result.updated;
+                      summary.failed += result.errors.length;
+
+                      result.errors.forEach((err) => {
+                        errors.push({
+                          row: err.row >= 0 ? err.row : -1,
+                          error: err.error,
+                        });
+                      });
                     } catch (error) {
-                      console.error('Error in batchFindDealsByNumbers:', error);
-                      // Продолжаем без проверки существующих сделок
+                      console.error('[IMPORT DEALS ERROR] Batch create failed:', error);
+                      errors.push({
+                        row: -1,
+                        error: `Batch import failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                      });
+                      summary.failed += validRows.length;
                     }
                   }
-                  
-                  let willCreate = 0;
-                  let willUpdate = 0;
-                  
-                  validRows.forEach((row) => {
-                    if (row.number && existingDeals.has(row.number)) {
-                      willUpdate++;
-                    } else {
-                      willCreate++;
-                    }
-                  });
-                  
-                  summary.created = willCreate;
-                  summary.updated = willUpdate;
-                } else {
-                  console.log('PRISMA DEAL CREATE PAYLOAD (batchCreateDeals):', {
-                    dealsData: validRows,
-                    userId: userId,
-                    dealsCount: validRows.length,
-                  });
-                  const result = await this.importBatchService.batchCreateDeals(validRows, userId);
-                  summary.created += result.created;
-                  summary.updated += result.updated;
-                  summary.failed += result.errors.length;
-
-                  result.errors.forEach((err) => {
-                    errors.push({
-                      row: err.row >= 0 ? err.row : -1,
-                      error: err.error,
-                    });
-                  });
                 }
               }
               
-              // Возвращаем результат с информацией о стадиях для создания
-              resolve({
+              // Return result
+              const result: ImportResultDto = {
                 summary,
                 errors,
+                warnings: warnings.length > 0 ? warnings : undefined,
                 stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
+              };
+              
+              // Log import context for debugging
+              console.log('[IMPORT CONTEXT]', { 
+                workspaceId: resolvedWorkspaceId, 
+                dryRun, 
+                rows: rows.length,
+                parsedRows: summary.total 
               });
+              
+              if (dryRun) {
+                console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+              }
+              
+              resolve(result);
               return;
             }
             
-            // Если нет строк для обработки
-            resolve({
+            // No rows to process
+            const result: ImportResultDto = {
               summary,
               errors,
+              warnings: warnings.length > 0 ? warnings : undefined,
               stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
-            });
-          } catch (error) {
-            console.error('Error in importDeals on end handler:', error);
-            console.error('Error details:', {
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-              rowsLength: rows.length,
-              summary,
-              stagesToCreateLength: stagesToCreate.length,
-              pipelineId,
+            };
+            
+            // Log import context for debugging
+            console.log('[IMPORT CONTEXT]', { 
+              workspaceId: resolvedWorkspaceId, 
+              dryRun, 
+              rows: 0,
+              parsedRows: summary.total 
             });
             
-            // Если это уже BadRequestException, просто пробрасываем его (400)
-            if (error instanceof BadRequestException) {
-              reject(error);
-              return;
+            if (dryRun) {
+              console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
             }
             
-            // Все остальные ошибки оборачиваем в InternalServerError с понятным сообщением
-            // Но лучше преобразовать в BadRequestException если это ошибка валидации
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes('not found') || errorMessage.includes('required') || errorMessage.includes('invalid')) {
-              reject(new BadRequestException(`Import validation error: ${errorMessage}`));
+            resolve(result);
+          } catch (error) {
+            // CRITICAL: In dry-run, NEVER reject - always return errors in result
+            console.error('[IMPORT DEALS DRY RUN ERROR] Error in end handler:', error);
+            
+            if (dryRun) {
+              // In dry-run, return errors in result instead of rejecting
+              errors.push({
+                row: -1,
+                error: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              });
+              const result: ImportResultDto = {
+                summary,
+                errors,
+              };
+              console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+              resolve(result);
             } else {
-              reject(error);
+              // In actual import, reject for global exception filter
+              if (error instanceof BadRequestException) {
+                reject(error);
+              } else {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                reject(new BadRequestException(`Import error: ${errorMessage}`));
+              }
             }
           }
         });
 
       fileStream
         .on('error', (error) => {
-          reject(new BadRequestException(`File stream error: ${error.message}`));
+          // CRITICAL: In dry-run, return error in result instead of rejecting
+          if (dryRun) {
+            errors.push({
+              row: -1,
+              error: `File stream error: ${error.message}`,
+            });
+            const result: ImportResultDto = {
+              summary,
+              errors,
+            };
+            console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+            resolve(result);
+          } else {
+            reject(new BadRequestException(`File stream error: ${error.message}`));
+          }
         })
         .pipe(parser);
-    });
+      });
+    } catch (error) {
+      // CRITICAL: Top-level catch - in dry-run, NEVER throw
+      console.error('[IMPORT DEALS DRY RUN ERROR]', error);
+      
+      if (dryRun) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const result: ImportResultDto = {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [{
+            row: -1,
+            error: `Import error: ${errorMessage}`,
+          }],
+        };
+        console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+        return result;
+      } else {
+        // For actual import, throw with detailed message in development mode
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        if (isDevelopment) {
+          throw new HttpException(
+            `Import failed: ${errorMessage}`,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+        } else {
+          throw new BadRequestException('Import failed');
+        }
+      }
+    }
   }
 
   /**
@@ -1250,31 +1475,38 @@ export class CsvImportService {
     } else if (ownerField) {
       const ownerValue = getValue(ownerField);
       if (ownerValue) {
-        // Пробуем резолвить по имени или email (case-insensitive)
+        // Resolve owner by email OR fullName (case-insensitive)
         const lookupValue = ownerValue.toLowerCase().trim();
         let foundUserId: string | undefined;
         
-        const usersEntries = Array.from(usersMap.entries());
-        for (const [key, id] of usersEntries) {
-          if (key.toLowerCase() === lookupValue) {
+        // Try exact match first (email:xxx or name:xxx)
+        for (const [key, id] of usersMap.entries()) {
+          const keyLower = key.toLowerCase();
+          if (keyLower === `email:${lookupValue}` || keyLower === `name:${lookupValue}`) {
             foundUserId = id;
             break;
           }
         }
         
+        // If not found, try partial match (email or name part)
+        if (!foundUserId) {
+          for (const [key, id] of usersMap.entries()) {
+            const keyLower = key.toLowerCase();
+            const keyValue = keyLower.split(':')[1] || '';
+            if (keyValue === lookupValue) {
+              foundUserId = id;
+              break;
+            }
+          }
+        }
+        
         if (foundUserId) {
           assignedToId = foundUserId;
-        } else if (usersMap.has(ownerValue)) {
-          // Возможно это уже ID пользователя
-          assignedToId = usersMap.get(ownerValue)!;
         } else {
-          // Не найден - добавляем предупреждение но не блокируем импорт
-          errors.push({
-            row: rowNumber,
-            field: ownerFieldName,
-            value: ownerValue,
-            error: `User "${ownerValue}" not found. Deal will be created without assignment. Available users: ${Array.from(new Set(usersEntries.map(([k, v]) => k.split('|')[0]))).slice(0, 5).join(', ')}`,
-          });
+          // Owner not found - warning, not fatal error
+          // Deal will be created without assignment
+          // Don't add error - just log warning (not blocking)
+          console.warn(`[ROW ${rowNumber}] Owner "${ownerValue}" not found. Deal will be created without assignment.`);
         }
       } else if (defaultAssignedToId) {
         // Если ownerField пустой для этой строки, используем дефолт

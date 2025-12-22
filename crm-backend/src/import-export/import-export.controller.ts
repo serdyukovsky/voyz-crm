@@ -159,6 +159,10 @@ export class ImportExportController {
           type: 'string',
           description: 'ID пайплайна для resolution стадий',
         },
+        workspaceId: {
+          type: 'string',
+          description: 'ID workspace (optional, falls back to user.workspaceId)',
+        },
         defaultAssignedToId: {
           type: 'string',
           description: 'ID ответственного по умолчанию (применяется ко всем строкам)',
@@ -176,13 +180,15 @@ export class ImportExportController {
     @UploadedFile() file: Express.Multer.File,
     @Body('mapping') mappingString: string,
     @Body('pipelineId') pipelineId: string,
+    @Body('workspaceId') workspaceIdFromBody: string | undefined,
     @Body('defaultAssignedToId') defaultAssignedToId: string | undefined,
     @Body('delimiter') delimiter: ',' | ';' = ',',
     @Query('dryRun') dryRun: string = 'false',
     @CurrentUser() user: any,
   ): Promise<ImportResultDto> {
-    console.log('USER:', user);
-    console.log('WORKSPACE:', user?.workspaceId);
+    // Resolve workspaceId: priority: request.body.workspaceId > user.workspaceId
+    const workspaceId = workspaceIdFromBody || user?.workspaceId;
+    console.log('[IMPORT CONTROLLER]', { workspaceId, workspaceIdFromBody, userWorkspaceId: user?.workspaceId, dryRun });
     if (!file) {
       throw new BadRequestException('CSV file is required');
     }
@@ -221,20 +227,49 @@ export class ImportExportController {
 
     // Импорт (с поддержкой dry-run)
     const isDryRun = dryRun === 'true' || dryRun === '1';
-    // Временно удален try/catch для сохранения оригинального stack trace
-    // Ошибки будут обработаны глобальным exception filter
-    const result = await this.csvImportService.importDeals(
-      fileStream,
-      mapping,
-      user, // Передаем весь объект user для валидации
-      pipelineId,
-      defaultAssignedToId, // Дефолтный ответственный для всех строк
-      undefined, // contactEmailPhoneMap - опционально
-      delimiter,
-      isDryRun,
-    );
+    
+    // CRITICAL: Wrap entire import in try/catch to prevent 500 errors in dry-run
+    try {
+      const result = await this.csvImportService.importDeals(
+        fileStream,
+        mapping,
+        user, // Передаем весь объект user для валидации
+        pipelineId,
+        workspaceId, // Explicit workspaceId (from body or user)
+        defaultAssignedToId, // Дефолтный ответственный для всех строк
+        undefined, // contactEmailPhoneMap - опционально
+        delimiter,
+        isDryRun,
+      );
 
-    return result;
+      // Log dry-run result for debugging
+      if (isDryRun) {
+        console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+      }
+
+      return result;
+    } catch (error) {
+      // In dry-run mode, NEVER throw 500 - always return errors in ImportResult
+      if (isDryRun) {
+        console.error('[IMPORT DEALS DRY RUN ERROR]', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [{
+            row: -1,
+            error: `Dry-run validation error: ${errorMessage}`,
+          }],
+        };
+      }
+      // For actual import, re-throw to let global exception filter handle it
+      throw error;
+    }
   }
 }
 

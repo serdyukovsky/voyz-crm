@@ -297,10 +297,25 @@ export async function importDeals(
     return acc
   }, {})
 
+  // Try to get workspaceId from user object in localStorage (optional)
+  let workspaceId: string | undefined = undefined
+  try {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      workspaceId = user?.workspaceId
+    }
+  } catch (e) {
+    // Ignore - backend will fallback to user.workspaceId from JWT
+  }
+
   const formData = new FormData()
   formData.append('file', file)
   formData.append('mapping', JSON.stringify(invertedMapping))
   formData.append('pipelineId', pipelineId)
+  if (workspaceId) {
+    formData.append('workspaceId', workspaceId)
+  }
   if (defaultAssignedToId) {
     formData.append('defaultAssignedToId', defaultAssignedToId)
   }
