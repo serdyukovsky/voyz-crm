@@ -12,7 +12,7 @@ import { ImportResult } from "@/components/crm/import-result"
 import { ExportPanel } from "@/components/crm/export-panel"
 import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react"
-import { importContacts, importDeals, type ImportResult as ImportResultType } from "@/lib/api/import"
+import { importDeals, type ImportResult as ImportResultType } from "@/lib/api/import"
 import { type ParsedCsvRow } from "@/lib/utils/csv-parser"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { ErrorBoundary } from "@/components/crm/error-boundary"
@@ -20,13 +20,11 @@ import { useTranslation } from "@/lib/i18n/i18n-context"
 import { getPipelines, type Pipeline } from "@/lib/api/pipelines"
 
 type ImportStep = 'upload' | 'preview' | 'mapping' | 'dry-run' | 'result'
-type EntityType = 'contact' | 'deal'
 
 function ImportExportContent() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<"import" | "export">("import")
   const [currentStep, setCurrentStep] = useState<ImportStep>('upload')
-  const [entityType, setEntityType] = useState<EntityType>('contact')
   
   // File & Data
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -36,15 +34,11 @@ function ImportExportContent() {
   // Mapping (undefined means "not selected", not empty string)
   const [mapping, setMapping] = useState<Record<string, string | undefined>>({})
   
-  // Validation state
-  const [isMappingValid, setIsMappingValid] = useState(false)
-  const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([])
-  
-  // Pipeline для deal import (обязательно для resolution stages)
+  // Pipeline для combined import (обязательно для deals, которые всегда включены)
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined)
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   
-  // Default assigned user для deal import (опционально, для "apply to all")
+  // Default assigned user для combined import (опционально, для "apply to all")
   const [defaultAssignedToId, setDefaultAssignedToId] = useState<string | undefined>(undefined)
   const [applyAssignedToAll, setApplyAssignedToAll] = useState(false)
   
@@ -61,22 +55,18 @@ function ImportExportContent() {
   
   const { showSuccess, showError } = useToastNotification()
 
-  // Загрузка pipelines для deals
+  // Загрузка pipelines для combined import (always needed for deals)
   useEffect(() => {
-    if (entityType === 'deal') {
-      const loadPipelines = async () => {
-        try {
-          const data = await getPipelines()
-          setPipelines(data)
-        } catch (err) {
-          console.error('Failed to load pipelines:', err)
-        }
+    const loadPipelines = async () => {
+      try {
+        const data = await getPipelines()
+        setPipelines(data)
+      } catch (err) {
+        console.error('Failed to load pipelines:', err)
       }
-      loadPipelines()
-    } else {
-      setPipelines([])
     }
-  }, [entityType])
+    loadPipelines()
+  }, [])
 
   // Обработка глобальных ошибок
   useEffect(() => {
@@ -128,13 +118,8 @@ function ImportExportContent() {
     setMapping(newMapping)
   }
 
-  const handleValidationChange = (isValid: boolean, missingFields: string[]) => {
-    setIsMappingValid(isValid)
-    setMissingRequiredFields(missingFields)
-  }
-
   const handleContinueToMapping = () => {
-    // Разрешаем переход к mapping даже без pipeline для deals
+    // Разрешаем переход к mapping даже без pipeline
     // Pipeline можно выбрать на экране mapping
     setCurrentStep('mapping')
   }
@@ -142,11 +127,29 @@ function ImportExportContent() {
   const handleDryRun = async () => {
     if (!uploadedFile) return
 
-    // Валидация для deals: требуется выбрать pipeline
-    if (entityType === 'deal' && !selectedPipelineId) {
-      const errorMessage = 'Please select a pipeline before performing dry-run'
+    // Validation: Check all required fields before Dry Run
+    const errors: string[] = []
+
+    // 1. Pipeline is required
+    if (!selectedPipelineId) {
+      errors.push('Pipeline is required')
+    }
+
+    // 2. Deal title is required (mapping must include 'title')
+    const mappedFields = Object.values(mapping).filter(v => v !== undefined)
+    if (!mappedFields.includes('title')) {
+      errors.push('Deal: Title is required')
+    }
+
+    // 3. Contact fullName is required (mapping must include 'fullName')
+    if (!mappedFields.includes('fullName')) {
+      errors.push('Contact: Full Name is required')
+    }
+
+    if (errors.length > 0) {
+      const errorMessage = errors.join('. ')
       setError(errorMessage)
-      showError('Pipeline required', errorMessage)
+      showError('Validation failed', errorMessage)
       return
     }
 
@@ -154,16 +157,15 @@ function ImportExportContent() {
     setError(null)
 
     try {
-      const result = entityType === 'contact'
-        ? await importContacts(uploadedFile, mapping, ',', true)
-        : await importDeals(
-            uploadedFile, 
-            mapping, 
-            selectedPipelineId!, 
-            ',', 
-            true,
-            applyAssignedToAll ? defaultAssignedToId : undefined
-          )
+      // Combined import: always use deals API which handles both contacts and deals
+      const result = await importDeals(
+        uploadedFile, 
+        mapping, 
+        selectedPipelineId!, 
+        ',', 
+        true,
+        applyAssignedToAll ? defaultAssignedToId : undefined
+      )
 
       setDryRunResult(result)
       setCurrentStep('dry-run')
@@ -179,28 +181,22 @@ function ImportExportContent() {
   const handleConfirmImport = async () => {
     if (!uploadedFile || !dryRunResult) return
 
-    // Валидация для deals: требуется выбрать pipeline
-    if (entityType === 'deal' && !selectedPipelineId) {
-      const errorMessage = 'Please select a pipeline before confirming import'
-      setError(errorMessage)
-      showError('Pipeline required', errorMessage)
-      return
-    }
+    // No validation needed here - validation was already done before Dry Run
+    // If we reached this point, all validations passed
 
     setIsImporting(true)
     setError(null)
 
     try {
-      const result = entityType === 'contact'
-        ? await importContacts(uploadedFile, mapping, ',', false)
-        : await importDeals(
-            uploadedFile, 
-            mapping, 
-            selectedPipelineId!, 
-            ',', 
-            false,
-            applyAssignedToAll ? defaultAssignedToId : undefined
-          )
+      // Combined import: always use deals API which handles both contacts and deals
+      const result = await importDeals(
+        uploadedFile, 
+        mapping, 
+        selectedPipelineId!, 
+        ',', 
+        false,
+        applyAssignedToAll ? defaultAssignedToId : undefined
+      )
 
       setImportResult(result)
       setCurrentStep('result')
@@ -297,42 +293,6 @@ function ImportExportContent() {
               </div>
             )}
 
-            {/* Entity Type Selector */}
-            {currentStep === 'upload' && (
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-foreground">{t('importExport.importType')}</label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={entityType === 'contact' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setEntityType('contact')
-                      setSelectedPipelineId(undefined)
-                      if (currentStep !== 'upload') {
-                        setCurrentStep('upload')
-                        handleReset()
-                      }
-                    }}
-                  >
-                    {t('importExport.contacts')}
-                  </Button>
-                  <Button
-                    variant={entityType === 'deal' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setEntityType('deal')
-                      setSelectedPipelineId(undefined)
-                      if (currentStep !== 'upload') {
-                        setCurrentStep('upload')
-                        handleReset()
-                      }
-                    }}
-                  >
-                    {t('importExport.deals')}
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* Step 1: Upload */}
             {currentStep === 'upload' && (
@@ -350,40 +310,6 @@ function ImportExportContent() {
                   rows={csvRows}
                   fileName={uploadedFile?.name}
                 />
-                
-                {/* Pipeline Selection for Deals - обязательный шаг перед маппингом */}
-                {entityType === 'deal' && (
-                  <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/20">
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-foreground">
-                        {t('importExport.selectPipeline')}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t('importExport.pipelineRequiredForMapping')}
-                      </p>
-                    </div>
-                    
-                    <PipelineSelector
-                      selectedPipelineId={selectedPipelineId}
-                      onPipelineChange={setSelectedPipelineId}
-                    />
-                    
-                    {/* Подсказка если pipeline не выбран */}
-                    {!selectedPipelineId && (
-                      <div className="flex items-start gap-2 p-3 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                            {t('importExport.pipelineRequired')}
-                          </p>
-                          <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
-                            {t('importExport.selectPipelineToContinue')}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
                 
                 <div className="flex justify-end">
                   <Button 
@@ -424,45 +350,42 @@ function ImportExportContent() {
             {currentStep === 'mapping' && csvHeaders.length > 0 && (
               <ErrorBoundary>
                 <div className="space-y-6">
-                  {/* Pipeline Selection for Deals - В САМОМ ВЕРХУ экрана mapping */}
-                  {entityType === 'deal' && (
-                    <div className="w-full p-4 border-2 border-primary/30 rounded-lg bg-muted/30">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          {t('importExport.selectPipeline')}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {t('importExport.pipelineRequiredForMapping')}
-                        </p>
-                      </div>
-                      
-                      <div className="w-full">
-                        <PipelineSelector
-                          selectedPipelineId={selectedPipelineId}
-                          onPipelineChange={setSelectedPipelineId}
-                        />
-                      </div>
-                      
-                      {/* Подсказка если pipeline не выбран */}
-                      {!selectedPipelineId && (
-                        <div className="flex items-start gap-2 p-3 mt-4 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
-                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                              {t('importExport.pipelineRequired')}
-                            </p>
-                            <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
-                              {t('importExport.selectPipelineToMapStages')}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                  {/* Pipeline Selection - required for combined import (deals need it) */}
+                  <div className="w-full p-4 border-2 border-primary/30 rounded-lg bg-muted/30">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-foreground mb-1">
+                        {t('importExport.selectPipeline')}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {t('importExport.pipelineRequiredForMapping')}
+                      </p>
                     </div>
-                  )}
+                    
+                    <div className="w-full">
+                      <PipelineSelector
+                        selectedPipelineId={selectedPipelineId}
+                        onPipelineChange={setSelectedPipelineId}
+                      />
+                    </div>
+                    
+                    {/* Подсказка если pipeline не выбран */}
+                    {!selectedPipelineId && (
+                      <div className="flex items-start gap-2 p-3 mt-4 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                            {t('importExport.pipelineRequired')}
+                          </p>
+                          <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                            {t('importExport.selectPipelineToMapStages')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   
-                  {/* Import Settings Section - для Deals (AssignedTo) */}
-                  {entityType === 'deal' && (
-                    <div className="space-y-4">
+                  {/* Import Settings Section - AssignedTo */}
+                  <div className="space-y-4">
                       <div className="border-l-4 border-primary pl-4">
                         <h3 className="text-base font-semibold text-foreground mb-1">
                           {t('importExport.importSettings')}
@@ -481,7 +404,6 @@ function ImportExportContent() {
                         dryRunErrors={dryRunResult?.errors || []}
                       />
                     </div>
-                  )}
                   
                   {/* Column Mapping Section */}
                   <div className="space-y-4">
@@ -496,9 +418,7 @@ function ImportExportContent() {
                     
                     <AutoMappingForm
                       csvColumns={csvHeaders}
-                      entityType={entityType}
                       onMappingChange={handleMappingChange}
-                      onValidationChange={handleValidationChange}
                       initialMapping={mapping}
                       csvSampleData={csvRows}
                       selectedPipelineId={selectedPipelineId}
@@ -516,11 +436,7 @@ function ImportExportContent() {
                     </Button>
                     <Button
                       onClick={handleDryRun}
-                      disabled={
-                        !isMappingValid || 
-                        isDryRunLoading || 
-                        (entityType === 'deal' && !selectedPipelineId)
-                      }
+                      disabled={isDryRunLoading}
                     >
                       {isDryRunLoading ? (
                         <>
@@ -546,7 +462,6 @@ function ImportExportContent() {
                   isLoading={isImporting}
                   onConfirm={handleConfirmImport}
                   onCancel={() => setCurrentStep('mapping')}
-                  isConfirmDisabled={!isMappingValid}
                 />
               </div>
             )}
