@@ -74,3 +74,5 @@ grep -i "error\|exception\|failed" /tmp/backend_runtime.log | tail -20
 grep "importDeals\|importContacts" /tmp/backend_runtime.log | tail -20
 ```
 
+
+

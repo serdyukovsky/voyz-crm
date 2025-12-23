@@ -446,6 +446,19 @@ export class ImportBatchService {
             });
             const existingNumbersSet = new Set(existingInBatch.map(d => d.number));
             
+            // Log each deal before createMany
+            batch.forEach((deal, dealIndex) => {
+              console.log('[IMPORT CREATE DEAL]', {
+                title: deal.title,
+                pipelineId: deal.pipelineId,
+                stageId: deal.stageId,
+                ownerId: deal.assignedToId || null,
+                row: dealIndex + 1, // Index in batch (1-based)
+                batchIndex: batchIndex + 1,
+                number: deal.number,
+              });
+            });
+            
             const createResult = await tx.deal.createMany({
               data: batch,
               skipDuplicates: true,

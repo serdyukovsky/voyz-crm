@@ -32,30 +32,45 @@ async function bootstrap() {
 
   // CORS Configuration - MUST be before cookie parser and other middleware
   // Allow GitHub Codespaces origins (https://*.app.github.dev)
-  // and local development origins (localhost:5173, localhost:3000)
-  const allowedOrigins = process.env.FRONTEND_URL
+  // and local development origins (localhost:5173, localhost:3000, 127.0.0.1:3000)
+  const envOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : [];
+  
+  // Default allowed origins (both localhost and 127.0.0.1 for compatibility)
+  const defaultOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ];
+  
+  const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
   // Enable CORS with proper configuration
+  console.log('CORS: Allowed origins:', allowedOrigins);
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) {
+        console.log('CORS: Allowing request with no origin');
         return callback(null, true);
       }
 
       // Allow GitHub Codespaces origins (https://*.app.github.dev)
       if (origin.match(/^https:\/\/.*\.app\.github\.dev$/)) {
+        console.log('CORS: Allowing GitHub Codespace origin:', origin);
         return callback(null, true);
       }
 
       // Check against explicitly allowed origins
       if (allowedOrigins.includes(origin)) {
+        console.log('CORS: Allowing origin:', origin);
         return callback(null, true);
       }
 
       // Reject all other origins
+      console.warn('CORS: Rejected origin:', origin, 'Allowed:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,

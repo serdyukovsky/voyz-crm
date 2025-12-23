@@ -697,6 +697,9 @@ export class CsvImportService {
       return { summary, errors, globalErrors, warnings };
     }
     
+    // Log: Сразу после парсинга CSV
+    console.log('[IMPORT DEBUG] parsed rows:', rows.length);
+    
     // Map для сбора всех стадий из CSV (stageName -> firstRowNumber)
     const csvStagesMap = new Map<string, number>();
     
@@ -739,7 +742,17 @@ export class CsvImportService {
         // Check if row is empty (all values are empty/whitespace after trim)
         const isEmptyRow = Object.values(trimmedRow).every(val => !val || val === '');
         if (isEmptyRow) {
-          console.log(`[IMPORT] Skipping empty row ${rowNumber}`);
+          const reason = 'Empty row';
+          const titleColumn = mapping.title;
+          const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
+          console.log('[IMPORT ROW SKIPPED]', {
+            row: rowNumber,
+            reason,
+            title,
+            pipelineId: pipelineId || '',
+            stageId: '',
+            hasErrors: 0
+          });
           summary.skipped++;
           continue;
         }
@@ -778,6 +791,17 @@ export class CsvImportService {
               error: 'Pipeline ID is required',
             });
             // Skip row entirely - do not validate title or process further
+            const reason = 'Pipeline ID is required';
+            const titleColumn = mapping.title;
+            const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
+            console.log('[IMPORT ROW SKIPPED]', {
+              row: rowNumber,
+              reason,
+              title,
+              pipelineId: '',
+              stageId: '',
+              hasErrors: rowErrors.length
+            });
             errors.push(...rowErrors);
             summary.failed++;
             continue;
@@ -802,6 +826,17 @@ export class CsvImportService {
               });
             }
             // Skip row entirely - do not validate title or process further
+            const reason = `Pipeline with ID "${pipelineId}" not found or could not be loaded`;
+            const titleColumn = mapping.title;
+            const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
+            console.log('[IMPORT ROW SKIPPED]', {
+              row: rowNumber,
+              reason,
+              title,
+              pipelineId: pipelineId || '',
+              stageId: '',
+              hasErrors: rowErrors.length
+            });
             errors.push(...rowErrors);
             summary.failed++;
             continue;
@@ -822,6 +857,16 @@ export class CsvImportService {
           
           // If critical errors (title missing), skip row
           if (rowErrors.length > 0) {
+            const reason = rowErrors.map(e => e.error).join('; ') || 'Critical validation errors';
+            const title = titleValue || '';
+            console.log('[IMPORT ROW SKIPPED]', {
+              row: rowNumber,
+              reason,
+              title,
+              pipelineId: pipelineId || '',
+              stageId: '',
+              hasErrors: rowErrors.length
+            });
             errors.push(...rowErrors);
             summary.failed++;
             continue;
@@ -849,6 +894,17 @@ export class CsvImportService {
               row: rowNumber,
                 field: 'stageId',
                 error: 'Stage is required. Please map a stage field or ensure pipeline has a default stage.',
+            });
+            const reason = 'Stage is required. Please map a stage field or ensure pipeline has a default stage.';
+            const titleColumn = mapping.title;
+            const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
+            console.log('[IMPORT ROW SKIPPED]', {
+              row: rowNumber,
+              reason,
+              title,
+              pipelineId: pipelineId || '',
+              stageId: dealData.stageId || '',
+              hasErrors: 1
             });
             summary.failed++;
               continue;
@@ -1116,6 +1172,8 @@ export class CsvImportService {
               if (validRows.length > 0) {
                 console.log('[IMPORT DEALS] Entering validRows.length > 0 block, dryRun:', dryRun);
                 if (dryRun) {
+                  // Log: Перед dry-run simulate
+                  console.log('[IMPORT DEBUG] DRY RUN rows:', rows.length);
                   // CRITICAL: In dry-run, ONLY simulate - NO DB operations
                   // If workspaceId is missing, skip DB checks but still count rows
                   if (!resolvedWorkspaceId) {
@@ -1123,6 +1181,7 @@ export class CsvImportService {
                     validRows.forEach(() => {
                       summary.created++;
                     });
+                    console.log('[IMPORT RESULT MUTATION]', { summary: { ...summary }, dryRun: true, reason: 'dry-run without workspaceId' });
                   } else {
                     // Normal dry-run with workspaceId - check existing deals
                     const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
@@ -1146,8 +1205,11 @@ export class CsvImportService {
                         summary.created++;
                       }
                     });
+                    console.log('[IMPORT RESULT MUTATION]', { summary: { ...summary }, dryRun: true, reason: 'dry-run with workspaceId' });
                   }
                 } else {
+                  // Log: Перед actual import
+                  console.log('[IMPORT DEBUG] ACTUAL IMPORT rows:', rows.length);
                   // Actual import - create/update deals
                   // workspaceId is required for actual import
                   console.log('[IMPORT DEALS] Starting actual import (not dry-run):', {
@@ -1199,6 +1261,8 @@ export class CsvImportService {
                       validRowsCount: validRows.length,
                       userId,
                     });
+                    // Log: ПЕРЕД началом обработки строк в actual import
+                    console.log('[IMPORT ACTUAL] start', { rows: rows.length });
                     // Proceed with import if we have workspaceId OR pipeline exists
                     try {
                       // Ensure number is present for batchCreateDeals (it requires number: string)
@@ -1230,6 +1294,13 @@ export class CsvImportService {
                       summary.created += result.created;
                       summary.updated += result.updated;
                       summary.failed += result.errors.length;
+                      
+                      console.log('[IMPORT RESULT MUTATION]', { 
+                        summary: { ...summary }, 
+                        dryRun: false, 
+                        reason: 'after batchCreateDeals',
+                        batchResult: { created: result.created, updated: result.updated, errors: result.errors.length }
+                      });
 
                       result.errors.forEach((err) => {
                         errors.push({
@@ -1288,8 +1359,24 @@ export class CsvImportService {
                 parsedRows: summary.total 
               });
               
+              // Log final result before return
+              console.log('[IMPORT RESULT MUTATION]', { 
+                summary: { ...summary }, 
+                dryRun, 
+                reason: 'final result before return',
+                resultSummary: result.summary
+              });
+              
               if (dryRun) {
                 console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+              } else {
+                // Log: В КОНЦЕ функции перед return для actual import
+                console.log('[IMPORT ACTUAL] result', {
+                  created: summary.created,
+                  updated: summary.updated,
+                  skipped: summary.skipped,
+                  failed: summary.failed
+                });
               }
               
               return result;
@@ -1312,8 +1399,24 @@ export class CsvImportService {
               parsedRows: summary.total 
             });
             
+            // Log final result before return (no rows case)
+            console.log('[IMPORT RESULT MUTATION]', { 
+              summary: { ...summary }, 
+              dryRun, 
+              reason: 'final result before return (no rows)',
+              resultSummary: result.summary
+            });
+            
             if (dryRun) {
               console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+            } else {
+              // Log: В КОНЦЕ функции перед return для actual import (no rows case)
+              console.log('[IMPORT ACTUAL] result', {
+                created: summary.created,
+                updated: summary.updated,
+                skipped: summary.skipped,
+                failed: summary.failed
+              });
             }
             
             return result;
@@ -1329,6 +1432,12 @@ export class CsvImportService {
                 errors,
                 globalErrors: globalErrors.length > 0 ? globalErrors : undefined,
               };
+              console.log('[IMPORT RESULT MUTATION]', { 
+                summary: { ...summary }, 
+                dryRun: true, 
+                reason: 'error catch block (dry-run)',
+                resultSummary: result.summary
+              });
               console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
               return result;
             } else {
@@ -1358,6 +1467,12 @@ export class CsvImportService {
           errors: [],
           globalErrors: [`Import error: ${errorMessage}`],
         };
+        console.log('[IMPORT RESULT MUTATION]', { 
+          summary: { ...result.summary }, 
+          dryRun: true, 
+          reason: 'top-level catch block (dry-run)',
+          resultSummary: result.summary
+        });
         console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
         return result;
             } else {
