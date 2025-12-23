@@ -2,27 +2,23 @@ import {
   Controller,
   Post,
   Get,
-  UseInterceptors,
-  UploadedFile,
   Body,
   Query,
   UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
-  PayloadTooLargeException,
+  Req,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CsvImportService } from './csv-import.service';
 import { AutoMappingService } from './auto-mapping.service';
 import { ContactFieldMapping, DealFieldMapping, ImportMappingDto } from './dto/field-mapping.dto';
 import { ImportResultDto } from './dto/import-result.dto';
+import { ImportDealsDto } from './dto/import-deals.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { Readable } from 'stream';
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 @ApiTags('Import')
 @Controller('import')
@@ -32,7 +28,9 @@ export class ImportExportController {
   constructor(
     private readonly csvImportService: CsvImportService,
     private readonly autoMappingService: AutoMappingService,
-  ) {}
+  ) {
+    console.log('🔥 ImportExportController initialized');
+  }
 
   /**
    * Получение метаданных полей для импорта
@@ -64,96 +62,29 @@ export class ImportExportController {
     return this.autoMappingService.autoMapColumns(columns, entityType);
   }
 
-  @Post('contacts')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Импорт контактов из CSV' })
-  @ApiConsumes('multipart/form-data')
-  @ApiQuery({ name: 'dryRun', type: 'boolean', required: false, description: 'Режим предпросмотра без записи в БД' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-        mapping: {
-          type: 'string',
-          description: 'JSON mapping для полей CSV',
-        },
-        delimiter: {
-          type: 'string',
-          enum: [',', ';'],
-          default: ',',
-        },
-      },
-    },
-  })
-  @UseInterceptors(FileInterceptor('file'))
-  async importContacts(
-    @UploadedFile() file: Express.Multer.File,
-    @Body('mapping') mappingString: string,
-    @Body('delimiter') delimiter: ',' | ';' = ',',
-    @Query('dryRun') dryRun: string = 'false',
-    @CurrentUser() user: any,
-  ): Promise<ImportResultDto> {
-    if (!file) {
-      throw new BadRequestException('CSV file is required');
-    }
-
-    // Проверка размера файла
-    if (file.size > MAX_FILE_SIZE) {
-      throw new PayloadTooLargeException(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-    }
-
-    // Проверка типа файла
-    if (!file.mimetype.includes('csv') && !file.originalname.endsWith('.csv')) {
-      throw new BadRequestException('File must be a CSV file');
-    }
-
-    // Парсинг mapping
-    let mapping: ContactFieldMapping;
-    try {
-      mapping = JSON.parse(mappingString || '{}');
-    } catch (error) {
-      throw new BadRequestException('Invalid mapping JSON: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-
-    // Валидация mapping
-    // fullName опционален, email или phone обязательны (проверяется в mapContactRow)
-
-    // Создаем stream из файла
-    const fileStream = Readable.from(file.buffer);
-
-    // Импорт (с поддержкой dry-run)
-    const isDryRun = dryRun === 'true' || dryRun === '1';
-    const result = await this.csvImportService.importContacts(
-      fileStream,
-      mapping,
-      user.userId || user.id,
-      delimiter,
-      isDryRun,
-    );
-
-    return result;
-  }
-
+  // CRITICAL: @Post('deals') MUST come BEFORE @Post('contacts')
+  // NestJS processes routes in declaration order, and FileInterceptor on contacts
+  // can intercept requests if deals comes after contacts
   @Post('deals')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Импорт сделок из CSV' })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/json')
   @ApiQuery({ name: 'dryRun', type: 'boolean', required: false, description: 'Режим предпросмотра без записи в БД' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
+        rows: {
+          type: 'array',
+          description: 'Parsed CSV rows from frontend (CSV parsing is done on frontend)',
+          items: {
+            type: 'object',
+            additionalProperties: { type: 'string' }
+          }
         },
         mapping: {
-          type: 'string',
-          description: 'JSON mapping для полей CSV',
+          type: 'object',
+          description: 'Mapping from CRM fields to CSV column names',
         },
         pipelineId: {
           type: 'string',
@@ -167,80 +98,185 @@ export class ImportExportController {
           type: 'string',
           description: 'ID ответственного по умолчанию (применяется ко всем строкам)',
         },
-        delimiter: {
-          type: 'string',
-          enum: [',', ';'],
-          default: ',',
-        },
       },
+      required: ['rows', 'mapping', 'pipelineId'],
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
   async importDeals(
-    @UploadedFile() file: Express.Multer.File,
-    @Body('mapping') mappingString: string,
-    @Body('pipelineId') pipelineId: string,
-    @Body('workspaceId') workspaceIdFromBody: string | undefined,
-    @Body('defaultAssignedToId') defaultAssignedToId: string | undefined,
-    @Body('delimiter') delimiter: ',' | ';' = ',',
+    @Body() dto: any, // Use 'any' to bypass ValidationPipe issues temporarily
     @Query('dryRun') dryRun: string = 'false',
     @CurrentUser() user: any,
+    @Req() req: Request, // Add request object for debugging
   ): Promise<ImportResultDto> {
+    // CRITICAL: Determine dry-run mode FIRST (before any usage)
+    const isDryRun = dryRun === 'true' || dryRun === '1';
+    
+    // 🔥 CRITICAL: Log immediately to confirm this endpoint is called
+    console.error('🔥🔥🔥 CONTROLLER ENTRY - importDeals endpoint called');
+    console.error('🔥 Request path:', req.path);
+    console.error('🔥 Request method:', req.method);
+    console.error('🔥 Request URL:', req.url);
+    console.error('🔥 Content-Type:', req.headers['content-type']);
+    console.error('🔥 DTO keys:', dto ? Object.keys(dto) : 'null');
+    console.error('🔥 Has rows:', !!dto?.rows);
+    console.error('🔥 Rows count:', dto?.rows?.length || 0);
+    console.error('🔥 dryRun query param:', dryRun);
+    console.error('🔥 isDryRun:', isDryRun);
+    // 🔥 DIAGNOSTIC: Log controller entry
+    console.log('🔥 CONTROLLER ENTRY - importDeals endpoint called');
+    console.log('🔥 Raw DTO type:', typeof dto);
+    console.log('🔥 Raw DTO keys:', dto ? Object.keys(dto) : 'null');
+    
+    console.log('🔥 DTO received:', {
+      hasRows: !!dto?.rows,
+      rowsCount: dto?.rows?.length || 0,
+      hasMapping: !!dto?.mapping,
+      mappingKeys: dto?.mapping ? Object.keys(dto.mapping) : [],
+      pipelineId: dto?.pipelineId,
+      workspaceId: dto?.workspaceId,
+      hasFile: 'file' in (dto || {}),
+      allKeys: dto ? Object.keys(dto) : [],
+      dryRun,
+      isDryRun,
+    });
+    
+    // CRITICAL: Check if file is somehow in the request
+    if (dto && 'file' in dto) {
+      console.error('🔥 ERROR: file found in DTO! This should not happen.');
+      console.error('🔥 DTO keys:', Object.keys(dto));
+      if (isDryRun) {
+        return {
+          summary: { total: 0, created: 0, updated: 0, failed: 0, skipped: 0 },
+          errors: [],
+          globalErrors: ['Invalid request: file field should not be present. Use rows instead.'],
+        };
+      }
+      throw new BadRequestException('Invalid request: file field should not be present. Use rows instead.');
+    }
+    
     // Resolve workspaceId: priority: request.body.workspaceId > user.workspaceId
-    const workspaceId = workspaceIdFromBody || user?.workspaceId;
-    console.log('[IMPORT CONTROLLER]', { workspaceId, workspaceIdFromBody, userWorkspaceId: user?.workspaceId, dryRun });
-    if (!file) {
-      throw new BadRequestException('CSV file is required');
+    const workspaceId = dto.workspaceId || user?.workspaceId;
+    console.log('[IMPORT CONTROLLER]', { 
+      workspaceId, 
+      workspaceIdFromBody: dto.workspaceId, 
+      userWorkspaceId: user?.workspaceId,
+      userId: user?.id || user?.userId,
+      userObject: user ? {
+        id: user.id || user.userId,
+        email: user.email,
+        hasWorkspaceId: !!user.workspaceId,
+        workspaceId: user.workspaceId,
+        allKeys: Object.keys(user),
+      } : null,
+      dryRun,
+      isDryRun,
+      rowsCount: dto?.rows?.length || 0
+    });
+    
+    // CRITICAL: Warn if workspaceId is missing in actual import
+    if (!isDryRun && !workspaceId) {
+      console.error('[IMPORT CONTROLLER] ⚠️ WARNING: workspaceId is missing in actual import!');
+      console.error('[IMPORT CONTROLLER] This will prevent deals from being created.');
+    }
+    
+    // CRITICAL: Validate rows - CSV parsing is done on frontend
+    // In dry-run, return globalErrors instead of throwing
+    if (!dto.rows || !Array.isArray(dto.rows) || dto.rows.length === 0) {
+      if (isDryRun) {
+        // In dry-run, NEVER throw - always return 200 with errors
+        return {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [],
+          globalErrors: ['Rows are required and must be a non-empty array'],
+        };
+      }
+      throw new BadRequestException('Rows are required and must be a non-empty array');
     }
 
-    // Проверка размера файла
-    if (file.size > MAX_FILE_SIZE) {
-      throw new PayloadTooLargeException(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+    // Validate mapping
+    if (!dto.mapping || typeof dto.mapping !== 'object') {
+      if (isDryRun) {
+        return {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [],
+          globalErrors: ['Mapping is required and must be an object'],
+        };
+      }
+      throw new BadRequestException('Mapping is required and must be an object');
     }
 
-    // Проверка типа файла
-    if (!file.mimetype.includes('csv') && !file.originalname.endsWith('.csv')) {
-      throw new BadRequestException('File must be a CSV file');
-    }
-
-    // Парсинг mapping
-    let mapping: DealFieldMapping;
-    try {
-      mapping = JSON.parse(mappingString || '{}');
-    } catch (error) {
-      throw new BadRequestException('Invalid mapping JSON: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-
-    // Валидация mapping
-    // title обязателен, number опционален, stageId не обязателен (резолвится автоматически по имени)
-    if (!mapping.title) {
+    // Валидация mapping - title обязателен
+    if (!dto.mapping.title) {
+      if (isDryRun) {
+        return {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [],
+          globalErrors: ['Mapping must include title field'],
+        };
+      }
       throw new BadRequestException('Mapping must include title field');
     }
 
     // Валидация pipelineId
-    if (!pipelineId || typeof pipelineId !== 'string') {
+    if (!dto.pipelineId || typeof dto.pipelineId !== 'string') {
+      if (isDryRun) {
+        return {
+          summary: {
+            total: 0,
+            created: 0,
+            updated: 0,
+            failed: 0,
+            skipped: 0,
+          },
+          errors: [],
+          globalErrors: ['pipelineId is required'],
+        };
+      }
       throw new BadRequestException('pipelineId is required');
     }
-
-    // Создаем stream из файла
-    const fileStream = Readable.from(file.buffer);
-
-    // Импорт (с поддержкой dry-run)
-    const isDryRun = dryRun === 'true' || dryRun === '1';
     
     // CRITICAL: Wrap entire import in try/catch to prevent 500 errors in dry-run
     try {
+      console.log('[IMPORT CONTROLLER] About to call csvImportService.importDeals:', {
+        rowsCount: dto.rows?.length || 0,
+        hasMapping: !!dto.mapping,
+        pipelineId: dto.pipelineId,
+        workspaceId,
+        hasUser: !!user,
+        userId: user?.id || user?.userId,
+        isDryRun,
+      });
+      
       const result = await this.csvImportService.importDeals(
-        fileStream,
-        mapping,
+        dto.rows, // Parsed CSV rows from frontend
+        dto.mapping,
         user, // Передаем весь объект user для валидации
-        pipelineId,
+        dto.pipelineId,
         workspaceId, // Explicit workspaceId (from body or user)
-        defaultAssignedToId, // Дефолтный ответственный для всех строк
+        dto.defaultAssignedToId, // Дефолтный ответственный для всех строк
         undefined, // contactEmailPhoneMap - опционально
-        delimiter,
         isDryRun,
       );
+      
+      console.log('[IMPORT CONTROLLER] csvImportService.importDeals completed successfully');
 
       // Log dry-run result for debugging
       if (isDryRun) {
@@ -265,6 +301,7 @@ export class ImportExportController {
             row: -1,
             error: `Dry-run validation error: ${errorMessage}`,
           }],
+          globalErrors: [`Dry-run validation error: ${errorMessage}`],
         };
       }
       // For actual import, re-throw to let global exception filter handle it

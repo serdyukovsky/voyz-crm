@@ -9,7 +9,8 @@ import { type ImportSummary, type ImportError } from '@/lib/api/import'
 
 interface ImportResultProps {
   summary: ImportSummary
-  errors: ImportError[]
+  errors: ImportError[] // Row-specific errors (row >= 0)
+  globalErrors?: string[] // Global errors (mapping, pipeline, etc.)
   warnings?: string[]
   onReset?: () => void
 }
@@ -17,14 +18,17 @@ interface ImportResultProps {
 export function ImportResult({
   summary,
   errors,
+  globalErrors = [],
   warnings = [],
   onReset,
 }: ImportResultProps) {
   const [isErrorsExpanded, setIsErrorsExpanded] = useState(true)
+  const [isGlobalErrorsExpanded, setIsGlobalErrorsExpanded] = useState(true)
   const [errorSearchTerm, setErrorSearchTerm] = useState('')
   const [showAllErrors, setShowAllErrors] = useState(false)
   
   const hasErrors = errors.length > 0
+  const hasGlobalErrors = globalErrors.length > 0
   const hasWarnings = warnings.length > 0
   const isSuccess = summary.failed === 0 && (summary.created > 0 || summary.updated > 0)
 
@@ -81,6 +85,47 @@ export function ImportResult({
               {summary.created + summary.updated} record{summary.created + summary.updated !== 1 ? 's' : ''} {summary.created > 0 && summary.updated > 0 ? 'created or updated' : summary.created > 0 ? 'created' : 'updated'}.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Global Errors - shown separately from row errors */}
+      {hasGlobalErrors && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setIsGlobalErrorsExpanded(!isGlobalErrorsExpanded)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              {isGlobalErrorsExpanded ? (
+                <ChevronUp className="h-4 w-4 text-destructive" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-destructive" />
+              )}
+              <XCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm font-medium text-destructive">
+                {globalErrors.length} global error{globalErrors.length !== 1 ? 's' : ''}
+              </p>
+            </button>
+          </div>
+          
+          {isGlobalErrorsExpanded && (
+            <div className="border border-destructive/20 rounded-lg overflow-hidden">
+              <div className="divide-y divide-border">
+                {globalErrors.map((error, idx) => (
+                  <div key={idx} className="p-3 bg-destructive/5 hover:bg-destructive/10 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <Badge variant="destructive" className="text-xs shrink-0">
+                        Global
+                      </Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-destructive">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

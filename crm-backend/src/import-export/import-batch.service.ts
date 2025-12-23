@@ -409,21 +409,73 @@ export class ImportBatchService {
 
     // Batch создание
     const createBatches = this.chunkArray(toCreate, this.BATCH_SIZE);
-    for (const batch of createBatches) {
+    console.log('[BATCH CREATE DEALS] Starting batch creation:', {
+      totalDeals: toCreate.length,
+      batches: createBatches.length,
+      batchSize: this.BATCH_SIZE,
+      sampleDeal: toCreate[0] ? {
+        number: toCreate[0].number,
+        title: toCreate[0].title,
+        pipelineId: toCreate[0].pipelineId,
+        stageId: toCreate[0].stageId,
+      } : null,
+    });
+    
+    for (let batchIndex = 0; batchIndex < createBatches.length; batchIndex++) {
+      const batch = createBatches[batchIndex];
       try {
-        await this.prisma.$transaction(
+        console.log(`[BATCH CREATE DEALS] Processing batch ${batchIndex + 1}/${createBatches.length}:`, {
+          batchSize: batch.length,
+          sampleDeal: batch[0] ? {
+            number: batch[0].number,
+            title: batch[0].title,
+            pipelineId: batch[0].pipelineId,
+            stageId: batch[0].stageId,
+          } : null,
+        });
+        
+        // CRITICAL: Use the actual count from createMany, not batch.length
+        // createMany returns { count: number } - the actual number of created records
+        const createResult = await this.prisma.$transaction(
           async (tx) => {
-            await tx.deal.createMany({
+            // CRITICAL: Check for duplicates BEFORE createMany to get accurate count
+            const batchNumbers = batch.map(d => d.number);
+            const existingInBatch = await tx.deal.findMany({
+              where: { number: { in: batchNumbers } },
+              select: { number: true },
+            });
+            const existingNumbersSet = new Set(existingInBatch.map(d => d.number));
+            
+            const createResult = await tx.deal.createMany({
               data: batch,
               skipDuplicates: true,
             });
+            
+            const actuallyCreated = createResult.count;
+            const skipped = batch.length - actuallyCreated;
+            
+            console.log(`[BATCH CREATE DEALS] Batch ${batchIndex + 1} result:`, {
+              batchSize: batch.length,
+              actuallyCreated,
+              skipped,
+              existingInDB: existingNumbersSet.size,
+              sampleExisting: Array.from(existingNumbersSet).slice(0, 3),
+            });
+            
+            if (skipped > 0) {
+              console.warn(`[BATCH CREATE DEALS] WARNING: ${skipped} deals were skipped (duplicates or errors)`);
+            }
+            
+            return createResult;
           },
           {
             timeout: 30000,
             isolationLevel: 'ReadCommitted',
           },
         );
-        result.created += batch.length;
+        
+        // CRITICAL: Use actual count from createMany, not batch.length
+        result.created += createResult.count;
       } catch (error) {
         result.errors.push({
           row: -1,

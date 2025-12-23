@@ -108,7 +108,8 @@ export interface StageToCreate {
 
 export interface ImportResult {
   summary: ImportSummary
-  errors: ImportError[]
+  errors: ImportError[] // Row-specific errors (row >= 0)
+  globalErrors?: string[] // Global errors (mapping, pipeline, etc.)
   warnings?: string[]
   stagesToCreate?: StageToCreate[]
 }
@@ -212,12 +213,37 @@ export async function importContacts(
     return acc
   }, {})
 
+  // CRITICAL: Remove pipelineId from mapping if present
+  // pipelineId is a top-level parameter, NOT a CSV column mapping
+  // If it's in mapping, backend will try to find CSV column named "pipelineId" and fail
+  if ('pipelineId' in cleanMapping) {
+    console.warn('[IMPORT MAPPING] WARNING: pipelineId found in mapping - removing it. pipelineId should be passed as separate parameter, not in mapping.');
+    delete cleanMapping.pipelineId;
+  }
+
   // CRITICAL: Invert mapping format from {csvColumn: crmField} to {crmField: csvColumn}
   // Frontend uses {csvColumn: crmField}, but backend expects {crmField: csvColumn}
+  // Example: { "Deal Title": "title" } -> { "title": "Deal Title" }
   const invertedMapping = Object.entries(cleanMapping).reduce<Record<string, string>>((acc, [csvColumn, crmField]) => {
-    acc[crmField] = csvColumn
+    // CRITICAL: Double-check - never include pipelineId in inverted mapping
+    if (crmField && typeof crmField === 'string' && crmField !== 'pipelineId') {
+      acc[crmField] = csvColumn
+    } else if (crmField === 'pipelineId') {
+      console.warn('[IMPORT MAPPING] WARNING: Attempted to map pipelineId - skipping. pipelineId must be passed separately.');
+    }
     return acc
   }, {})
+  
+  // Log mapping for debugging - ensure keys match backend expectations
+  // Backend expects: mapping.title = "CSV Column Name"
+  console.log('[IMPORT MAPPING]', {
+    original: cleanMapping, // { "CSV Column": "crmField" }
+    inverted: invertedMapping, // { "crmField": "CSV Column" }
+    hasTitle: 'title' in invertedMapping,
+    titleColumn: invertedMapping.title,
+    allMappedFields: Object.keys(invertedMapping),
+    pipelineIdInMapping: 'pipelineId' in cleanMapping || 'pipelineId' in invertedMapping
+  })
 
   const formData = new FormData()
   formData.append('file', file)
@@ -264,12 +290,12 @@ export async function importContacts(
 
 /**
  * Импорт сделок из CSV
+ * CRITICAL: CSV parsing is done on frontend, backend receives parsed rows
  */
 export async function importDeals(
-  file: File,
+  rows: Record<string, string>[], // Parsed CSV rows from frontend
   mapping: Record<string, string | undefined>,
   pipelineId: string,
-  delimiter: ',' | ';' = ',',
   dryRun: boolean = false,
   defaultAssignedToId?: string,
 ): Promise<ImportResult> {
@@ -290,12 +316,38 @@ export async function importDeals(
     return acc
   }, {})
 
+  // CRITICAL: Remove pipelineId from mapping if present
+  // pipelineId is a top-level parameter, NOT a CSV column mapping
+  // If it's in mapping, backend will try to find CSV column named "pipelineId" and fail
+  if ('pipelineId' in cleanMapping) {
+    console.warn('[IMPORT MAPPING] WARNING: pipelineId found in mapping - removing it. pipelineId should be passed as separate parameter, not in mapping.');
+    delete cleanMapping.pipelineId;
+  }
+
   // CRITICAL: Invert mapping format from {csvColumn: crmField} to {crmField: csvColumn}
   // Frontend uses {csvColumn: crmField}, but backend expects {crmField: csvColumn}
+  // Example: { "Deal Title": "title" } -> { "title": "Deal Title" }
   const invertedMapping = Object.entries(cleanMapping).reduce<Record<string, string>>((acc, [csvColumn, crmField]) => {
-    acc[crmField] = csvColumn
+    // CRITICAL: Double-check - never include pipelineId in inverted mapping
+    if (crmField && typeof crmField === 'string' && crmField !== 'pipelineId') {
+      acc[crmField] = csvColumn
+    } else if (crmField === 'pipelineId') {
+      console.warn('[IMPORT MAPPING] WARNING: Attempted to map pipelineId - skipping. pipelineId must be passed separately.');
+    }
     return acc
   }, {})
+  
+  // Log mapping and rows for debugging
+  console.log('[IMPORT MAPPING]', {
+    original: cleanMapping, // { "CSV Column": "crmField" }
+    inverted: invertedMapping, // { "crmField": "CSV Column" }
+    hasTitle: 'title' in invertedMapping,
+    titleColumn: invertedMapping.title,
+    allMappedFields: Object.keys(invertedMapping),
+    pipelineIdInMapping: 'pipelineId' in cleanMapping || 'pipelineId' in invertedMapping,
+    rowsCount: rows.length,
+    firstRowSample: rows[0] ? Object.keys(rows[0]).slice(0, 5) : []
+  })
 
   // Try to get workspaceId from user object in localStorage (optional)
   let workspaceId: string | undefined = undefined
@@ -304,22 +356,33 @@ export async function importDeals(
     if (userStr) {
       const user = JSON.parse(userStr)
       workspaceId = user?.workspaceId
+      console.log('[IMPORT] workspaceId from localStorage:', {
+        hasUser: !!user,
+        workspaceId,
+        userKeys: user ? Object.keys(user) : [],
+        userId: user?.id || user?.userId,
+      })
+    } else {
+      console.warn('[IMPORT] No user object in localStorage')
     }
   } catch (e) {
+    console.error('[IMPORT] Failed to parse user from localStorage:', e)
     // Ignore - backend will fallback to user.workspaceId from JWT
   }
+  
+  if (!workspaceId && !dryRun) {
+    console.warn('[IMPORT] ⚠️ WARNING: workspaceId is missing in actual import request. Backend will try to get it from JWT token.')
+  }
 
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('mapping', JSON.stringify(invertedMapping))
-  formData.append('pipelineId', pipelineId)
-  if (workspaceId) {
-    formData.append('workspaceId', workspaceId)
+  // CRITICAL: Send rows as JSON, not FormData
+  // CSV parsing is done on frontend, backend receives parsed rows
+  const requestBody = {
+    rows: rows, // Parsed CSV rows
+    mapping: invertedMapping,
+    pipelineId: pipelineId,
+    workspaceId: workspaceId,
+    defaultAssignedToId: defaultAssignedToId,
   }
-  if (defaultAssignedToId) {
-    formData.append('defaultAssignedToId', defaultAssignedToId)
-  }
-  formData.append('delimiter', delimiter)
 
   // API_BASE_URL уже должен содержать /api
   let url = `${API_BASE_URL}/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
@@ -331,8 +394,9 @@ export async function importDeals(
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    body: formData,
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -352,8 +416,27 @@ export async function importDeals(
       throw new UnauthorizedError()
     }
     
-    const error = await response.text()
-    throw new Error(`Failed to import deals: ${error}`)
+    // 🔥 DIAGNOSTIC: Log error response details
+    const errorText = await response.text()
+    console.error('🔥 IMPORT ERROR RESPONSE:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.url,
+      headers: Object.fromEntries(response.headers.entries()),
+      errorText,
+    })
+    
+    // Try to parse as JSON for better error message
+    let errorMessage = errorText
+    try {
+      const errorJson = JSON.parse(errorText)
+      errorMessage = errorJson.message || errorJson.error || errorText
+      console.error('🔥 PARSED ERROR:', errorJson)
+    } catch (e) {
+      // Not JSON, use as-is
+    }
+    
+    throw new Error(`Failed to import deals (${response.status}): ${errorMessage}`)
   }
 
   return response.json()

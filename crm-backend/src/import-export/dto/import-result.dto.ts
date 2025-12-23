@@ -26,7 +26,8 @@ export interface StageToCreate {
 
 export interface ImportResultDto {
   summary: ImportSummary;
-  errors: ImportError[];
+  errors: ImportError[]; // Row-specific errors (row >= 0)
+  globalErrors?: string[]; // Global errors (not tied to specific rows)
   warnings?: string[]; // Предупреждения (не критичные)
   stagesToCreate?: StageToCreate[]; // Стадии, которые будут созданы при импорте
 }
