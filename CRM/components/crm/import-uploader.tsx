@@ -71,15 +71,17 @@ export function ImportUploader({ onFileUpload, disabled = false }: ImportUploade
       setError(null)
       setIsParsing(true)
 
-      // Парсим первые 20 строк для предпросмотра
-      console.log('Starting CSV parsing...')
-      const { headers, rows } = await parseCsvFile(file, ',', 20)
+      // Парсим ВСЕ строки CSV (без ограничений)
+      // Для предпросмотра будут использоваться только первые 20 строк
+      console.log('Starting CSV parsing (full file)...')
+      const { headers, rows } = await parseCsvFile(file, ',', undefined) // undefined = no limit
       
       console.log('Parsing result:', {
         headersCount: headers.length,
         headers,
         rowsCount: rows.length,
-        firstRow: rows[0]
+        firstRow: rows[0],
+        totalRows: rows.length
       })
       
       if (!headers || headers.length === 0) {

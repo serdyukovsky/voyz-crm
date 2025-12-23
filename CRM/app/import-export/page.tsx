@@ -159,9 +159,13 @@ function ImportExportContent() {
 
     try {
       // Combined import: always use deals API which handles both contacts and deals
-      // CRITICAL: Send parsed rows, not file - CSV parsing is done on frontend
+      // CRITICAL: For dry-run, use only first 20 rows (previewRows)
+      // csvRows contains ALL rows, but dry-run should only process preview
+      const previewRows = csvRows.slice(0, 20) // Create new array, don't mutate csvRows
+      console.log('[IMPORT] Dry-run: using previewRows (first 20 of', csvRows.length, 'total rows)')
+      
       const result = await importDeals(
-        csvRows, // Parsed CSV rows from frontend
+        previewRows, // Only first 20 rows for dry-run preview
         mapping, 
         selectedPipelineId!, 
         true, // dryRun
@@ -190,9 +194,12 @@ function ImportExportContent() {
 
     try {
       // Combined import: always use deals API which handles both contacts and deals
-      // CRITICAL: Send parsed rows, not file - CSV parsing is done on frontend
+      // CRITICAL: For actual import, use ALL rows (csvRows contains all parsed rows)
+      // csvRows is allRows - contains all CSV rows without any limitations
+      console.log('[IMPORT] Actual import: using all rows (', csvRows.length, 'total rows)')
+      
       const result = await importDeals(
-        csvRows, // Parsed CSV rows from frontend
+        csvRows, // ALL rows for actual import (no limitations)
         mapping, 
         selectedPipelineId!, 
         false, // dryRun = false (actual import)
@@ -345,8 +352,9 @@ function ImportExportContent() {
               <div className="space-y-4">
                 <ImportPreviewTable
                   headers={csvHeaders}
-                  rows={csvRows}
+                  rows={csvRows.slice(0, 20)}
                   fileName={uploadedFile?.name}
+                  totalRows={csvRows.length}
                 />
                 
                 <div className="flex justify-end">
