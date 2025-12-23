@@ -128,6 +128,8 @@ function ImportExportContent() {
     if (!uploadedFile) return
 
     // Validation: Check all required fields before Dry Run
+    // Backend validation is source of truth - frontend mirrors backend rules
+    // Only required field for deal import: title
     const errors: string[] = []
 
     // 1. Pipeline is required
@@ -136,15 +138,14 @@ function ImportExportContent() {
     }
 
     // 2. Deal title is required (mapping must include 'title')
+    // This is the ONLY required field for deal import
     const mappedFields = Object.values(mapping).filter(v => v !== undefined)
     if (!mappedFields.includes('title')) {
-      errors.push('Deal: Title is required')
+      errors.push('Deal: Title mapping is required')
     }
-
-    // 3. Contact fullName is required (mapping must include 'fullName')
-    if (!mappedFields.includes('fullName')) {
-      errors.push('Contact: Full Name is required')
-    }
+    
+    // Contact fields are OPTIONAL - no validation needed
+    // Deal import can continue without contact information
 
     if (errors.length > 0) {
       const errorMessage = errors.join('. ')
@@ -158,12 +159,12 @@ function ImportExportContent() {
 
     try {
       // Combined import: always use deals API which handles both contacts and deals
+      // CRITICAL: Send parsed rows, not file - CSV parsing is done on frontend
       const result = await importDeals(
-        uploadedFile, 
+        csvRows, // Parsed CSV rows from frontend
         mapping, 
         selectedPipelineId!, 
-        ',', 
-        true,
+        true, // dryRun
         applyAssignedToAll ? defaultAssignedToId : undefined
       )
 
@@ -189,21 +190,40 @@ function ImportExportContent() {
 
     try {
       // Combined import: always use deals API which handles both contacts and deals
+      // CRITICAL: Send parsed rows, not file - CSV parsing is done on frontend
       const result = await importDeals(
-        uploadedFile, 
+        csvRows, // Parsed CSV rows from frontend
         mapping, 
         selectedPipelineId!, 
-        ',', 
-        false,
+        false, // dryRun = false (actual import)
         applyAssignedToAll ? defaultAssignedToId : undefined
       )
 
       setImportResult(result)
       setCurrentStep('result')
-      showSuccess(
-        'Import completed',
-        `${result.summary.created + result.summary.updated} records imported successfully`
-      )
+      
+      // CRITICAL: Check if any records were actually created/updated
+      const totalImported = result.summary.created + result.summary.updated
+      if (totalImported === 0) {
+        console.warn('[IMPORT] No records were imported:', {
+          created: result.summary.created,
+          updated: result.summary.updated,
+          failed: result.summary.failed,
+          skipped: result.summary.skipped,
+          total: result.summary.total,
+          errors: result.errors?.length || 0,
+          globalErrors: result.globalErrors?.length || 0,
+        })
+        showError(
+          'Import completed with warnings',
+          `No records were imported. Created: ${result.summary.created}, Updated: ${result.summary.updated}, Failed: ${result.summary.failed}, Skipped: ${result.summary.skipped}. Check errors for details.`
+        )
+      } else {
+        showSuccess(
+          'Import completed',
+          `${totalImported} records imported successfully (${result.summary.created} created, ${result.summary.updated} updated)`
+        )
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to import'
       setError(errorMessage)
@@ -230,6 +250,24 @@ function ImportExportContent() {
   const hasAssignedToMapping = () => {
     // Проверяем есть ли маппинг для assignedToId
     return Object.values(mapping).includes('assignedToId')
+  }
+  
+  // Validation: Check if required mappings are present
+  const getMappingValidationErrors = () => {
+    const errors: string[] = []
+    const mappedFields = Object.values(mapping).filter(v => v !== undefined)
+    
+    // Deal title is REQUIRED
+    if (!mappedFields.includes('title')) {
+      errors.push('Deal: Title mapping is required')
+    }
+    
+    return errors
+  }
+  
+  const isDryRunDisabled = () => {
+    // Disable if validation errors exist or pipeline not selected
+    return getMappingValidationErrors().length > 0 || !selectedPipelineId || isDryRunLoading
   }
 
   return (
@@ -434,19 +472,31 @@ function ImportExportContent() {
                     >
                       {t('importExport.back')}
                     </Button>
-                    <Button
-                      onClick={handleDryRun}
-                      disabled={isDryRunLoading}
-                    >
-                      {isDryRunLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {t('importExport.runningDryRun')}
-                        </>
-                      ) : (
-                        t('importExport.runDryRun')
+                    <div className="flex flex-col items-end gap-2">
+                      {getMappingValidationErrors().length > 0 && (
+                        <div className="flex items-start gap-2 p-2 border border-destructive/20 bg-destructive/5 rounded text-xs text-destructive">
+                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <div>
+                            {getMappingValidationErrors().map((err, idx) => (
+                              <div key={idx}>{err}</div>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                    </Button>
+                      <Button
+                        onClick={handleDryRun}
+                        disabled={isDryRunDisabled()}
+                      >
+                        {isDryRunLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {t('importExport.runningDryRun')}
+                          </>
+                        ) : (
+                          t('importExport.runDryRun')
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </ErrorBoundary>
@@ -458,6 +508,7 @@ function ImportExportContent() {
                 <DryRunSummary
                   summary={dryRunResult.summary}
                   errors={dryRunResult.errors}
+                  globalErrors={dryRunResult.globalErrors}
                   stagesToCreate={dryRunResult.stagesToCreate}
                   isLoading={isImporting}
                   onConfirm={handleConfirmImport}

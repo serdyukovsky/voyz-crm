@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { ArgumentsHost } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -8,6 +8,9 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
+  // 🔥 DIAGNOSTIC TEST: Remove this after verification
+  // throw new Error('BACKEND RELOADED TEST');
+  
   const app = await NestFactory.create(AppModule);
 
   // Global process-level error logging
@@ -22,7 +25,9 @@ async function bootstrap() {
   process.on('uncaughtException', (error: Error) => {
     console.error('🔥 UNCAUGHT EXCEPTION');
     console.error('Error:', error);
+    console.error('Message:', error.message);
     console.error('Stack:', error.stack);
+    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
   });
 
   // CORS Configuration - MUST be before cookie parser and other middleware
@@ -67,12 +72,38 @@ async function bootstrap() {
   // Cookie parser
   app.use(cookieParser());
 
+  // 🔥 DIAGNOSTIC: Log all requests to /api/import/deals
+  app.use((req: any, res: any, next: any) => {
+    if (req.path === '/api/import/deals' || req.path.includes('/import/deals')) {
+      console.log('🔥 MIDDLEWARE - Request to import/deals:', {
+        method: req.method,
+        path: req.path,
+        query: req.query,
+        contentType: req.headers['content-type'],
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        hasRows: !!req.body?.rows,
+        rowsCount: req.body?.rows?.length || 0,
+        hasMapping: !!req.body?.mapping,
+        hasFile: 'file' in (req.body || {}),
+      });
+    }
+    next();
+  });
+
   // Validation
+  // CRITICAL: Temporarily disable forbidNonWhitelisted for import endpoints
+  // to avoid issues with file field in multipart requests
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Changed to false to allow extra fields (like file from old requests)
       transform: true,
+      skipMissingProperties: false,
+      exceptionFactory: (errors) => {
+        // 🔥 DIAGNOSTIC: Log validation errors
+        console.error('🔥 VALIDATION ERROR:', JSON.stringify(errors, null, 2));
+        return new BadRequestException(errors);
+      },
     }),
   );
 

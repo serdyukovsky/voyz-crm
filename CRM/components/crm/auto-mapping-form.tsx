@@ -91,6 +91,7 @@ export function AutoMappingForm({
   }
 
   // Group fields by entity for visual organization
+  // CRITICAL: Exclude pipelineId from mappable fields - it's passed separately, not as CSV column
   const getGroupedFields = () => {
     const grouped: { deal: ImportField[]; contact: ImportField[]; other: ImportField[] } = {
       deal: [],
@@ -99,6 +100,12 @@ export function AutoMappingForm({
     }
     
     crmFields.forEach(field => {
+      // CRITICAL: pipelineId must NEVER be in mapping - it's a top-level parameter, not a CSV field
+      if (field.key === 'pipelineId') {
+        console.warn('[AUTO MAPPING] Excluding pipelineId from mappable fields - it should be passed separately');
+        return; // Skip pipelineId
+      }
+      
       if (field.entity === 'deal') {
         grouped.deal.push(field)
       } else if (field.entity === 'contact') {
@@ -128,6 +135,12 @@ export function AutoMappingForm({
     if (autoMappings.length > 0 && Object.keys(mapping).length === 0) {
       const autoMapping: Record<string, string | undefined> = {}
       autoMappings.forEach((am) => {
+        // CRITICAL: Never map pipelineId - it's a top-level parameter, not a CSV column
+        if (am.suggestedField === 'pipelineId') {
+          console.warn('[AUTO MAPPING] Skipping pipelineId - it should not be mapped to CSV columns');
+          return;
+        }
+        
         // Only set mapping if suggestedField exists and confidence is sufficient
         // Normalize for runtime safety (API might return empty strings or null)
         if (am.suggestedField && am.confidence >= 0.6) {
@@ -196,12 +209,31 @@ export function AutoMappingForm({
         console.warn('Invalid csvColumn:', csvColumn)
         return
       }
+      
+      // CRITICAL: Never allow pipelineId to be mapped
+      // pipelineId is a top-level parameter, NOT a CSV column mapping
+      const rawValue = fromSelectValue(crmField, SKIP_COLUMN_VALUE)
+      const actualValue = normalizeSelectValue(rawValue)
+      if (actualValue === 'pipelineId') {
+        console.warn('[MAPPING] Attempted to map pipelineId - blocking. pipelineId must be passed separately, not as CSV column mapping.');
+        return;
+      }
+      
       setMapping((prev) => {
         // Convert sentinel value to undefined, then normalize
         // This provides runtime safety against empty strings, null, etc.
-        const rawValue = fromSelectValue(crmField, SKIP_COLUMN_VALUE)
-        const actualValue = normalizeSelectValue(rawValue)
         const newMapping = { ...prev, [csvColumn]: actualValue }
+        // Double-check: remove pipelineId if somehow it got in
+        if (Object.values(newMapping).includes('pipelineId')) {
+          console.warn('[MAPPING] Found pipelineId in mapping - removing it');
+          const cleaned: Record<string, string | undefined> = {};
+          Object.entries(newMapping).forEach(([key, value]) => {
+            if (value !== 'pipelineId') {
+              cleaned[key] = value;
+            }
+          });
+          return cleaned;
+        }
         return newMapping
       })
     } catch (err) {
@@ -427,19 +459,24 @@ export function AutoMappingForm({
               
               {/* CRM Field Cell */}
               <td className="px-4 py-3">
-                <Select
-                  value={selectValue}
-                  onValueChange={(value: string) => {
-                    try {
-                      handleMappingChange(column, value)
-                    } catch (err) {
-                      console.error('Error changing mapping:', err)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-9 bg-card border-border w-full">
-                    <SelectValue placeholder={t('common.select')} />
-                  </SelectTrigger>
+                <div className="space-y-1">
+                  <Select
+                    value={selectValue}
+                    onValueChange={(value: string) => {
+                      try {
+                        handleMappingChange(column, value)
+                      } catch (err) {
+                        console.error('Error changing mapping:', err)
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={cn(
+                      "h-9 bg-card border-border w-full",
+                      // Highlight required field (title) if not mapped
+                      normalizedMapping !== 'title' && !Object.values(mapping).includes('title') && crmFields.find(f => f.key === 'title' && f.required) && "border-destructive/50"
+                    )}>
+                      <SelectValue placeholder={t('common.select')} />
+                    </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     {/* Sentinel value for "skip" */}
                     <SelectItem value={SKIP_COLUMN_VALUE}>{t('importExport.skipColumn')}</SelectItem>
@@ -549,6 +586,14 @@ export function AutoMappingForm({
                     )}
                   </SelectContent>
                 </Select>
+                {/* Inline error for required field (title) if not mapped */}
+                {!Object.values(mapping).includes('title') && crmFields.find(f => f.key === 'title' && f.required) && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Deal: Title mapping is required
+                  </p>
+                )}
+                </div>
               </td>
               
               {/* Actions Cell */}
