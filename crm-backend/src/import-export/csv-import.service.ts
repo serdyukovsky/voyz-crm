@@ -110,6 +110,19 @@ export class CsvImportService {
     // Получение кастомных полей сделок
     const customFields: ImportFieldDto[] = await this.getDealCustomFields();
 
+    // CRITICAL RUNTIME CHECK: systemFields must not be empty
+    // This is a programming error - systemFields are statically defined and should never be empty
+    if (!systemFields || systemFields.length === 0) {
+      const errorMessage = 'FATAL: Deal systemFields is empty. This is a programming error - systemFields must be defined in getDealsImportMeta().';
+      console.error('[IMPORT META FATAL ERROR]', {
+        error: errorMessage,
+        systemFields,
+        systemFieldsType: typeof systemFields,
+        systemFieldsIsArray: Array.isArray(systemFields),
+      });
+      throw new Error(errorMessage);
+    }
+
     // Получение пайплайнов со стадиями
     const pipelines: PipelineDto[] = await this.getPipelinesWithStages();
 
@@ -134,18 +147,42 @@ export class CsvImportService {
     // Получаем метаданные сделок
     const dealMeta = await this.getDealsImportMeta();
     
+    // CRITICAL: Ensure systemFields and customFields are always arrays (never undefined)
+    const systemFields = Array.isArray(dealMeta.systemFields) ? dealMeta.systemFields : [];
+    const customFields = Array.isArray(dealMeta.customFields) ? dealMeta.customFields : [];
+    
+    // CRITICAL RUNTIME CHECK: systemFields must not be empty
+    // Empty systemFields means frontend cannot show fields for mapping, causing silent fail
+    // This is a FATAL error - import cannot work without systemFields
+    if (!systemFields || systemFields.length === 0) {
+      const errorMessage = 'FATAL: systemFields is empty or undefined. Import meta is corrupted. This prevents users from creating field mappings.';
+      console.error('[IMPORT META FATAL ERROR]', {
+        error: errorMessage,
+        dealMetaSystemFields: dealMeta.systemFields,
+        dealMetaSystemFieldsType: typeof dealMeta.systemFields,
+        dealMetaSystemFieldsIsArray: Array.isArray(dealMeta.systemFields),
+        dealMetaSystemFieldsLength: Array.isArray(dealMeta.systemFields) ? dealMeta.systemFields.length : 'N/A',
+        contactMetaSystemFieldsLength: Array.isArray(contactMeta.systemFields) ? contactMeta.systemFields.length : 'N/A',
+      });
+      throw new Error(errorMessage);
+    }
+    
     // Объединяем все поля в один плоский массив
     const allFields: ImportFieldDto[] = [
-      ...contactMeta.systemFields,
-      ...contactMeta.customFields,
-      ...dealMeta.systemFields,
-      ...dealMeta.customFields,
+      ...(Array.isArray(contactMeta.systemFields) ? contactMeta.systemFields : []),
+      ...(Array.isArray(contactMeta.customFields) ? contactMeta.customFields : []),
+      ...systemFields,
+      ...customFields,
     ];
     
     return {
-      fields: allFields, // Flat array with entity property on each field
-      pipelines: dealMeta.pipelines,
-      users: dealMeta.users,
+      // CRITICAL: Always return systemFields and customFields for backward compatibility
+      // Frontend expects these fields to always be present (even if empty arrays)
+      systemFields, // Deal system fields (pipelineId is NOT included per requirements)
+      customFields, // Deal custom fields
+      fields: allFields, // Flat array with entity property on each field (for mixed import)
+      pipelines: dealMeta.pipelines || [],
+      users: dealMeta.users || [],
     };
   }
 
@@ -902,8 +939,8 @@ export class CsvImportService {
               row: rowNumber,
               reason,
               title,
-              pipelineId: pipelineId || '',
-              stageId: dealData.stageId || '',
+              pipelineId: pipelineId || 'N/A',
+              stageId: dealData.stageId || 'N/A',
               hasErrors: 1
             });
             summary.failed++;
@@ -1218,6 +1255,9 @@ export class CsvImportService {
                     hasWorkspaceId: !!resolvedWorkspaceId,
                     userId,
                     pipelineId,
+                    pipeline: pipeline ? 'LOADED' : 'NULL',
+                    hasPipeline: !!pipeline,
+                    pipelineLoaded: pipelineLoaded,
                   });
                   
                   // CRITICAL: If workspaceId is missing, try to get it from pipeline or first deal
@@ -1254,6 +1294,20 @@ export class CsvImportService {
                     }
                   }
                   
+                  // CRITICAL DEBUG: Check condition before actual import
+                  console.log('[IMPORT ACTUAL CRITICAL CHECK]', {
+                    finalWorkspaceId: finalWorkspaceId || 'UNDEFINED',
+                    hasFinalWorkspaceId: !!finalWorkspaceId,
+                    pipeline: pipeline ? 'LOADED' : 'NULL',
+                    hasPipeline: !!pipeline,
+                    pipelineId: pipelineId,
+                    conditionWillPass: !!(finalWorkspaceId || pipeline),
+                    validRowsCount: validRows.length,
+                    willCallBatchCreateDeals: !!(finalWorkspaceId || pipeline) && validRows.length > 0,
+                    processedRowsCount: processedRows.length,
+                    updatedRowsCount: updatedRows.length,
+                  });
+                  
                   if (finalWorkspaceId || pipeline) {
                     console.log('[IMPORT DEALS] Proceeding with import:', {
                       finalWorkspaceId,
@@ -1265,15 +1319,100 @@ export class CsvImportService {
                     console.log('[IMPORT ACTUAL] start', { rows: rows.length });
                     // Proceed with import if we have workspaceId OR pipeline exists
                     try {
-                      // Ensure number is present for batchCreateDeals (it requires number: string)
-                      const dealsWithNumber = validRows.map(row => ({
-                        ...row,
-                        number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
-                        stageId: row.stageId || '', // Ensure stageId is present
-                      }));
+                      // CRITICAL: Validate stageId BEFORE adding to dealsWithNumber
+                      // Filter out rows without valid stageId and add them to errors
+                      const dealsWithNumber: Array<{
+                        number: string;
+                        title: string;
+                        amount?: number | string | null;
+                        budget?: number | string | null;
+                        pipelineId: string;
+                        stageId: string;
+                        assignedToId?: string | null;
+                        contactId?: string | null;
+                        companyId?: string | null;
+                        expectedCloseAt?: Date | string | null;
+                        description?: string | null;
+                        tags?: string[];
+                      }> = [];
+                      
+                      for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
+                        const row = validRows[rowIndex];
+                        const rowNumber = rowIndex + 1;
+                        
+                        // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен
+                        if (!row.stageId || row.stageId.trim() === '') {
+                          const reason = 'Stage is required for deal import';
+                          console.log('[IMPORT ROW SKIPPED]', {
+                            row: rowNumber,
+                            reason,
+                            title: row.title || 'N/A',
+                            pipelineId: row.pipelineId || 'N/A',
+                            stageId: row.stageId || 'MISSING',
+                            hasErrors: 1
+                          });
+                          errors.push({
+                            row: rowNumber,
+                            field: 'stageId',
+                            error: 'Stage is required for deal import',
+                          });
+                          summary.failed++;
+                          continue;
+                        }
+                        
+                        // ЖЕСТКАЯ ВАЛИДАЦИЯ: title обязателен
+                        if (!row.title || row.title.trim() === '') {
+                          const reason = 'Title is required for deal import';
+                          console.log('[IMPORT ROW SKIPPED]', {
+                            row: rowNumber,
+                            reason,
+                            title: 'MISSING',
+                            pipelineId: row.pipelineId || 'N/A',
+                            stageId: row.stageId || 'N/A',
+                            hasErrors: 1
+                          });
+                          errors.push({
+                            row: rowNumber,
+                            field: 'title',
+                            error: 'Title is required for deal import',
+                          });
+                          summary.failed++;
+                          continue;
+                        }
+                        
+                        // ЖЕСТКАЯ ВАЛИДАЦИЯ: pipelineId обязателен
+                        if (!row.pipelineId || row.pipelineId.trim() === '') {
+                          const reason = 'Pipeline is required for deal import';
+                          console.log('[IMPORT ROW SKIPPED]', {
+                            row: rowNumber,
+                            reason,
+                            title: row.title || 'N/A',
+                            pipelineId: 'MISSING',
+                            stageId: row.stageId || 'N/A',
+                            hasErrors: 1
+                          });
+                          errors.push({
+                            row: rowNumber,
+                            field: 'pipelineId',
+                            error: 'Pipeline is required for deal import',
+                          });
+                          summary.failed++;
+                          continue;
+                        }
+                        
+                        // Все валидации пройдены - добавляем в dealsWithNumber
+                        dealsWithNumber.push({
+                          ...row,
+                          number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
+                          stageId: row.stageId, // НИКОГДА не передаем пустую строку
+                          title: row.title, // НИКОГДА не передаем пустую строку
+                          pipelineId: row.pipelineId, // НИКОГДА не передаем пустую строку
+                        });
+                      }
                       
                       console.log('[IMPORT DEALS] Calling batchCreateDeals:', {
                         dealsCount: dealsWithNumber.length,
+                        filteredOut: validRows.length - dealsWithNumber.length,
                         sampleDeal: dealsWithNumber[0] ? {
                           number: dealsWithNumber[0].number,
                           title: dealsWithNumber[0].title,
