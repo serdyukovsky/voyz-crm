@@ -366,13 +366,38 @@ export class ImportBatchService {
 
     dealsData.forEach((row, index) => {
       try {
+        // ЖЕСТКАЯ ВАЛИДАЦИЯ: REQUIRED поля не могут быть пустыми
+        if (!row.title || row.title.trim() === '') {
+          result.errors.push({
+            row: index,
+            error: 'Title is required for deal import',
+          });
+          return; // Пропускаем эту строку
+        }
+        
+        if (!row.pipelineId || row.pipelineId.trim() === '') {
+          result.errors.push({
+            row: index,
+            error: 'Pipeline is required for deal import',
+          });
+          return; // Пропускаем эту строку
+        }
+        
+        if (!row.stageId || row.stageId.trim() === '') {
+          result.errors.push({
+            row: index,
+            error: 'Stage is required for deal import',
+          });
+          return; // Пропускаем эту строку
+        }
+        
         const existing = existingDealsMap.get(row.number);
         const dealData = {
-          title: row.title || 'New Deal',
+          title: row.title, // НИКОГДА не используем fallback
           amount: row.amount !== undefined && row.amount !== null ? Number(row.amount) : 0,
           budget: row.budget !== undefined && row.budget !== null ? Number(row.budget) : null,
-          pipelineId: row.pipelineId,
-          stageId: row.stageId,
+          pipelineId: row.pipelineId, // НИКОГДА не используем fallback
+          stageId: row.stageId, // НИКОГДА не используем fallback
           assignedToId: row.assignedToId || null,
           contactId: row.contactId || null,
           companyId: row.companyId || null,
@@ -464,6 +489,21 @@ export class ImportBatchService {
               skipDuplicates: true,
             });
             
+            // ВАЛИДАЦИЯ РЕЗУЛЬТАТА: Если createMany вернул 0, но строки были переданы - это ошибка
+            if (createResult.count === 0 && batch.length > 0) {
+              console.error('[DEAL CREATE FAILED] createMany returned 0 but rows were provided:', {
+                batchSize: batch.length,
+                batchIndex: batchIndex + 1,
+                sampleDeal: batch[0] ? {
+                  number: batch[0].number,
+                  title: batch[0].title,
+                  pipelineId: batch[0].pipelineId,
+                  stageId: batch[0].stageId,
+                } : null,
+              });
+              throw new Error(`createMany returned 0 but ${batch.length} rows were provided. Possible FK constraint violation or duplicate numbers.`);
+            }
+            
             const actuallyCreated = createResult.count;
             const skipped = batch.length - actuallyCreated;
             
@@ -490,10 +530,20 @@ export class ImportBatchService {
         // CRITICAL: Use actual count from createMany, not batch.length
         result.created += createResult.count;
       } catch (error) {
-        result.errors.push({
-          row: -1,
-          error: error instanceof Error ? error.message : 'Batch create error',
+        // НЕ ГЛОТАЕМ ОШИБКИ: Логируем и пробрасываем
+        console.error('[DEAL CREATE FAILED]', error);
+        console.error('[DEAL CREATE FAILED] Stack:', error instanceof Error ? error.stack : 'N/A');
+        console.error('[DEAL CREATE FAILED] Batch details:', {
+          batchIndex: batchIndex + 1,
+          batchSize: batch.length,
+          sampleDeal: batch[0] ? {
+            number: batch[0].number,
+            title: batch[0].title,
+            pipelineId: batch[0].pipelineId,
+            stageId: batch[0].stageId,
+          } : null,
         });
+        throw error;
       }
     }
 
