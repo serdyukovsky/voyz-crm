@@ -40,7 +40,6 @@ export class ChatController {
   @ApiResponse({ status: 200, description: 'List of threads' })
   async getUserThreads(@CurrentUser() user: any) {
     console.log('USER:', user);
-    console.log('WORKSPACE:', user?.workspaceId);
     return this.chatService.getUserThreads(user.userId || user.id);
   }
 

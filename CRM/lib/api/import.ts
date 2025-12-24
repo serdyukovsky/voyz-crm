@@ -349,38 +349,13 @@ export async function importDeals(
     firstRowSample: rows[0] ? Object.keys(rows[0]).slice(0, 5) : []
   })
 
-  // Try to get workspaceId from user object in localStorage (optional)
-  let workspaceId: string | undefined = undefined
-  try {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const user = JSON.parse(userStr)
-      workspaceId = user?.workspaceId
-      console.log('[IMPORT] workspaceId from localStorage:', {
-        hasUser: !!user,
-        workspaceId,
-        userKeys: user ? Object.keys(user) : [],
-        userId: user?.id || user?.userId,
-      })
-    } else {
-      console.warn('[IMPORT] No user object in localStorage')
-    }
-  } catch (e) {
-    console.error('[IMPORT] Failed to parse user from localStorage:', e)
-    // Ignore - backend will fallback to user.workspaceId from JWT
-  }
-  
-  if (!workspaceId && !dryRun) {
-    console.warn('[IMPORT] ⚠️ WARNING: workspaceId is missing in actual import request. Backend will try to get it from JWT token.')
-  }
-
   // CRITICAL: Send rows as JSON, not FormData
   // CSV parsing is done on frontend, backend receives parsed rows
+  // workspaceId removed - deals are linked to pipeline, not workspace
   const requestBody = {
     rows: rows, // Parsed CSV rows
     mapping: invertedMapping,
     pipelineId: pipelineId,
-    workspaceId: workspaceId,
     defaultAssignedToId: defaultAssignedToId,
   }
 
@@ -389,6 +364,19 @@ export async function importDeals(
   if (!API_BASE_URL.includes('/api')) {
     url = `${API_BASE_URL}/api/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
   }
+  
+  // 🔥 DIAGNOSTIC: Log request details
+  console.log('🔥 IMPORT REQUEST:', {
+    url,
+    method: 'POST',
+    contentType: 'application/json',
+    bodyKeys: Object.keys(requestBody),
+    rowsCount: requestBody.rows.length,
+    hasMapping: !!requestBody.mapping,
+    mappingKeys: Object.keys(requestBody.mapping || {}),
+    pipelineId: requestBody.pipelineId,
+    dryRun,
+  })
   
   const response = await fetch(url, {
     method: 'POST',
@@ -428,11 +416,21 @@ export async function importDeals(
     
     // Try to parse as JSON for better error message
     let errorMessage = errorText
+    let errorJson: any = null
     try {
-      const errorJson = JSON.parse(errorText)
-      errorMessage = errorJson.message || errorJson.error || errorText
-      console.error('🔥 PARSED ERROR:', errorJson)
+      errorJson = JSON.parse(errorText)
+      errorMessage = errorJson.message || errorJson.error || errorJson[0]?.message || errorText
+      console.error('🔥 PARSED ERROR:', JSON.stringify(errorJson, null, 2))
+      console.error('🔥 ERROR MESSAGE:', errorMessage)
+      console.error('🔥 ERROR TYPE:', typeof errorJson)
+      if (Array.isArray(errorJson)) {
+        console.error('🔥 ERROR IS ARRAY:', errorJson.length, 'items')
+        errorJson.forEach((err, idx) => {
+          console.error(`🔥 ERROR[${idx}]:`, err)
+        })
+      }
     } catch (e) {
+      console.error('🔥 ERROR PARSE FAILED:', e)
       // Not JSON, use as-is
     }
     

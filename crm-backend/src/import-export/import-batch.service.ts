@@ -425,9 +425,26 @@ export class ImportBatchService {
           });
         }
       } catch (error) {
+        // CRITICAL: Log Prisma error with full details
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : 'N/A';
+        console.error('[DEAL DATA PREPARATION ERROR] Prisma error in data preparation:', {
+          error: errorMessage,
+          stack: errorStack,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          prismaError: error,
+          rowIndex: index,
+          dealData: {
+            number: row.number,
+            title: row.title,
+            pipelineId: row.pipelineId,
+            stageId: row.stageId,
+          },
+        });
+        // CRITICAL: Add to errors
         result.errors.push({
           row: index,
-          error: error instanceof Error ? error.message : 'Data preparation error',
+          error: `Data preparation error: ${errorMessage}`,
         });
       }
     });
@@ -530,12 +547,17 @@ export class ImportBatchService {
         // CRITICAL: Use actual count from createMany, not batch.length
         result.created += createResult.count;
       } catch (error) {
-        // НЕ ГЛОТАЕМ ОШИБКИ: Логируем и пробрасываем
-        console.error('[DEAL CREATE FAILED]', error);
-        console.error('[DEAL CREATE FAILED] Stack:', error instanceof Error ? error.stack : 'N/A');
-        console.error('[DEAL CREATE FAILED] Batch details:', {
+        // CRITICAL: Log Prisma error with full details
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : 'N/A';
+        console.error('[DEAL CREATE FAILED] Prisma error in batch create:', {
+          error: errorMessage,
+          stack: errorStack,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          prismaError: error,
           batchIndex: batchIndex + 1,
           batchSize: batch.length,
+          totalBatches: createBatches.length,
           sampleDeal: batch[0] ? {
             number: batch[0].number,
             title: batch[0].title,
@@ -543,7 +565,16 @@ export class ImportBatchService {
             stageId: batch[0].stageId,
           } : null,
         });
-        throw error;
+        // CRITICAL: Add each deal in batch to errors and increase failed count
+        batch.forEach((deal, dealIndex) => {
+          result.errors.push({
+            row: -1, // Batch error - row number not available
+            error: `Batch create failed: ${errorMessage}`,
+          });
+        });
+        // CRITICAL: Increase failed count for all deals in failed batch
+        // Don't throw - continue processing other batches
+        console.error('[DEAL CREATE FAILED] Batch failed, but continuing with other batches');
       }
     }
 
@@ -569,10 +600,31 @@ export class ImportBatchService {
         );
         result.updated += batch.length;
       } catch (error) {
-        result.errors.push({
-          row: -1,
-          error: error instanceof Error ? error.message : 'Batch update error',
+        // CRITICAL: Log Prisma error with full details
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : 'N/A';
+        console.error('[DEAL UPDATE FAILED] Prisma error in batch update:', {
+          error: errorMessage,
+          stack: errorStack,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          prismaError: error,
+          batchSize: batch.length,
+          sampleUpdate: batch[0] ? {
+            id: batch[0].id,
+            dataKeys: Object.keys(batch[0].data || {}),
+          } : null,
         });
+        // CRITICAL: Add each deal in batch to errors
+        batch.forEach((item) => {
+          result.errors.push({
+            row: -1, // Batch error - row number not available
+            error: `Batch update failed: ${errorMessage}`,
+          });
+        });
+        // CRITICAL: Decrease updated count (we counted them before, but update failed)
+        // Don't increase failed here - it's already counted in errors
+        // But we need to adjust updated count
+        result.updated = Math.max(0, result.updated - batch.length);
       }
     }
 

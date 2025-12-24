@@ -10,6 +10,7 @@ import {
   BadRequestException,
   Req,
 } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CsvImportService } from './csv-import.service';
@@ -19,6 +20,7 @@ import { ImportResultDto } from './dto/import-result.dto';
 import { ImportDealsDto } from './dto/import-deals.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { PrismaService } from '@/common/services/prisma.service';
 
 @ApiTags('Import')
 @Controller('import')
@@ -28,6 +30,7 @@ export class ImportExportController {
   constructor(
     private readonly csvImportService: CsvImportService,
     private readonly autoMappingService: AutoMappingService,
+    private readonly prisma: PrismaService,
   ) {
     console.log('🔥 ImportExportController initialized');
   }
@@ -41,7 +44,25 @@ export class ImportExportController {
   @ApiOperation({ summary: 'Получение метаданных полей для импорта' })
   @ApiQuery({ name: 'entityType', enum: ['contact', 'deal'], required: true })
   async getImportMeta(@Query('entityType') entityType: 'contact' | 'deal') {
-    return this.csvImportService.getImportMeta(entityType);
+    console.log('🔥🔥🔥 ImportExportController.getImportMeta - START');
+    console.log('🔥 getImportMeta - entityType:', entityType);
+    try {
+      const result: any = await this.csvImportService.getImportMeta(entityType);
+      console.log('🔥 getImportMeta - SUCCESS:', {
+        systemFieldsCount: result?.systemFields?.length || 0,
+        customFieldsCount: result?.customFields?.length || 0,
+        pipelinesCount: result?.pipelines?.length || 0,
+        usersCount: result?.users?.length || 0,
+      });
+      return result;
+    } catch (error) {
+      console.error('🔥🔥🔥 ImportExportController.getImportMeta - ERROR:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        entityType,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -90,16 +111,12 @@ export class ImportExportController {
           type: 'string',
           description: 'ID пайплайна для resolution стадий',
         },
-        workspaceId: {
-          type: 'string',
-          description: 'ID workspace (optional, falls back to user.workspaceId)',
-        },
         defaultAssignedToId: {
           type: 'string',
           description: 'ID ответственного по умолчанию (применяется ко всем строкам)',
         },
       },
-      required: ['rows', 'mapping', 'pipelineId'],
+      required: ['rows', 'mapping'], // pipelineId is optional - used only for soft validation
     },
   })
   async importDeals(
@@ -112,20 +129,35 @@ export class ImportExportController {
     const isDryRun = dryRun === 'true' || dryRun === '1';
     
     // 🔥 CRITICAL: Log immediately to confirm this endpoint is called
-    console.error('🔥🔥🔥 CONTROLLER ENTRY - importDeals endpoint called');
-    console.error('🔥 Request path:', req.path);
-    console.error('🔥 Request method:', req.method);
-    console.error('🔥 Request URL:', req.url);
-    console.error('🔥 Content-Type:', req.headers['content-type']);
-    console.error('🔥 DTO keys:', dto ? Object.keys(dto) : 'null');
-    console.error('🔥 Has rows:', !!dto?.rows);
-    console.error('🔥 Rows count:', dto?.rows?.length || 0);
-    console.error('🔥 dryRun query param:', dryRun);
-    console.error('🔥 isDryRun:', isDryRun);
-    // 🔥 DIAGNOSTIC: Log controller entry
-    console.log('🔥 CONTROLLER ENTRY - importDeals endpoint called');
-    console.log('🔥 Raw DTO type:', typeof dto);
-    console.log('🔥 Raw DTO keys:', dto ? Object.keys(dto) : 'null');
+    console.log('🔥🔥🔥 CONTROLLER ENTRY - importDeals endpoint called');
+    console.log('🔥 Request path:', req.path);
+    console.log('🔥 Request method:', req.method);
+    console.log('🔥 Request URL:', req.url);
+    console.log('🔥 Content-Type:', req.headers['content-type']);
+    console.log('🔥 DTO type:', typeof dto);
+    console.log('🔥 DTO is null?', dto === null);
+    console.log('🔥 DTO is undefined?', dto === undefined);
+    console.log('🔥 DTO keys:', dto ? Object.keys(dto) : 'null');
+    if (dto && typeof dto === 'object') {
+      console.log('🔥 DTO rows count:', dto.rows ? (Array.isArray(dto.rows) ? dto.rows.length : 'NOT ARRAY') : 'NO ROWS');
+      console.log('🔥 DTO has mapping?', !!dto.mapping);
+      console.log('🔥 DTO pipelineId:', dto.pipelineId);
+    }
+    console.log('🔥 DTO value (first 1000 chars):', JSON.stringify(dto, null, 2).substring(0, 1000));
+    
+    // CRITICAL: Check if dto is empty or null
+    if (!dto || typeof dto !== 'object' || Object.keys(dto).length === 0) {
+      console.error('🔥 ERROR: DTO is empty or null!');
+      console.error('🔥 DTO value:', dto);
+      if (isDryRun) {
+        return {
+          summary: { total: 0, created: 0, updated: 0, failed: 0, skipped: 0 },
+          errors: [],
+          globalErrors: ['Request body is empty. Please send rows and mapping as JSON.'],
+        };
+      }
+      throw new BadRequestException('Request body is empty. Please send rows and mapping as JSON.');
+    }
     
     console.log('🔥 DTO received:', {
       hasRows: !!dto?.rows,
@@ -133,7 +165,6 @@ export class ImportExportController {
       hasMapping: !!dto?.mapping,
       mappingKeys: dto?.mapping ? Object.keys(dto.mapping) : [],
       pipelineId: dto?.pipelineId,
-      workspaceId: dto?.workspaceId,
       hasFile: 'file' in (dto || {}),
       allKeys: dto ? Object.keys(dto) : [],
       dryRun,
@@ -154,30 +185,13 @@ export class ImportExportController {
       throw new BadRequestException('Invalid request: file field should not be present. Use rows instead.');
     }
     
-    // Resolve workspaceId: priority: request.body.workspaceId > user.workspaceId
-    const workspaceId = dto.workspaceId || user?.workspaceId;
     console.log('[IMPORT CONTROLLER]', { 
-      workspaceId, 
-      workspaceIdFromBody: dto.workspaceId, 
-      userWorkspaceId: user?.workspaceId,
       userId: user?.id || user?.userId,
-      userObject: user ? {
-        id: user.id || user.userId,
-        email: user.email,
-        hasWorkspaceId: !!user.workspaceId,
-        workspaceId: user.workspaceId,
-        allKeys: Object.keys(user),
-      } : null,
       dryRun,
       isDryRun,
-      rowsCount: dto?.rows?.length || 0
+      rowsCount: dto?.rows?.length || 0,
+      pipelineId: dto?.pipelineId,
     });
-    
-    // CRITICAL: Warn if workspaceId is missing in actual import
-    if (!isDryRun && !workspaceId) {
-      console.error('[IMPORT CONTROLLER] ⚠️ WARNING: workspaceId is missing in actual import!');
-      console.error('[IMPORT CONTROLLER] This will prevent deals from being created.');
-    }
     
     // CRITICAL: Validate rows - CSV parsing is done on frontend
     // In dry-run, return globalErrors instead of throwing
@@ -235,23 +249,9 @@ export class ImportExportController {
       throw new BadRequestException('Mapping must include title field');
     }
 
-    // Валидация pipelineId
-    if (!dto.pipelineId || typeof dto.pipelineId !== 'string') {
-      if (isDryRun) {
-        return {
-          summary: {
-            total: 0,
-            created: 0,
-            updated: 0,
-            failed: 0,
-            skipped: 0,
-          },
-          errors: [],
-          globalErrors: ['pipelineId is required'],
-        };
-      }
-      throw new BadRequestException('pipelineId is required');
-    }
+    // PipelineId is optional - used only for soft validation
+    // If pipelineId is missing, import continues but stage validation is skipped
+    // PipelineId in CSV rows will be used if available
     
     // CRITICAL: Wrap entire import in try/catch to prevent 500 errors in dry-run
     try {
@@ -259,7 +259,6 @@ export class ImportExportController {
         rowsCount: dto.rows?.length || 0,
         hasMapping: !!dto.mapping,
         pipelineId: dto.pipelineId,
-        workspaceId,
         hasUser: !!user,
         userId: user?.id || user?.userId,
         isDryRun,
@@ -270,7 +269,6 @@ export class ImportExportController {
         dto.mapping,
         user, // Передаем весь объект user для валидации
         dto.pipelineId,
-        workspaceId, // Explicit workspaceId (from body or user)
         dto.defaultAssignedToId, // Дефолтный ответственный для всех строк
         undefined, // contactEmailPhoneMap - опционально
         isDryRun,

@@ -81,11 +81,26 @@ export class PipelinesService {
   }
 
   async findAll() {
-    return this.prisma.pipeline.findMany({
-      where: { isActive: true },
-      include: { stages: { orderBy: { order: 'asc' } } },
-      orderBy: { order: 'asc' },
-    });
+    console.log('[PIPELINES SERVICE] findAll called - START');
+    console.log('[PIPELINES SERVICE] prisma available:', !!this.prisma);
+    try {
+      console.log('[PIPELINES SERVICE] Fetching pipelines from DB...');
+      const pipelines = await this.prisma.pipeline.findMany({
+        where: { isActive: true },
+        include: { stages: { orderBy: { order: 'asc' } } },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      });
+      console.log('[PIPELINES SERVICE] Found pipelines:', pipelines.length);
+      return pipelines;
+    } catch (error) {
+      console.error('[PIPELINES SERVICE ERROR] Error in findAll:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        prismaError: error,
+        errorName: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw error;
+    }
   }
 
   async findOne(id: string) {

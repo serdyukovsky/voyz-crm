@@ -5,11 +5,18 @@ import { CsvImportService } from './csv-import.service';
 import { AutoMappingService } from './auto-mapping.service';
 import { ImportExportController } from './import-export.controller';
 import { CommonModule } from '@/common/common.module';
+import { PrismaService } from '@/common/services/prisma.service';
 
 @Module({
   imports: [CommonModule],
   controllers: [ImportExportController],
-  providers: [ImportExportService, ImportBatchService, CsvImportService, AutoMappingService],
+  providers: [
+    ImportExportService,
+    ImportBatchService,
+    CsvImportService,
+    AutoMappingService,
+    PrismaService, // CRITICAL: Explicitly add PrismaService to ensure injection
+  ],
   exports: [ImportExportService, ImportBatchService, CsvImportService, AutoMappingService],
 })
 export class ImportExportModule {}

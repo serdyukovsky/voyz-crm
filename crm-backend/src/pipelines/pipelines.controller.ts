@@ -47,9 +47,22 @@ export class PipelinesController {
     description: 'List of pipelines',
     type: [PipelineResponseDto],
   })
-  findAll(@CurrentUser() user?: any) {
-    console.log('PipelinesController.findAll - user:', user ? { id: user.id, role: user.role, permissions: user.permissions } : 'no user');
-    return this.pipelinesService.findAll();
+  async findAll(@CurrentUser() user?: any) {
+    console.log('🔥🔥🔥 PipelinesController.findAll - START');
+    console.log('🔥 PipelinesController.findAll - user:', user ? { id: user.id, role: user.role, permissions: user.permissions } : 'no user');
+    try {
+      console.log('🔥 PipelinesController.findAll - calling pipelinesService.findAll()...');
+      const result = await this.pipelinesService.findAll();
+      console.log('🔥 PipelinesController.findAll - success, pipelines count:', Array.isArray(result) ? result.length : 'not array');
+      return result;
+    } catch (error) {
+      console.error('🔥🔥🔥 PipelinesController.findAll - ERROR:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorName: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw error;
+    }
   }
 
   @Post()
