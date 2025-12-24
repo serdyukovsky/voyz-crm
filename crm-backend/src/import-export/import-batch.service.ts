@@ -339,6 +339,8 @@ export class ImportBatchService {
       expectedCloseAt?: Date | string | null;
       description?: string | null;
       tags?: string[];
+      rejectionReasons?: string[];
+      reason?: string | null;
     }>,
     userId: string,
   ): Promise<{
@@ -392,10 +394,16 @@ export class ImportBatchService {
         }
         
         const existing = existingDealsMap.get(row.number);
-        const dealData = {
+        
+        // CRITICAL: amount cannot be null in Prisma schema (has @default(0))
+        // For create: use 0 if amount is null/undefined
+        // For update: exclude amount from update data if it's null/undefined (don't overwrite existing value)
+        const amountValue = row.amount !== undefined && row.amount !== null ? Number(row.amount) : null;
+        const budgetValue = row.budget !== undefined && row.budget !== null ? Number(row.budget) : null;
+        
+        const baseDealData = {
           title: row.title, // НИКОГДА не используем fallback
-          amount: row.amount !== undefined && row.amount !== null ? Number(row.amount) : 0,
-          budget: row.budget !== undefined && row.budget !== null ? Number(row.budget) : null,
+          budget: budgetValue,
           pipelineId: row.pipelineId, // НИКОГДА не используем fallback
           stageId: row.stageId, // НИКОГДА не используем fallback
           assignedToId: row.assignedToId || null,
@@ -408,19 +416,57 @@ export class ImportBatchService {
             : null,
           description: row.description || null,
           tags: row.tags || [],
+          rejectionReasons: row.rejectionReasons || [],
+          reason: row.reason || null,
         };
+        
+        console.log(`[BATCH CREATE DEAL DATA] Row ${index + 1}:`, {
+          number: row.number,
+          title: baseDealData.title,
+          amount: amountValue,
+          budget: baseDealData.budget,
+          description: baseDealData.description ? baseDealData.description.substring(0, 50) + '...' : null,
+          tags: baseDealData.tags,
+          rejectionReasons: baseDealData.rejectionReasons,
+          reason: baseDealData.reason,
+          assignedToId: baseDealData.assignedToId,
+          contactId: baseDealData.contactId,
+          companyId: baseDealData.companyId,
+          expectedCloseAt: baseDealData.expectedCloseAt,
+          isUpdate: !!existing,
+        });
 
         if (existing) {
           // Обновление существующей сделки
+          // CRITICAL: Don't include amount if it's null - Prisma doesn't allow null for amount
+          // Only update amount if it has a valid value
+          const updateData: any = { ...baseDealData };
+          
+          // CRITICAL: Only add amount if it has a valid numeric value
+          if (amountValue !== null && amountValue !== undefined && !isNaN(Number(amountValue))) {
+            updateData.amount = Number(amountValue);
+          }
+          // Explicitly ensure amount is NOT in updateData if it's null/undefined
+          // This prevents Prisma from trying to set amount to null
+          
+          // Log update data to verify amount is not included
+          console.log(`[BATCH UPDATE DATA] Row ${index + 1}, Deal ${existing.id}:`, {
+            hasAmount: 'amount' in updateData,
+            amountValue: 'amount' in updateData ? updateData.amount : 'NOT INCLUDED',
+            updateDataKeys: Object.keys(updateData),
+          });
+          
           toUpdate.push({
             id: existing.id,
-            data: dealData,
+            data: updateData,
           });
         } else {
           // Создание новой сделки
+          // CRITICAL: amount must be 0 (not null) for new deals
           toCreate.push({
             number: row.number,
-            ...dealData,
+            ...baseDealData,
+            amount: amountValue !== null && amountValue !== undefined ? amountValue : 0,
             createdById: userId,
           });
         }
@@ -582,10 +628,27 @@ export class ImportBatchService {
     const updateBatches = this.chunkArray(toUpdate, this.BATCH_SIZE);
     for (const batch of updateBatches) {
       try {
+        // CRITICAL: Filter out amount from update data if it's null/undefined
+        // Prisma doesn't allow null for amount field
+        const sanitizedBatch = batch.map((item) => {
+          const sanitizedData: any = { ...item.data };
+          
+          // Remove amount if it's null, undefined, or NaN
+          if ('amount' in sanitizedData && (sanitizedData.amount === null || sanitizedData.amount === undefined || isNaN(Number(sanitizedData.amount)))) {
+            delete sanitizedData.amount;
+            console.log(`[BATCH UPDATE SANITIZE] Removed null/undefined amount from deal ${item.id}`);
+          }
+          
+          return {
+            id: item.id,
+            data: sanitizedData,
+          };
+        });
+        
         await this.prisma.$transaction(
           async (tx) => {
             await Promise.all(
-              batch.map((item) =>
+              sanitizedBatch.map((item) =>
                 tx.deal.update({
                   where: { id: item.id },
                   data: item.data,

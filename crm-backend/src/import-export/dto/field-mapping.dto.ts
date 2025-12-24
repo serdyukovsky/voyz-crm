@@ -50,6 +50,7 @@ export interface DealFieldMapping {
   companyId?: string;
   expectedCloseAt?: string;
   description?: string;
+  reason?: string; // Причина/основание
   rejectionReasons?: string; // Причина отказа (значения будут разделены запятой)
   tags?: string;
   
