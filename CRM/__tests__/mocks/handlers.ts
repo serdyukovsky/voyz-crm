@@ -38,28 +38,51 @@ export const handlers = [
 
   // Import deals
   http.post(`${API_BASE}/import/deals`, async ({ request }) => {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const mapping = JSON.parse(formData.get('mapping') as string);
+    // CRITICAL: Backend now expects JSON with rows, not FormData with file
+    // CSV parsing is done on frontend, backend receives parsed rows
+    const contentType = request.headers.get('content-type');
+    
+    let body: any;
+    if (contentType?.includes('application/json')) {
+      body = await request.json();
+    } else {
+      // Fallback for old FormData format (for backward compatibility in tests)
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      const mapping = JSON.parse(formData.get('mapping') as string || '{}');
 
-    if (!file) {
+      if (!file) {
+        return HttpResponse.json(
+          { message: 'CSV file is required' },
+          { status: 400 }
+        );
+      }
+      // Convert to new format for testing
+      body = {
+        rows: [], // Mock rows - in real scenario, CSV would be parsed on frontend
+        mapping: mapping,
+        pipelineId: formData.get('pipelineId') as string || '',
+      };
+    }
+
+    if (!body.rows || !Array.isArray(body.rows) || body.rows.length === 0) {
       return HttpResponse.json(
-        { message: 'CSV file is required' },
+        { message: 'Rows are required and must be a non-empty array' },
         { status: 400 }
       );
     }
 
-    if (!mapping.number || !mapping.title || !mapping.pipelineId || !mapping.stageId) {
+    if (!body.mapping || !body.mapping.title) {
       return HttpResponse.json(
-        { message: 'Mapping must include number, title, pipelineId, and stageId fields' },
+        { message: 'Mapping must include title field' },
         { status: 400 }
       );
     }
 
     return HttpResponse.json({
       summary: {
-        total: 2,
-        created: 2,
+        total: body.rows.length,
+        created: body.rows.length,
         updated: 0,
         failed: 0,
         skipped: 0,

@@ -186,7 +186,7 @@ export class ChatService {
               createdAt: 'desc',
             },
             include: {
-              sender: {
+              user: {
                 select: {
                   id: true,
                   firstName: true,

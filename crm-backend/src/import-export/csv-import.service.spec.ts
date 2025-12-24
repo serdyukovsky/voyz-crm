@@ -21,10 +21,31 @@ describe('CsvImportService (Integration)', () => {
   // Увеличиваем timeout для больших batch тестов
   jest.setTimeout(30000); // 30 секунд
 
-  // Создаем Readable stream из CSV строки
-  const createCsvStream = (csvContent: string): Readable => {
-    return Readable.from([csvContent]);
+  // Парсим CSV строку в массив rows (как это делает фронтенд)
+  const parseCsvToRows = (csvContent: string): Record<string, string>[] => {
+    const lines = csvContent.trim().split('\n');
+    if (lines.length < 2) return [];
+    
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      rows.push(row);
+    }
+    
+    return rows;
   };
+
+  // Создаем тестового пользователя объект
+  const createTestUser = (userId: string) => ({
+    id: userId,
+    userId: userId,
+  });
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -385,12 +406,16 @@ DEAL-001,Тестовая сделка,100000,${testPipelineId},${testStageId},i
         email: 'Email контакта',
       };
 
-      const stream = createCsvStream(csvContent);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
       const result = await service.importDeals(
-        stream,
+        rows,
         mapping,
-        testUserId,
+        user,
+        testPipelineId,
+        undefined,
         contactEmailPhoneMap,
+        false,
       );
 
       expect(result.summary.total).toBe(1);
@@ -424,8 +449,9 @@ DEAL-002,Вторая сделка,50000,${testPipelineId},${testStageId},`;
         email: 'Email контакта',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       // Должны быть созданы обе сделки (contactId будет null)
       expect(result.summary.total).toBe(2);
@@ -461,8 +487,9 @@ DEAL-002,Вторая сделка,50000,${testPipelineId},${testStageId},`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result.summary.total).toBe(1500);
       expect(result.summary.created).toBe(1500);
@@ -496,8 +523,9 @@ DEAL-002,Вторая сделка,50000,${testPipelineId},${testStageId},`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result.summary.total).toBe(2000);
       expect(result.summary.created).toBe(2000);
@@ -523,8 +551,9 @@ DEAL-005,Валидная сделка 2,30000,${testPipelineId},${testStageId}`
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result.summary.total).toBe(5);
       expect(result.summary.created).toBe(2); // Только валидные
@@ -560,8 +589,9 @@ DEAL-001,Сделка с датой,100000,${testPipelineId},${testStageId},2024
         expectedCloseAt: 'Дата закрытия',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result.summary.created).toBe(1);
 
@@ -588,8 +618,9 @@ DEAL-001,Сделка с тегами,100000,${testPipelineId},${testStageId},vi
         tags: 'Теги',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result.summary.created).toBe(1);
 
@@ -947,8 +978,9 @@ DEAL-002;Сделка 2;50000;${testPipelineId};${testStageId}`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId, undefined, ';');
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result).toBeDefined();
       expect(result.summary.total).toBe(2);
@@ -979,8 +1011,9 @@ DEAL-002,Сделка 2,50000,${testPipelineId},${testStageId}`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result).toBeDefined();
       expect(result.summary.total).toBe(2);
@@ -1000,8 +1033,9 @@ DEAL-001,Сделка 1,100000,${testPipelineId},${testStageId}`;
         // number не указан!
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result).toBeDefined();
       expect(result.summary.failed).toBeGreaterThanOrEqual(1);
@@ -1027,8 +1061,9 @@ DEAL-004,Без pipeline,25000,,${testStageId}`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
-      const result = await service.importDeals(stream, mapping, testUserId);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
+      const result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
 
       expect(result).toBeDefined();
       expect(result.summary.total).toBe(4);
@@ -1060,11 +1095,12 @@ DEAL-002,Без pipeline,25000,,${testStageId}`;
         stageId: 'Stage ID',
       };
 
-      const stream = createCsvStream(csvContent);
+      const rows = parseCsvToRows(csvContent);
+      const user = createTestUser(testUserId);
       let result;
 
       try {
-        result = await service.importDeals(stream, mapping, testUserId);
+        result = await service.importDeals(rows, mapping, user, testPipelineId, undefined, undefined, false);
       } catch (error) {
         fail('Сервис не должен падать с ошибкой: ' + error);
       }
@@ -1291,12 +1327,13 @@ DEAL-002,Новая сделка,200000,${testPipelineId},${testStageId}
         };
 
         // Dry-run
-        const stream1 = createCsvStream(csvContent);
-        const dryRunResult = await service.importDeals(stream1, mapping, testUserId, undefined, ',', true);
+        const rows1 = parseCsvToRows(csvContent);
+        const user = createTestUser(testUserId);
+        const dryRunResult = await service.importDeals(rows1, mapping, user, testPipelineId, undefined, undefined, true);
 
         // Реальный импорт
-        const stream2 = createCsvStream(csvContent);
-        const realResult = await service.importDeals(stream2, mapping, testUserId, undefined, ',', false);
+        const rows2 = parseCsvToRows(csvContent);
+        const realResult = await service.importDeals(rows2, mapping, user, testPipelineId, undefined, undefined, false);
 
         // Проверка что summary совпадает
         expect(dryRunResult.summary.total).toBe(realResult.summary.total);

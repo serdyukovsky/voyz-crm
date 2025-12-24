@@ -114,3 +114,5 @@ console.log('[IMPORT ACTUAL CRITICAL CHECK]', {
 - `pipeline: 'NULL'` → pipeline не загружен
 - `finalWorkspaceId: 'UNDEFINED'` → workspaceId отсутствует
 
+
+

@@ -17,16 +17,25 @@ interface Pipeline {
 }
 
 interface PipelineSelectorProps {
+  pipelines?: Pipeline[] // Optional: if provided, use these instead of fetching
   selectedPipelineId?: string
   onPipelineChange: (pipelineId: string) => void
 }
 
-export function PipelineSelector({ selectedPipelineId, onPipelineChange }: PipelineSelectorProps) {
-  const [pipelines, setPipelines] = useState<Pipeline[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+export function PipelineSelector({ pipelines: pipelinesProp, selectedPipelineId, onPipelineChange }: PipelineSelectorProps) {
+  const [pipelines, setPipelines] = useState<Pipeline[]>(pipelinesProp || [])
+  const [isLoading, setIsLoading] = useState(!pipelinesProp) // Only load if pipelines not provided
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // If pipelines are provided via props, use them and skip fetching
+    if (pipelinesProp) {
+      setPipelines(pipelinesProp)
+      setIsLoading(false)
+      return
+    }
+
+    // Otherwise, fetch pipelines
     const fetchPipelines = async () => {
       try {
         setIsLoading(true)
@@ -44,7 +53,14 @@ export function PipelineSelector({ selectedPipelineId, onPipelineChange }: Pipel
     }
 
     fetchPipelines()
-  }, [])
+  }, [pipelinesProp])
+  
+  // Update pipelines when prop changes
+  useEffect(() => {
+    if (pipelinesProp) {
+      setPipelines(pipelinesProp)
+    }
+  }, [pipelinesProp])
 
   if (isLoading) {
     return (

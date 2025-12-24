@@ -33,16 +33,51 @@ export class CsvImportService {
   constructor(
     private readonly importBatchService: ImportBatchService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    // CRITICAL: Verify PrismaService injection in constructor
+    if (!this.prisma) {
+      console.error('[CSV IMPORT SERVICE] CRITICAL ERROR: PrismaService is NOT injected in constructor!');
+      console.error('[CSV IMPORT SERVICE] Constructor params:', {
+        hasImportBatchService: !!this.importBatchService,
+        hasPrisma: !!this.prisma,
+        prismaType: typeof this.prisma,
+        prismaValue: this.prisma,
+      });
+      throw new Error('PrismaService is NOT injected in CsvImportService constructor. Check ImportExportModule providers.');
+    }
+    console.log('[CSV IMPORT SERVICE] Constructor: PrismaService injected successfully:', {
+      hasPrisma: !!this.prisma,
+      prismaType: typeof this.prisma,
+      prismaMethods: this.prisma ? Object.keys(this.prisma).slice(0, 10) : [],
+    });
+  }
+
 
   /**
    * Получение метаданных полей для импорта
    * Возвращает полную информацию о доступных полях, пайплайнах и пользователях
    */
   async getImportMeta(entityType: 'contact' | 'deal'): Promise<ImportMetaResponseDto> {
-    // ALWAYS return mixed import meta (full list of fields for both contact and deal)
-    // This supports MIXED CSV IMPORT where one CSV can contain both entities
-    return this.getMixedImportMeta();
+    try {
+      console.log('[IMPORT META] Getting import meta for entityType:', entityType);
+      // ALWAYS return mixed import meta (full list of fields for both contact and deal)
+      // This supports MIXED CSV IMPORT where one CSV can contain both entities
+      const result = await this.getMixedImportMeta();
+      console.log('[IMPORT META] Successfully retrieved import meta:', {
+        systemFieldsCount: result.systemFields?.length || 0,
+        customFieldsCount: result.customFields?.length || 0,
+        pipelinesCount: result.pipelines?.length || 0,
+        usersCount: result.users?.length || 0,
+      });
+      return result;
+    } catch (error) {
+      console.error('[IMPORT META ERROR] Failed to get import meta:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        entityType,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -87,6 +122,7 @@ export class CsvImportService {
    * Получение метаданных для импорта сделок
    */
   private async getDealsImportMeta(): Promise<DealsImportMetaDto> {
+    console.log('🔥🔥🔥 getDealsImportMeta - START');
     // Системные поля сделок
     const systemFields: ImportFieldDto[] = [
       { key: 'number', label: 'Deal Number', required: false, type: 'string', description: 'Номер сделки', group: 'basic', entity: 'deal' },
@@ -124,28 +160,60 @@ export class CsvImportService {
     }
 
     // Получение пайплайнов со стадиями
+    console.log('🔥 getDealsImportMeta - fetching pipelines...');
     const pipelines: PipelineDto[] = await this.getPipelinesWithStages();
+    console.log('🔥 getDealsImportMeta - pipelines fetched:', pipelines.length);
 
     // Получение активных пользователей
+    console.log('🔥 getDealsImportMeta - fetching users...');
     const users: UserDto[] = await this.getActiveUsers();
+    console.log('🔥 getDealsImportMeta - users fetched:', users.length);
 
-    return {
+    const result = {
       systemFields,
       customFields,
       pipelines,
       users,
     };
+    
+    console.log('🔥🔥🔥 getDealsImportMeta - SUCCESS, returning:', {
+      systemFieldsCount: result.systemFields.length,
+      customFieldsCount: result.customFields.length,
+      pipelinesCount: result.pipelines.length,
+      usersCount: result.users.length,
+    });
+    
+    return result;
   }
 
   /**
    * Получение метаданных для MIXED импорта (контакты + сделки в одном плоском массиве)
    */
   private async getMixedImportMeta(): Promise<any> {
-    // Получаем метаданные контактов
-    const contactMeta = await this.getContactsImportMeta();
-    
-    // Получаем метаданные сделок
-    const dealMeta = await this.getDealsImportMeta();
+    console.log('🔥🔥🔥 getMixedImportMeta - START');
+    try {
+      console.log('[IMPORT META] Getting contact meta...');
+      // Получаем метаданные контактов
+      const contactMeta = await this.getContactsImportMeta();
+      console.log('[IMPORT META] Contact meta retrieved:', {
+        systemFieldsCount: contactMeta.systemFields?.length || 0,
+        customFieldsCount: contactMeta.customFields?.length || 0,
+        usersCount: contactMeta.users?.length || 0,
+      });
+      
+      console.log('[IMPORT META] Getting deal meta...');
+      // Получаем метаданные сделок
+      const dealMeta = await this.getDealsImportMeta();
+      console.log('🔥🔥🔥 getDealsImportMeta returned:', {
+        systemFieldsCount: dealMeta.systemFields?.length || 0,
+        customFieldsCount: dealMeta.customFields?.length || 0,
+        pipelinesCount: dealMeta.pipelines?.length || 0,
+        usersCount: dealMeta.users?.length || 0,
+        systemFieldsType: typeof dealMeta.systemFields,
+        systemFieldsIsArray: Array.isArray(dealMeta.systemFields),
+        customFieldsType: typeof dealMeta.customFields,
+        customFieldsIsArray: Array.isArray(dealMeta.customFields),
+      });
     
     // CRITICAL: Ensure systemFields and customFields are always arrays (never undefined)
     const systemFields = Array.isArray(dealMeta.systemFields) ? dealMeta.systemFields : [];
@@ -175,7 +243,7 @@ export class CsvImportService {
       ...customFields,
     ];
     
-    return {
+    const result = {
       // CRITICAL: Always return systemFields and customFields for backward compatibility
       // Frontend expects these fields to always be present (even if empty arrays)
       systemFields, // Deal system fields (pipelineId is NOT included per requirements)
@@ -184,6 +252,22 @@ export class CsvImportService {
       pipelines: dealMeta.pipelines || [],
       users: dealMeta.users || [],
     };
+    
+    console.log('🔥🔥🔥 getMixedImportMeta - SUCCESS, returning:', {
+      systemFieldsCount: result.systemFields.length,
+      customFieldsCount: result.customFields.length,
+      pipelinesCount: result.pipelines.length,
+      usersCount: result.users.length,
+    });
+    
+    return result;
+    } catch (error) {
+      console.error('🔥🔥🔥 getMixedImportMeta - ERROR:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -200,6 +284,9 @@ export class CsvImportService {
    */
   private async getDealCustomFields(): Promise<ImportFieldDto[]> {
     try {
+      if (!this.prisma) {
+        throw new Error('PrismaService is NOT injected');
+      }
       const customFields = await this.prisma.customField.findMany({
         where: { isActive: true, entityType: 'DEAL' },
         orderBy: { order: 'asc' },
@@ -261,17 +348,23 @@ export class CsvImportService {
    * Получение всех пайплайнов со стадиями
    */
   private async getPipelinesWithStages(): Promise<PipelineDto[]> {
-    const pipelines = await this.prisma.pipeline.findMany({
-      where: { isActive: true },
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
+    try {
+      if (!this.prisma) {
+        throw new Error('PrismaService is NOT injected');
+      }
+      console.log('[IMPORT META] Fetching pipelines...');
+      const pipelines = await this.prisma.pipeline.findMany({
+        where: { isActive: true },
+        include: {
+          stages: {
+            orderBy: { order: 'asc' },
+          },
         },
-      },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-    });
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      });
+      console.log('[IMPORT META] Found pipelines:', pipelines.length);
 
-    return pipelines.map((pipeline) => ({
+      return pipelines.map((pipeline) => ({
       id: pipeline.id,
       name: pipeline.name,
       description: pipeline.description || undefined,
@@ -286,12 +379,25 @@ export class CsvImportService {
         isClosed: stage.isClosed || false,
       })),
     }));
+    } catch (error) {
+      console.error('[IMPORT META ERROR] Error fetching pipelines:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        prismaError: error,
+      });
+      // Return empty array instead of throwing to prevent 500 error
+      // Frontend will show "No pipelines found" message
+      return [];
+    }
   }
 
   /**
    * Получение активных пользователей
    */
   private async getActiveUsers(): Promise<UserDto[]> {
+    if (!this.prisma) {
+      throw new Error('PrismaService is NOT injected');
+    }
     const users = await this.prisma.user.findMany({
       where: { isActive: true },
       select: {
@@ -337,7 +443,7 @@ export class CsvImportService {
 
     const errors: ImportError[] = [];
     const contactRows: Array<{
-      fullName: string;
+      fullName?: string | null;
       email?: string | null;
       phone?: string | null;
       position?: string | null;
@@ -453,8 +559,7 @@ export class CsvImportService {
    * @param rows - Parsed CSV rows from frontend
    * @param mapping - Маппинг полей CSV → внутренние поля
    * @param user - Пользователь, выполняющий импорт
-   * @param pipelineId - ID пайплайна для resolution стадий по имени
-   * @param workspaceId - ID workspace (явный параметр, приоритет над user.workspaceId)
+   * @param pipelineId - ID пайплайна для resolution стадий по имени (deals связаны с pipeline)
    * @param defaultAssignedToId - Дефолтный ответственный для всех строк (для "apply to all")
    * @param contactEmailPhoneMap - Map для резолва contactId по email/phone (опционально)
    * @param dryRun - Режим предпросмотра без записи в БД
@@ -464,7 +569,6 @@ export class CsvImportService {
     mapping: DealFieldMapping,
     user: any,
     pipelineId: string,
-    workspaceId: string | undefined, // Explicit workspaceId parameter
     defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     dryRun: boolean = false,
@@ -475,17 +579,15 @@ export class CsvImportService {
       rowsCount: rows?.length || 0,
       hasMapping: !!mapping,
       pipelineId,
-      workspaceId,
       dryRun,
       hasUser: !!user,
       userId: user?.id || user?.userId,
-      userWorkspaceId: user?.workspaceId,
     });
     
     // CRITICAL: Top-level try/catch to prevent 500 errors
     try {
       // CRITICAL: Validate user object early to prevent crashes
-    if (!user) {
+      if (!user) {
         console.error('[IMPORT DEALS ERROR] User object is null or undefined');
         if (dryRun) {
           return {
@@ -497,16 +599,20 @@ export class CsvImportService {
         throw new BadRequestException('User is required for import');
       }
       
-      // Resolve workspaceId: explicit parameter > user.workspaceId
-      const resolvedWorkspaceId = workspaceId || user?.workspaceId;
+      // Initialize error arrays
+      const errors: ImportError[] = []; // Row-specific errors only (row >= 0)
+      const globalErrors: string[] = []; // Global errors (mapping, pipeline, etc.)
+      const warnings: string[] = [];
+
+      // Get userId from user object
+      const userId = user?.id || user?.userId;
       
       // Log mapping and context before validation - ensure keys match expectations
       console.log('[IMPORT CONTEXT]', { 
-        workspaceId: resolvedWorkspaceId, 
-      dryRun, 
+        userId,
+        dryRun, 
         pipelineId,
         hasUser: !!user,
-        userWorkspaceId: user?.workspaceId,
         mapping,
         mappingKeys: Object.keys(mapping || {}),
         hasTitleMapping: mapping?.title ? true : false,
@@ -521,45 +627,25 @@ export class CsvImportService {
         skipped: 0,
       };
 
-      const errors: ImportError[] = []; // Row-specific errors only (row >= 0)
-      const globalErrors: string[] = []; // Global errors (mapping, pipeline, etc.)
-      const warnings: string[] = [];
-
       // Defensive guards - collect global errors instead of row errors
-      // BUT: Never early-return before CSV processing - allow validation even without workspaceId
-    if (!user) {
+      // BUT: Never early-return before CSV processing
+      if (!user) {
         globalErrors.push('User is missing');
         // Continue to CSV processing - errors will be shown in preview
       }
-
-      // workspaceId is required for DB operations, but NOT for CSV parsing/validation
-      if (!resolvedWorkspaceId) {
-        if (dryRun) {
-          // In dry-run, allow CSV processing but skip DB checks
-          warnings.push('Workspace not resolved, DB checks skipped');
-        } else {
-          // In actual import, workspaceId is required
-          globalErrors.push('Workspace is required for import');
-        }
-      }
       
-      // PipelineId validation - if missing in dry-run, add warning, not error
+      // PipelineId validation - pipeline is optional, used only for soft validation
+      // If missing, stage validation will be skipped, but import continues
       if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
-        if (dryRun) {
-          warnings.push('Pipeline ID is missing, stage resolution will be skipped');
-        } else {
-          globalErrors.push('Pipeline ID is required');
-        }
-    }
+        warnings.push('Pipeline ID is missing, stage validation will be skipped');
+      }
 
-    // CRITICAL: Safe access to userId - user is already validated above
-    const userId = user?.userId || user?.id;
-
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      // CRITICAL: Safe access to userId - user is already validated above
+      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
         console.error('[IMPORT DEALS ERROR] User ID is missing:', { userId, userKeys: user ? Object.keys(user) : [] });
         globalErrors.push('User ID is required');
         // Continue to CSV processing - validation will show errors
-    }
+      }
 
     if (!mapping || typeof mapping !== 'object') {
         globalErrors.push('Mapping is required and must be an object');
@@ -597,25 +683,14 @@ export class CsvImportService {
       if (pipelineId && typeof pipelineId === 'string' && pipelineId.trim() !== '') {
         try {
           // CRITICAL: Always try to load pipeline, even in dry-run
-          // Pipeline model doesn't have workspaceId, so we can load it without workspaceId
-          // Only skip if we're in dry-run AND workspaceId is missing AND we want to skip DB operations
-          // But for pipeline validation, we should still try to load it
-          if (false && !resolvedWorkspaceId && dryRun) {
-            // DISABLED: Always try to load pipeline for validation
-            // Skip DB load, but initialize empty maps for CSV processing
-            stagesMap = new Map<string, string>();
-            defaultStageId = undefined;
-            warnings.push('Pipeline stages not loaded (workspaceId missing), stage validation skipped');
-            console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: false, stagesCount: 0, reason: 'workspaceId missing (disabled)' });
-          } else {
-            // CRITICAL: Load pipeline - Pipeline model doesn't have workspaceId field
-            // So we load by ID only
-            console.log('[IMPORT PIPELINE DEBUG] Attempting to load pipeline:', { 
-              pipelineId, 
-              workspaceId: resolvedWorkspaceId,
-              hasWorkspaceId: !!resolvedWorkspaceId
-            });
+          // Pipeline model doesn't have workspaceId, so we load it by ID only
+          console.log('[IMPORT PIPELINE DEBUG] Attempting to load pipeline:', { 
+            pipelineId
+          });
             
+            if (!this.prisma) {
+              throw new Error('PrismaService is NOT injected');
+            }
             pipeline = await this.prisma.pipeline.findUnique({
       where: { id: pipelineId },
               include: {
@@ -634,11 +709,8 @@ export class CsvImportService {
             
             if (!pipeline) {
               // Pipeline not found - pipeline remains null
-              // In dry-run, this will be handled at row level
-              // In actual import, add global error
-              if (!dryRun) {
-                globalErrors.push(`Pipeline with ID "${pipelineId}" not found`);
-              }
+              // Pipeline is optional - import continues without stage validation
+              warnings.push(`Pipeline with ID "${pipelineId}" not found, stage validation will be skipped`);
               stagesMap = new Map<string, string>();
               defaultStageId = undefined;
               console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: false, stagesCount: 0, reason: 'pipeline not found' });
@@ -664,15 +736,11 @@ export class CsvImportService {
                 console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: true, stagesCount: 0, reason: 'no stages array' });
               }
             }
-          }
         } catch (error) {
           console.error('[IMPORT DEALS DRY RUN ERROR] Failed to load pipeline:', error);
-          // In dry-run, pipeline issues are handled at row level, not global
-          // In actual import, add global error
-          if (!dryRun) {
-            globalErrors.push(`Failed to load pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-          // Continue to CSV processing - errors will be shown at row level
+          // Pipeline is optional - if loading fails, import continues without stage validation
+          warnings.push(`Failed to load pipeline: ${error instanceof Error ? error.message : 'Unknown error'}. Stage validation will be skipped.`);
+          // Continue to CSV processing - pipeline is optional
           stagesMap = new Map<string, string>();
           defaultStageId = undefined;
           pipeline = null;
@@ -687,15 +755,12 @@ export class CsvImportService {
       }
       
       // Load users for resolution - wrap in try/catch for dry-run safety
-      // In dry-run without workspaceId, skip DB operations
       let usersMap: Map<string, string>;
       try {
-        if (!resolvedWorkspaceId && dryRun) {
-          // Skip DB load in dry-run without workspaceId
-          usersMap = new Map<string, string>();
-          warnings.push('Users not loaded (workspaceId missing), owner resolution skipped');
-        } else {
-          const users = await this.prisma.user.findMany({
+        if (!this.prisma) {
+          throw new Error('PrismaService is NOT injected');
+        }
+        const users = await this.prisma.user.findMany({
       where: { isActive: true },
       select: {
         id: true,
@@ -715,10 +780,19 @@ export class CsvImportService {
               usersMap.set(`name:${fullName}`, user.id);
             }
           });
-        }
       } catch (error) {
-        console.error('[IMPORT DEALS DRY RUN ERROR] Failed to load users:', error);
-        // Don't fail - owner resolution will just not work
+        // CRITICAL: Log Prisma error with full details
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : 'N/A';
+        console.error('[IMPORT DEALS ERROR] Failed to load users (Prisma error):', {
+          error: errorMessage,
+          stack: errorStack,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          prismaError: error,
+        });
+        // Don't fail import - owner resolution will just not work
+        // But add warning so user knows about the issue
+        warnings.push(`Failed to load users: ${errorMessage}. Owner resolution will be skipped.`);
         usersMap = new Map<string, string>();
       }
     
@@ -815,72 +889,13 @@ export class CsvImportService {
           }
           
           // Defensive guards for each row
-          // CRITICAL: Pipeline validation MUST come before title validation
-          // If pipeline is missing, skip row entirely (no title validation)
           const rowErrors: ImportError[] = [];
           
-          // Guard 1: Pipeline ID check - CRITICAL, must be first
-          // If pipelineId is missing or pipeline is null, skip row entirely
-          if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
-            rowErrors.push({
-              row: rowNumber,
-              field: 'pipelineId',
-              error: 'Pipeline ID is required',
-            });
-            // Skip row entirely - do not validate title or process further
-            const reason = 'Pipeline ID is required';
-            const titleColumn = mapping.title;
-            const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
-            console.log('[IMPORT ROW SKIPPED]', {
-              row: rowNumber,
-              reason,
-              title,
-              pipelineId: '',
-              stageId: '',
-              hasErrors: rowErrors.length
-            });
-            errors.push(...rowErrors);
-            summary.failed++;
-            continue;
-          }
+          // Pipeline is OPTIONAL - used only for soft validation of stageId
+          // If pipeline is missing or not loaded, import continues without stage validation
+          // Pipeline does NOT block import or cause rows to fail automatically
           
-          // Guard 1b: Pipeline must be loaded successfully
-          // In dry-run, if pipeline is null, add row-level error (not global)
-          if (!pipeline) {
-            if (dryRun) {
-              // In dry-run, add row-level error, not global
-              rowErrors.push({
-                row: rowNumber,
-                field: 'pipelineId',
-                error: `Pipeline with ID "${pipelineId}" not found or could not be loaded`,
-              });
-            } else {
-              // In actual import, this should have been caught globally, but add row error as fallback
-              rowErrors.push({
-                row: rowNumber,
-                field: 'pipelineId',
-                error: `Pipeline with ID "${pipelineId}" not found`,
-              });
-            }
-            // Skip row entirely - do not validate title or process further
-            const reason = `Pipeline with ID "${pipelineId}" not found or could not be loaded`;
-            const titleColumn = mapping.title;
-            const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
-            console.log('[IMPORT ROW SKIPPED]', {
-              row: rowNumber,
-              reason,
-              title,
-              pipelineId: pipelineId || '',
-              stageId: '',
-              hasErrors: rowErrors.length
-            });
-            errors.push(...rowErrors);
-            summary.failed++;
-            continue;
-          }
-          
-          // Guard 2: Deal title check - ONLY required field
-          // This runs ONLY after pipeline validation passes
+          // Guard 1: Deal title check - ONLY required field
           // Use trimmedRow - values are already trimmed
           const titleColumn = mapping.title;
           const titleValue = titleColumn ? (trimmedRow[titleColumn] || '') : '';
@@ -962,9 +977,31 @@ export class CsvImportService {
         }
       }
     } catch (error) {
-      // NEVER throw - always collect error
-      console.error('[IMPORT DEALS DRY RUN ERROR] Error processing rows loop:', error);
-      globalErrors.push(`Error processing rows: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // CRITICAL: Log Prisma error with full details
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'N/A';
+      console.error('[IMPORT DEALS ERROR] Error processing rows loop (Prisma error):', {
+        error: errorMessage,
+        stack: errorStack,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        prismaError: error,
+        rowsCount: rows.length,
+        processedRowsCount: processedRows.length,
+      });
+      // CRITICAL: Add to globalErrors and increase failed count
+      globalErrors.push(`Error processing rows: ${errorMessage}`);
+      // CRITICAL: Mark all remaining rows as failed
+      const remainingRows = rows.length - processedRows.length;
+      if (remainingRows > 0) {
+        summary.failed += remainingRows;
+        // Add errors for each remaining row
+        for (let i = processedRows.length; i < rows.length; i++) {
+          errors.push({
+            row: i + 1,
+            error: `Row processing failed: ${errorMessage}`,
+          });
+        }
+      }
     }
 
       // Process stages and create deals (async operations)
@@ -987,19 +1024,15 @@ export class CsvImportService {
             
         if (processedRows.length > 0) {
               // Pipeline already loaded above, use it
-              // In dry-run without workspaceId, pipeline may be null - skip stage creation logic
-              if (!pipeline && resolvedWorkspaceId && pipelineId) {
+              // Pipeline is optional - if not found, stage creation is skipped but import continues
+              if (!pipeline && pipelineId) {
                 // Pipeline not found - already handled in loading section, but double-check
-                if (dryRun) {
-                  warnings.push(`Pipeline with ID "${pipelineId}" not found, stage resolution skipped`);
-                } else {
-                  globalErrors.push(`Pipeline with ID "${pipelineId}" not found`);
-                }
+                warnings.push(`Pipeline with ID "${pipelineId}" not found, stage resolution skipped`);
               }
               
-              // Only process stages if we have pipeline and workspaceId
+              // Only process stages if we have pipeline
               // CRITICAL: NEVER access pipeline.stages if pipeline is null
-              if (pipeline && resolvedWorkspaceId && pipeline.stages && Array.isArray(pipeline.stages)) {
+              if (pipeline && pipeline.stages && Array.isArray(pipeline.stages)) {
               
               // Собираем уникальные стадии из CSV и сравниваем с существующими
               const existingStageNames = new Set(
@@ -1042,8 +1075,8 @@ export class CsvImportService {
                 stage.order = pipeline.stages.length + index;
               });
               }
-              } else if (!resolvedWorkspaceId && dryRun) {
-                // In dry-run without workspaceId, collect stages from CSV for preview
+              } else if (dryRun) {
+                // In dry-run, collect stages from CSV for preview
                 csvStagesMap.forEach((firstRowNumber, stageName) => {
                   if (stageName && typeof stageName === 'string') {
                     const trimmedName = stageName.trim();
@@ -1058,21 +1091,23 @@ export class CsvImportService {
               }
               
               // CRITICAL: In dry-run, NEVER create stages - only collect them
-              // Also require workspaceId and pipeline for stage creation
+              // Also require pipeline for stage creation
               const createdStagesMap = new Map<string, string>(); // normalizedStageName -> stageId
               
-              if (!dryRun && stagesToCreate.length > 0 && resolvedWorkspaceId && pipeline) {
-                // Only create stages in actual import mode with workspaceId and pipeline
+              if (!dryRun && stagesToCreate.length > 0 && pipeline) {
+                // Only create stages in actual import mode with pipeline
                 console.log('[IMPORT DEALS] Creating stages:', {
                   stagesToCreateCount: stagesToCreate.length,
                   stagesToCreate: stagesToCreate.map(s => s.name),
                   pipelineId,
-                  resolvedWorkspaceId,
                 });
                 
                 for (const stageToCreate of stagesToCreate) {
                   try {
                     console.log('[IMPORT DEALS] Creating stage:', stageToCreate.name);
+                    if (!this.prisma) {
+                      throw new Error('PrismaService is NOT injected');
+                    }
                     const newStage = await this.prisma.stage.create({
                       data: {
                         name: stageToCreate.name,
@@ -1095,29 +1130,39 @@ export class CsvImportService {
                     stagesMap.set(normalizedName, newStage.id);
                     stagesMap.set(newStage.id, newStage.id);
                   } catch (error) {
-                    console.error('[IMPORT DEALS ERROR] Failed to create stage:', {
+                    // CRITICAL: Log Prisma error with full details
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    const errorStack = error instanceof Error ? error.stack : 'N/A';
+                    console.error('[IMPORT DEALS ERROR] Failed to create stage (Prisma error):', {
                       stageName: stageToCreate.name,
-                      error: error instanceof Error ? error.message : 'Unknown error',
-                      stack: error instanceof Error ? error.stack : 'N/A',
+                      error: errorMessage,
+                      stack: errorStack,
+                      errorType: error instanceof Error ? error.constructor.name : typeof error,
+                      prismaError: error,
                     });
-                    // Collect error, don't throw
+                    // Collect error and increase failed count
+                    const rowNumber = csvStagesMap.get(stageToCreate.name) || -1;
                     errors.push({
-                      row: csvStagesMap.get(stageToCreate.name) || -1,
+                      row: rowNumber,
                       field: 'stageId',
                       value: stageToCreate.name,
-                      error: `Failed to create stage "${stageToCreate.name}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+                      error: `Failed to create stage "${stageToCreate.name}": ${errorMessage}`,
                     });
+                    // CRITICAL: Increase failed count for stage creation error
+                    summary.failed++;
                   }
                 }
               } else if (!dryRun && stagesToCreate.length > 0) {
-                // In actual import without workspaceId or pipeline, cannot create stages
-                console.error('[IMPORT DEALS ERROR] Cannot create stages:', {
+                // In actual import without pipeline, cannot create stages
+                // Pipeline is optional - if missing, stage creation is skipped but import continues
+                console.warn('[IMPORT DEALS WARNING] Cannot create stages:', {
                   stagesToCreateCount: stagesToCreate.length,
-                  resolvedWorkspaceId,
                   hasPipeline: !!pipeline,
                   dryRun,
                 });
-                globalErrors.push(`Cannot create stages: ${!resolvedWorkspaceId ? 'workspaceId is required' : 'pipeline is required'}`);
+                if (!pipeline) {
+                  warnings.push('Cannot create stages: pipeline is not loaded. Stage creation skipped, but import continues.');
+                }
               }
               // In dry-run, stagesToCreate is already populated for reporting
               
@@ -1211,48 +1256,162 @@ export class CsvImportService {
                 if (dryRun) {
                   // Log: Перед dry-run simulate
                   console.log('[IMPORT DEBUG] DRY RUN rows:', rows.length);
-                  // CRITICAL: In dry-run, ONLY simulate - NO DB operations
-                  // If workspaceId is missing, skip DB checks but still count rows
-                  if (!resolvedWorkspaceId) {
-                    // No DB checks - just count all as "would create"
-                    validRows.forEach(() => {
-                      summary.created++;
-                    });
-                    console.log('[IMPORT RESULT MUTATION]', { summary: { ...summary }, dryRun: true, reason: 'dry-run without workspaceId' });
-                  } else {
-                    // Normal dry-run with workspaceId - check existing deals
-                    const numbers = validRows.map(r => r.number).filter((n): n is string => Boolean(n));
+                  // CRITICAL: Dry-run must execute ALL the same validations as actual import
+                  // The ONLY difference: NO DB write operations (no batchCreateDeals call)
+                  
+                  // CRITICAL: Execute ALL the same validations as actual import
+                  // Filter out rows without valid stageId, title, pipelineId
+                  const dealsWithNumber: Array<{
+                    number: string;
+                    title: string;
+                    amount?: number | string | null;
+                    budget?: number | string | null;
+                    pipelineId: string;
+                    stageId: string;
+                    assignedToId?: string | null;
+                    contactId?: string | null;
+                    companyId?: string | null;
+                    expectedCloseAt?: Date | string | null;
+                    description?: string | null;
+                    tags?: string[];
+                  }> = [];
+                  
+                  // CRITICAL: Execute the SAME validation loop as actual import
+                  for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
+                    const row = validRows[rowIndex];
+                    const rowNumber = rowIndex + 1;
                     
-                    let existingDeals = new Map<string, { id: string; number: string }>();
-                    if (numbers.length > 0) {
-                      try {
-                        // Only read operation - safe for dry-run
-                        existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
-                      } catch (error) {
-                        console.error('[IMPORT DEALS DRY RUN ERROR] Error checking existing deals:', error);
-                        // Continue without checking - not fatal
+                    // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен (same as actual import)
+                    if (!row.stageId || row.stageId.trim() === '') {
+                      const reason = 'Stage is required for deal import';
+                      console.log('[IMPORT ROW SKIPPED]', {
+                        row: rowNumber,
+                        reason,
+                        title: row.title || 'N/A',
+                        pipelineId: row.pipelineId || 'N/A',
+                        stageId: row.stageId || 'MISSING',
+                        hasErrors: 1
+                      });
+                      errors.push({
+                        row: rowNumber,
+                        field: 'stageId',
+                        error: 'Stage is required for deal import',
+                      });
+                      summary.failed++;
+                      continue; // Same continue as actual import
+                    }
+                    
+                    // ЖЕСТКАЯ ВАЛИДАЦИЯ: title обязателен (same as actual import)
+                    if (!row.title || row.title.trim() === '') {
+                      const reason = 'Title is required for deal import';
+                      console.log('[IMPORT ROW SKIPPED]', {
+                        row: rowNumber,
+                        reason,
+                        title: 'MISSING',
+                        pipelineId: row.pipelineId || 'N/A',
+                        stageId: row.stageId || 'N/A',
+                        hasErrors: 1
+                      });
+                      errors.push({
+                        row: rowNumber,
+                        field: 'title',
+                        error: 'Title is required for deal import',
+                      });
+                      summary.failed++;
+                      continue; // Same continue as actual import
+                    }
+                    
+                    // Pipeline is OPTIONAL - used only for soft validation of stageId
+                    // If pipelineId is missing in row, use pipelineId from function parameter
+                    // Pipeline object (for validation) is optional - import continues without it
+                    const rowPipelineId = row.pipelineId && row.pipelineId.trim() ? row.pipelineId : pipelineId;
+                    
+                    // SOFT VALIDATION: If pipeline is loaded, validate that stageId belongs to pipeline
+                    // This is soft validation - does NOT block import if validation fails
+                    if (pipeline && row.stageId && pipeline.stages) {
+                      const stageExists = pipeline.stages.some((s: any) => s.id === row.stageId);
+                      if (!stageExists) {
+                        // Soft validation warning - stageId may not belong to pipeline
+                        // But import continues - this is a warning, not an error
+                        warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" may not belong to pipeline "${pipelineId}"`);
                       }
                     }
                     
-                    // Simulate import
-                    validRows.forEach((row) => {
-                      if (row.number && existingDeals.has(row.number)) {
-                        summary.updated++;
-                      } else {
-                        summary.created++;
-                      }
+                    // Все валидации пройдены - добавляем в dealsWithNumber (same as actual import)
+                    dealsWithNumber.push({
+                      ...row,
+                      number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
+                      stageId: row.stageId, // НИКОГДА не передаем пустую строку
+                      title: row.title, // НИКОГДА не передаем пустую строку
+                      pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
                     });
-                    console.log('[IMPORT RESULT MUTATION]', { summary: { ...summary }, dryRun: true, reason: 'dry-run with workspaceId' });
                   }
+                  
+                  console.log('[IMPORT DEALS] Dry-run validation complete:', {
+                    dealsCount: dealsWithNumber.length,
+                    filteredOut: validRows.length - dealsWithNumber.length,
+                    sampleDeal: dealsWithNumber[0] ? {
+                      number: dealsWithNumber[0].number,
+                      title: dealsWithNumber[0].title,
+                      pipelineId: dealsWithNumber[0].pipelineId,
+                      stageId: dealsWithNumber[0].stageId,
+                    } : null,
+                  });
+                  
+                  // CRITICAL: In dry-run, simulate batchCreateDeals logic WITHOUT actual DB writes
+                  // Check existing deals to determine created vs updated
+                  const numbers = dealsWithNumber.map(d => d.number).filter((n): n is string => Boolean(n));
+                  
+                  let existingDeals = new Map<string, { id: string; number: string }>();
+                  if (numbers.length > 0) {
+                    try {
+                      // Only read operation - safe for dry-run
+                      existingDeals = await this.importBatchService.batchFindDealsByNumbers(numbers);
+                    } catch (error) {
+                      // CRITICAL: Log Prisma error with full details
+                      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                      const errorStack = error instanceof Error ? error.stack : 'N/A';
+                      console.error('[IMPORT DEALS DRY RUN ERROR] Error checking existing deals (Prisma error):', {
+                        error: errorMessage,
+                        stack: errorStack,
+                        errorType: error instanceof Error ? error.constructor.name : typeof error,
+                        prismaError: error,
+                        numbersCount: numbers.length,
+                      });
+                      // Add to errors and increase failed count
+                      errors.push({
+                        row: -1, // Global error for batch check
+                        error: `Failed to check existing deals: ${errorMessage}`,
+                      });
+                      // CRITICAL: Increase failed count - this affects import accuracy
+                      summary.failed += dealsWithNumber.length; // All deals in batch failed validation
+                      // Continue without checking - but mark as failed
+                    }
+                  }
+                  
+                  // Simulate batchCreateDeals logic: count created vs updated
+                  // This matches the real logic in batchCreateDeals
+                  dealsWithNumber.forEach((deal) => {
+                    if (deal.number && existingDeals.has(deal.number)) {
+                      summary.updated++;
+                    } else {
+                      summary.created++;
+                    }
+                  });
+                  
+                  console.log('[IMPORT RESULT MUTATION]', { 
+                    summary: { ...summary }, 
+                    dryRun: true, 
+                    reason: 'dry-run simulation complete',
+                    dealsWithNumberCount: dealsWithNumber.length,
+                    existingDealsCount: existingDeals.size
+                  });
                 } else {
                   // Log: Перед actual import
                   console.log('[IMPORT DEBUG] ACTUAL IMPORT rows:', rows.length);
                   // Actual import - create/update deals
-                  // workspaceId is required for actual import
                   console.log('[IMPORT DEALS] Starting actual import (not dry-run):', {
                     validRowsCount: validRows.length,
-                    resolvedWorkspaceId,
-                    hasWorkspaceId: !!resolvedWorkspaceId,
                     userId,
                     pipelineId,
                     pipeline: pipeline ? 'LOADED' : 'NULL',
@@ -1260,68 +1419,28 @@ export class CsvImportService {
                     pipelineLoaded: pipelineLoaded,
                   });
                   
-                  // CRITICAL: If workspaceId is missing, try to get it from pipeline or first deal
-                  let finalWorkspaceId = resolvedWorkspaceId;
-                  if (!finalWorkspaceId && pipeline) {
-                    // Try to get workspaceId from pipeline's first deal (if exists)
-                    try {
-                      const firstDeal = await this.prisma.deal.findFirst({
-                        where: { pipelineId: pipelineId },
-                        select: { id: true },
-                        take: 1,
-                      });
-                      if (firstDeal) {
-                        // Pipeline has deals, but we still don't have workspaceId
-                        // For now, we'll proceed without workspaceId and let the database handle it
-                        console.warn('[IMPORT DEALS] WorkspaceId not found, but pipeline exists. Proceeding with import.');
-                      }
-                    } catch (error) {
-                      console.error('[IMPORT DEALS ERROR] Failed to check pipeline deals:', error);
-                    }
-                  }
-                  
-                  // TEMPORARY FIX: Allow import without workspaceId if pipeline exists
-                  // This is a workaround until workspaceId is properly added to User model
-                  if (!finalWorkspaceId) {
-                    if (pipeline) {
-                      console.warn('[IMPORT DEALS] ⚠️ WARNING: workspaceId is missing, but pipeline exists. Proceeding with import (workspaceId will be set to null).');
-                      warnings.push('WorkspaceId is missing - import will proceed, but deals may not be associated with a workspace');
-                      // Continue with import - database may handle null workspaceId
-                    } else {
-                      console.error('[IMPORT DEALS ERROR] Workspace is required for import and pipeline is missing');
-                      globalErrors.push('Workspace is required for import');
-                      summary.failed += validRows.length;
-                    }
-                  }
-                  
                   // CRITICAL DEBUG: Check condition before actual import
                   console.log('[IMPORT ACTUAL CRITICAL CHECK]', {
-                    finalWorkspaceId: finalWorkspaceId || 'UNDEFINED',
-                    hasFinalWorkspaceId: !!finalWorkspaceId,
                     pipeline: pipeline ? 'LOADED' : 'NULL',
                     hasPipeline: !!pipeline,
                     pipelineId: pipelineId,
-                    conditionWillPass: !!(finalWorkspaceId || pipeline),
                     validRowsCount: validRows.length,
-                    willCallBatchCreateDeals: !!(finalWorkspaceId || pipeline) && validRows.length > 0,
+                    willCallBatchCreateDeals: validRows.length > 0,
                     processedRowsCount: processedRows.length,
                     updatedRowsCount: updatedRows.length,
                   });
                   
-                  if (finalWorkspaceId || pipeline) {
-                    console.log('[IMPORT DEALS] Proceeding with import:', {
-                      finalWorkspaceId,
-                      hasPipeline: !!pipeline,
-                      validRowsCount: validRows.length,
-                      userId,
-                    });
-                    // Log: ПЕРЕД началом обработки строк в actual import
-                    console.log('[IMPORT ACTUAL] start', { rows: rows.length });
-                    // Proceed with import if we have workspaceId OR pipeline exists
-                    try {
-                      // CRITICAL: Validate stageId BEFORE adding to dealsWithNumber
-                      // Filter out rows without valid stageId and add them to errors
-                      const dealsWithNumber: Array<{
+                  console.log('[IMPORT DEALS] Proceeding with import:', {
+                    hasPipeline: !!pipeline,
+                    validRowsCount: validRows.length,
+                    userId,
+                  });
+                  // Log: ПЕРЕД началом обработки строк в actual import
+                  console.log('[IMPORT ACTUAL] start', { rows: rows.length });
+                  // Proceed with import
+                  // CRITICAL: Validate stageId BEFORE adding to dealsWithNumber
+                  // Filter out rows without valid stageId and add them to errors
+                  let dealsWithNumber: Array<{
                         number: string;
                         title: string;
                         amount?: number | string | null;
@@ -1335,7 +1454,8 @@ export class CsvImportService {
                         description?: string | null;
                         tags?: string[];
                       }> = [];
-                      
+                  
+                  try {
                       for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
                         const row = validRows[rowIndex];
                         const rowNumber = rowIndex + 1;
@@ -1380,24 +1500,20 @@ export class CsvImportService {
                           continue;
                         }
                         
-                        // ЖЕСТКАЯ ВАЛИДАЦИЯ: pipelineId обязателен
-                        if (!row.pipelineId || row.pipelineId.trim() === '') {
-                          const reason = 'Pipeline is required for deal import';
-                          console.log('[IMPORT ROW SKIPPED]', {
-                            row: rowNumber,
-                            reason,
-                            title: row.title || 'N/A',
-                            pipelineId: 'MISSING',
-                            stageId: row.stageId || 'N/A',
-                            hasErrors: 1
-                          });
-                          errors.push({
-                            row: rowNumber,
-                            field: 'pipelineId',
-                            error: 'Pipeline is required for deal import',
-                          });
-                          summary.failed++;
-                          continue;
+                        // Pipeline is OPTIONAL - used only for soft validation of stageId
+                        // If pipelineId is missing in row, use pipelineId from function parameter
+                        // Pipeline object (for validation) is optional - import continues without it
+                        const rowPipelineId = row.pipelineId && row.pipelineId.trim() ? row.pipelineId : pipelineId;
+                        
+                        // SOFT VALIDATION: If pipeline is loaded, validate that stageId belongs to pipeline
+                        // This is soft validation - does NOT block import if validation fails
+                        if (pipeline && row.stageId && pipeline.stages) {
+                          const stageExists = pipeline.stages.some((s: any) => s.id === row.stageId);
+                          if (!stageExists) {
+                            // Soft validation warning - stageId may not belong to pipeline
+                            // But import continues - this is a warning, not an error
+                            warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" may not belong to pipeline "${pipelineId}"`);
+                          }
                         }
                         
                         // Все валидации пройдены - добавляем в dealsWithNumber
@@ -1406,7 +1522,7 @@ export class CsvImportService {
                           number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
                           stageId: row.stageId, // НИКОГДА не передаем пустую строку
                           title: row.title, // НИКОГДА не передаем пустую строку
-                          pipelineId: row.pipelineId, // НИКОГДА не передаем пустую строку
+                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
                         });
                       }
                       
@@ -1448,16 +1564,39 @@ export class CsvImportService {
                         });
                       });
                     } catch (error) {
-                      console.error('[IMPORT DEALS ERROR] Batch create failed:', error);
-                      console.error('[IMPORT DEALS ERROR] Stack:', error instanceof Error ? error.stack : 'N/A');
-                      globalErrors.push(`Batch import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      summary.failed += validRows.length;
-                    }
-                  } else {
-                    // Neither workspaceId nor pipeline - cannot proceed
-                    console.error('[IMPORT DEALS ERROR] Cannot proceed: both workspaceId and pipeline are missing');
-                    globalErrors.push('Cannot proceed with import: workspaceId or pipeline is required');
-                    summary.failed += validRows.length;
+                      // CRITICAL: Log Prisma error with full details
+                      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                      const errorStack = error instanceof Error ? error.stack : 'N/A';
+                      console.error('[IMPORT DEALS ERROR] Batch create failed (Prisma error):', {
+                        error: errorMessage,
+                        stack: errorStack,
+                        errorType: error instanceof Error ? error.constructor.name : typeof error,
+                        prismaError: error,
+                        dealsWithNumberCount: dealsWithNumber?.length || 0,
+                        validRowsCount: validRows.length,
+                        sampleDeal: dealsWithNumber?.[0] ? {
+                          number: dealsWithNumber[0].number,
+                          title: dealsWithNumber[0].title,
+                          pipelineId: dealsWithNumber[0].pipelineId,
+                          stageId: dealsWithNumber[0].stageId,
+                        } : null,
+                      });
+                      // CRITICAL: Add to globalErrors and increase failed count
+                      globalErrors.push(`Batch import failed: ${errorMessage}`);
+                      // CRITICAL: Add each deal to errors for detailed reporting
+                      if (dealsWithNumber) {
+                        dealsWithNumber.forEach((deal, index) => {
+                          errors.push({
+                            row: index + 1,
+                            error: `Failed to import deal: ${errorMessage}`,
+                          });
+                        });
+                        // CRITICAL: Increase failed count for all deals in failed batch
+                        summary.failed += dealsWithNumber.length;
+                      } else {
+                        // If dealsWithNumber is not defined, mark all processedRows as failed
+                        summary.failed += processedRows.length;
+                      }
                   }
                 }
               } else {
@@ -1492,7 +1631,6 @@ export class CsvImportService {
               
               // Log import context for debugging
               console.log('[IMPORT CONTEXT]', { 
-                workspaceId: resolvedWorkspaceId, 
                 dryRun, 
                 rows: processedRows.length,
                 parsedRows: summary.total 
@@ -1505,6 +1643,56 @@ export class CsvImportService {
                 reason: 'final result before return',
                 resultSummary: result.summary
               });
+              
+              // CRITICAL: Invariant check for actual import
+              // If validRows.length > 0, result CANNOT be all zeros
+              if (!dryRun && validRows.length > 0) {
+                const isAllZeros = summary.created === 0 && summary.updated === 0 && summary.failed === 0;
+                if (isAllZeros) {
+                  // CRITICAL ERROR: Silent failure detected
+                  const errorMessage = 'CRITICAL: Import invariant violation - validRows exist, but result is all zeros (created=0, updated=0, failed=0). This indicates a silent failure.';
+                  console.error('[IMPORT DEALS CRITICAL ERROR] Invariant violation detected:', {
+                    error: errorMessage,
+                    validRowsCount: validRows.length,
+                    summary: {
+                      created: summary.created,
+                      updated: summary.updated,
+                      failed: summary.failed,
+                      skipped: summary.skipped,
+                      total: summary.total,
+                    },
+                    processedRowsCount: processedRows.length,
+                    updatedRowsCount: updatedRows.length,
+                    sampleValidRow: validRows[0] ? {
+                      title: validRows[0].title,
+                      pipelineId: validRows[0].pipelineId,
+                      stageId: validRows[0].stageId,
+                    } : null,
+                    checkDetails: {
+                      condition: 'validRows.length > 0',
+                      actualValidRows: validRows.length,
+                      actualResult: `created=${summary.created}, updated=${summary.updated}, failed=${summary.failed}`,
+                    },
+                  });
+                  // CRITICAL: Add to globalErrors with explicit reason
+                  globalErrors.push(errorMessage);
+                  globalErrors.push('Possible causes: batchCreateDeals was not called, all rows were filtered out after validation, or batchCreateDeals returned 0 for all rows.');
+                  globalErrors.push(`Invariant check: validRows.length=${validRows.length}, result=all zeros`);
+                  // CRITICAL: Mark all validRows as failed
+                  summary.failed += validRows.length;
+                  // Add errors for each validRow
+                  validRows.forEach((row, index) => {
+                    errors.push({
+                      row: index + 1,
+                      error: 'Import invariant violation: row was processed but no result was recorded',
+                    });
+                  });
+                  // Update result with corrected summary
+                  result.summary = summary;
+                  result.globalErrors = globalErrors.length > 0 ? globalErrors : undefined;
+                  result.errors = errors;
+                }
+              }
               
               if (dryRun) {
                 console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
@@ -1519,57 +1707,75 @@ export class CsvImportService {
               }
               
               return result;
-            }
-            
-            // No rows to process
-            const result: ImportResultDto = {
-              summary,
-              errors,
-              globalErrors: globalErrors.length > 0 ? globalErrors : undefined,
-              warnings: warnings.length > 0 ? warnings : undefined,
-              stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
-            };
-            
-            // Log import context for debugging
-            console.log('[IMPORT CONTEXT]', { 
-              workspaceId: resolvedWorkspaceId, 
-              dryRun, 
-              rows: 0,
-              parsedRows: summary.total 
-            });
-            
-            // Log final result before return (no rows case)
-            console.log('[IMPORT RESULT MUTATION]', { 
-              summary: { ...summary }, 
-              dryRun, 
-              reason: 'final result before return (no rows)',
-              resultSummary: result.summary
-            });
-            
-            if (dryRun) {
-              console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
             } else {
-              // Log: В КОНЦЕ функции перед return для actual import (no rows case)
-              console.log('[IMPORT ACTUAL] result', {
-                created: summary.created,
-                updated: summary.updated,
-                skipped: summary.skipped,
-                failed: summary.failed
-              });
-            }
-            
-            return result;
-          } catch (error) {
-            // CRITICAL: In dry-run, NEVER throw - always return errors in result
-            console.error('[IMPORT DEALS DRY RUN ERROR] Error processing rows:', error);
-            
-            if (dryRun) {
-              // In dry-run, return errors in result instead of throwing
-              globalErrors.push(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              // No rows to process
               const result: ImportResultDto = {
                 summary,
                 errors,
                 globalErrors: globalErrors.length > 0 ? globalErrors : undefined,
+                warnings: warnings.length > 0 ? warnings : undefined,
+                stagesToCreate: stagesToCreate.length > 0 ? stagesToCreate : undefined,
+              };
+              
+              // Log import context for debugging
+              console.log('[IMPORT CONTEXT]', { 
+                dryRun, 
+                rows: 0,
+                parsedRows: summary.total 
+              });
+              
+              // Log final result before return (no rows case)
+              console.log('[IMPORT RESULT MUTATION]', { 
+                summary: { ...summary }, 
+                dryRun, 
+                reason: 'final result before return (no rows)',
+                resultSummary: result.summary
+              });
+              
+              if (dryRun) {
+                console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
+              } else {
+                // Log: В КОНЦЕ функции перед return для actual import (no rows case)
+                console.log('[IMPORT ACTUAL] result', {
+                  created: summary.created,
+                  updated: summary.updated,
+                  skipped: summary.skipped,
+                  failed: summary.failed
+                });
+              }
+              
+              return result;
+            }
+          } catch (error) {
+            // CRITICAL: Log Prisma error with full details
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : 'N/A';
+            console.error('[IMPORT DEALS ERROR] Error processing stages and deals (Prisma error):', {
+              error: errorMessage,
+              stack: errorStack,
+              errorType: error instanceof Error ? error.constructor.name : typeof error,
+              prismaError: error,
+              processedRowsCount: processedRows.length,
+              dryRun,
+            });
+            
+            if (dryRun) {
+              // In dry-run, return errors in result instead of throwing
+              globalErrors.push(`Processing error: ${errorMessage}`);
+              // CRITICAL: Increase failed count for all processed rows
+              summary.failed += processedRows.length;
+              // Add errors for each processed row
+              processedRows.forEach((row, index) => {
+                errors.push({
+                  row: index + 1,
+                  error: `Processing failed: ${errorMessage}`,
+                });
+              });
+              const result: ImportResultDto = {
+                summary,
+                errors,
+                globalErrors: globalErrors.length > 0 ? globalErrors : undefined,
+                warnings: warnings.length > 0 ? warnings : undefined,
               };
               console.log('[IMPORT RESULT MUTATION]', { 
                 summary: { ...summary }, 
@@ -1584,26 +1790,37 @@ export class CsvImportService {
             if (error instanceof BadRequestException) {
                 throw error;
               } else {
-                const errorMessage = error instanceof Error ? error.message : String(error);
                 throw new BadRequestException(`Import error: ${errorMessage}`);
               }
             }
           }
-    } catch (error) {
-      // CRITICAL: Top-level catch - in dry-run, NEVER throw
-      console.error('[IMPORT DEALS DRY RUN ERROR]', error);
+        } catch (error) {
+      // CRITICAL: Log Prisma error with full details
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : 'N/A';
+      console.error('[IMPORT DEALS ERROR] Top-level catch (Prisma error):', {
+        error: errorMessage,
+        stack: errorStack,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        prismaError: error,
+        rowsCount: rows?.length || 0,
+        dryRun,
+      });
       
       if (dryRun) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+        // In dry-run, return errors in result instead of throwing
         const result: ImportResultDto = {
           summary: {
-            total: 0,
+            total: rows?.length || 0,
             created: 0,
             updated: 0,
-            failed: 0,
+            failed: rows?.length || 0, // CRITICAL: Mark all rows as failed
             skipped: 0,
           },
-          errors: [],
+          errors: rows ? rows.map((_, index) => ({
+            row: index + 1,
+            error: `Import failed: ${errorMessage}`,
+          })) : [],
           globalErrors: [`Import error: ${errorMessage}`],
         };
         console.log('[IMPORT RESULT MUTATION]', { 
@@ -1616,7 +1833,6 @@ export class CsvImportService {
         return result;
             } else {
         // For actual import, throw with detailed message in development mode
-        const errorMessage = error instanceof Error ? error.message : String(error);
         const isDevelopment = process.env.NODE_ENV !== 'production';
         if (isDevelopment) {
           throw new HttpException(
@@ -2099,6 +2315,9 @@ export class CsvImportService {
       },
     };
     console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD (loadPipelineStagesMap):', pipelineFindPayload);
+    if (!this.prisma) {
+      throw new Error('PrismaService is NOT injected');
+    }
     const pipeline = await this.prisma.pipeline.findUnique(pipelineFindPayload);
 
     if (!pipeline) {
@@ -2132,6 +2351,9 @@ export class CsvImportService {
       },
     };
     console.log('PRISMA USER FIND MANY PAYLOAD (loadUsersMap):', userFindManyPayload);
+    if (!this.prisma) {
+      throw new Error('PrismaService is NOT injected');
+    }
     const users = await this.prisma.user.findMany(userFindManyPayload);
 
     const usersMap = new Map<string, string>();

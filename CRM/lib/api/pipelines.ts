@@ -18,6 +18,7 @@ export interface Pipeline {
   isDefault: boolean
   isActive: boolean
   order: number
+  workspaceId?: string
   stages: Stage[]
   createdAt: string
   updatedAt: string

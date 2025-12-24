@@ -209,3 +209,5 @@ console.log('[DEBUG] CONDITION FAILED - BLOCKED', {
 - [ ] Проверить логи в порядке приоритета
 - [ ] Найти баг за 30 минут
 
+
+

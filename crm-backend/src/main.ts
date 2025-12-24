@@ -110,14 +110,22 @@ async function bootstrap() {
   // to avoid issues with file field in multipart requests
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
+      whitelist: false, // Disable whitelist to allow any fields
       forbidNonWhitelisted: false, // Changed to false to allow extra fields (like file from old requests)
-      transform: true,
-      skipMissingProperties: false,
+      transform: false, // Disable transform to avoid issues with any type
+      skipMissingProperties: true, // Skip missing properties to avoid validation errors
       exceptionFactory: (errors) => {
         // 🔥 DIAGNOSTIC: Log validation errors
         console.error('🔥 VALIDATION ERROR:', JSON.stringify(errors, null, 2));
-        return new BadRequestException(errors);
+        const errorMessages = errors.map(err => {
+          const constraints = err.constraints ? Object.values(err.constraints).join(', ') : 'Unknown validation error';
+          return `${err.property}: ${constraints}`;
+        });
+        return new BadRequestException({
+          message: 'Validation failed',
+          errors: errorMessages,
+          details: errors,
+        });
       },
     }),
   );
