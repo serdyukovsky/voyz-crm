@@ -249,9 +249,13 @@ export class ImportExportController {
       throw new BadRequestException('Mapping must include title field');
     }
 
-    // PipelineId is optional - used only for soft validation
-    // If pipelineId is missing, import continues but stage validation is skipped
-    // PipelineId in CSV rows will be used if available
+    // PipelineId validation - required for actual import, optional for dry-run
+    // For actual import, pipelineId is required because deals must belong to a pipeline
+    if (!isDryRun) {
+      if (!dto.pipelineId || dto.pipelineId === null || typeof dto.pipelineId !== 'string' || dto.pipelineId.trim() === '') {
+        throw new BadRequestException('Pipeline ID is required for deal import');
+      }
+    }
     
     // CRITICAL: Wrap entire import in try/catch to prevent 500 errors in dry-run
     try {
@@ -268,7 +272,7 @@ export class ImportExportController {
         dto.rows, // Parsed CSV rows from frontend
         dto.mapping,
         user, // Передаем весь объект user для валидации
-        dto.pipelineId,
+        dto.pipelineId, // Pass as-is (undefined is allowed for dry-run, validated above for actual import)
         dto.defaultAssignedToId, // Дефолтный ответственный для всех строк
         undefined, // contactEmailPhoneMap - опционально
         isDryRun,
@@ -283,16 +287,27 @@ export class ImportExportController {
 
       return result;
     } catch (error) {
+      // Log detailed error information for debugging
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : 'N/A';
+      console.error('[IMPORT DEALS CONTROLLER ERROR]', {
+        error: errorMessage,
+        stack: errorStack,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        isDryRun,
+        pipelineId: dto.pipelineId,
+        rowsCount: dto.rows?.length || 0,
+        hasMapping: !!dto.mapping,
+      });
+      
       // In dry-run mode, NEVER throw 500 - always return errors in ImportResult
       if (isDryRun) {
-        console.error('[IMPORT DEALS DRY RUN ERROR]', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
         return {
           summary: {
-            total: 0,
+            total: dto.rows?.length || 0,
             created: 0,
             updated: 0,
-            failed: 0,
+            failed: dto.rows?.length || 0,
             skipped: 0,
           },
           errors: [{
