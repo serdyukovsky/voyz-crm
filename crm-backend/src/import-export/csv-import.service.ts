@@ -837,6 +837,7 @@ export class CsvImportService {
       description?: string | null;
       tags?: string[];
       rejectionReasons?: string[];
+      reason?: string | null;
     }> = [];
 
     // CRITICAL: Process rows directly - CSV parsing is done on frontend
@@ -948,6 +949,23 @@ export class CsvImportService {
             );
           
             if (dealData) {
+            // Log dealData to verify all fields are present
+            console.log(`[MAP DEAL ROW RESULT] Row ${rowNumber}:`, {
+              number: dealData.number,
+              title: dealData.title,
+              amount: dealData.amount,
+              budget: dealData.budget,
+              assignedToId: dealData.assignedToId,
+              contactId: dealData.contactId,
+              companyId: dealData.companyId,
+              expectedCloseAt: dealData.expectedCloseAt,
+              description: dealData.description ? dealData.description.substring(0, 50) + '...' : null,
+              tags: dealData.tags,
+              rejectionReasons: dealData.rejectionReasons,
+              stageId: dealData.stageId,
+              stageValue: dealData.stageValue,
+            });
+            
             // Guard 3: Stage check (if no stageValue and no defaultStage)
             if (!dealData.stageId && !dealData.stageValue && !defaultStageId) {
             errors.push({
@@ -1176,8 +1194,11 @@ export class CsvImportService {
               
               // Update stageId for rows with created stages or apply default
               const updatedRows = processedRows.map((row) => {
+                // CRITICAL: Preserve ALL fields from row, not just stageId
+                const updatedRow = { ...row };
+                
                 // If stageId not set but stageValue exists, try to find in created stages
-                if (!row.stageId && row.stageValue) {
+                if (!updatedRow.stageId && updatedRow.stageValue) {
                   const stageValueStr = typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || '');
                   const normalizedStageName = stageValueStr.trim().toLowerCase();
                   
@@ -1192,7 +1213,7 @@ export class CsvImportService {
                   }
                   
                   if (createdStageId) {
-                    row.stageId = createdStageId;
+                    updatedRow.stageId = createdStageId;
                   } else {
                     // Try to find in existing stages map
                     let foundStageId: string | undefined;
@@ -1204,16 +1225,17 @@ export class CsvImportService {
                       }
                     }
                     if (foundStageId) {
-                      row.stageId = foundStageId;
+                      updatedRow.stageId = foundStageId;
                     } else if (defaultStageId) {
-                      row.stageId = defaultStageId;
+                      updatedRow.stageId = defaultStageId;
                     }
                   }
-                } else if (!row.stageId && !row.stageValue && defaultStageId) {
+                } else if (!updatedRow.stageId && !updatedRow.stageValue && defaultStageId) {
                   // No stageValue, apply default stage
-                  row.stageId = defaultStageId;
+                  updatedRow.stageId = defaultStageId;
                 }
-                return row;
+                // CRITICAL: Return updatedRow with ALL fields preserved
+                return updatedRow;
               });
               
               // Filter valid rows (must have stageId or stageValue)
@@ -1540,13 +1562,44 @@ export class CsvImportService {
                         }
                         
                         // Все валидации пройдены - добавляем в dealsWithNumber
-                        dealsWithNumber.push({
-                          ...row,
+                        // CRITICAL: Include ALL fields from mapDealRow, not just number, stageId, title, pipelineId
+                        const dealToCreate = {
                           number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
-                          stageId: row.stageId, // НИКОГДА не передаем пустую строку
                           title: row.title, // НИКОГДА не передаем пустую строку
+<<<<<<< HEAD
                           pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter (always string here)
+=======
+                          amount: row.amount !== undefined ? row.amount : null,
+                          budget: row.budget !== undefined ? row.budget : null,
+                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
+                          stageId: row.stageId, // НИКОГДА не передаем пустую строку
+                          assignedToId: row.assignedToId !== undefined ? row.assignedToId : null,
+                          contactId: row.contactId !== undefined ? row.contactId : null,
+                          companyId: row.companyId !== undefined ? row.companyId : null,
+                          expectedCloseAt: row.expectedCloseAt !== undefined ? row.expectedCloseAt : null,
+                          description: row.description !== undefined ? row.description : null,
+                          tags: row.tags !== undefined ? row.tags : undefined,
+                          rejectionReasons: row.rejectionReasons !== undefined ? row.rejectionReasons : undefined,
+                          reason: row.reason !== undefined ? row.reason : null,
+                        };
+                        
+                        console.log(`[IMPORT DEAL DATA] Row ${rowNumber} deal data:`, {
+                          number: dealToCreate.number,
+                          title: dealToCreate.title,
+                          amount: dealToCreate.amount,
+                          budget: dealToCreate.budget,
+                          assignedToId: dealToCreate.assignedToId,
+                          contactId: dealToCreate.contactId,
+                          companyId: dealToCreate.companyId,
+                          expectedCloseAt: dealToCreate.expectedCloseAt,
+                          description: dealToCreate.description ? dealToCreate.description.substring(0, 50) + '...' : null,
+                          tags: dealToCreate.tags,
+                          rejectionReasons: dealToCreate.rejectionReasons,
+                          reason: dealToCreate.reason,
+>>>>>>> 373640c944765c28701d14c2da26fdd3116ea98d
                         });
+                        
+                        dealsWithNumber.push(dealToCreate);
                       }
                       
                       console.log('[IMPORT DEALS] Calling batchCreateDeals:', {
@@ -2080,6 +2133,7 @@ export class CsvImportService {
     description?: string | null;
     tags?: string[];
     rejectionReasons?: string[];
+    reason?: string | null;
   } | null {
     const getValue = (fieldName?: string): string | undefined => {
       if (!fieldName) return undefined;
@@ -2304,6 +2358,9 @@ export class CsvImportService {
 
 
 
+    // Парсинг reason (причина/основание)
+    const reasonValue = getValue(mapping.reason);
+
     return {
       number: numberValue,
       title: titleValue,
@@ -2319,6 +2376,7 @@ export class CsvImportService {
       description: sanitizeOptionalTextFields(getValue(mapping.description)) || null,
       tags: tags.length > 0 ? tags : undefined,
       rejectionReasons: rejectionReasons.length > 0 ? rejectionReasons : undefined,
+      reason: reasonValue || null,
     };
   }
 

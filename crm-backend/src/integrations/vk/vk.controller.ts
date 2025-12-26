@@ -6,14 +6,16 @@ import { WebhookGuard } from '../common/webhook.guard';
 export class VkController {
   constructor(private readonly vkService: VkService) {}
 
+  private async validateWebhookSignature(payload: any): Promise<boolean> {
+    return await this.vkService.validateWebhook(payload);
+  }
+
   @Post('webhook')
   @UseGuards(
     new WebhookGuard({
-      validateSignature: async (payload) => {
-        if (!this.vkService) {
-          return false;
-        }
-        return await this.vkService.validateWebhook(payload);
+      validateSignature: (payload: any) => {
+        const controller = this as VkController;
+        return controller.validateWebhookSignature(payload);
       },
     }),
   )
