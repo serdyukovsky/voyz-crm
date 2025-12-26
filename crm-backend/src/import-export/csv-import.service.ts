@@ -1566,12 +1566,9 @@ export class CsvImportService {
                         const dealToCreate = {
                           number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
                           title: row.title, // НИКОГДА не передаем пустую строку
-<<<<<<< HEAD
-                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter (always string here)
-=======
                           amount: row.amount !== undefined ? row.amount : null,
                           budget: row.budget !== undefined ? row.budget : null,
-                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
+                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter (always string here)
                           stageId: row.stageId, // НИКОГДА не передаем пустую строку
                           assignedToId: row.assignedToId !== undefined ? row.assignedToId : null,
                           contactId: row.contactId !== undefined ? row.contactId : null,
@@ -1596,7 +1593,6 @@ export class CsvImportService {
                           tags: dealToCreate.tags,
                           rejectionReasons: dealToCreate.rejectionReasons,
                           reason: dealToCreate.reason,
->>>>>>> 373640c944765c28701d14c2da26fdd3116ea98d
                         });
                         
                         dealsWithNumber.push(dealToCreate);
