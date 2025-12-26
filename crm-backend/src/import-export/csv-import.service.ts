@@ -568,7 +568,7 @@ export class CsvImportService {
     rows: Record<string, string>[], // Parsed CSV rows from frontend
     mapping: DealFieldMapping,
     user: any,
-    pipelineId: string,
+    pipelineId: string | undefined, // Optional for dry-run, required for actual import
     defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     dryRun: boolean = false,
@@ -634,10 +634,18 @@ export class CsvImportService {
         // Continue to CSV processing - errors will be shown in preview
       }
       
-      // PipelineId validation - pipeline is optional, used only for soft validation
-      // If missing, stage validation will be skipped, but import continues
-      if (!pipelineId || typeof pipelineId !== 'string' || pipelineId.trim() === '') {
-        warnings.push('Pipeline ID is missing, stage validation will be skipped');
+      // PipelineId validation - required for actual import, optional for dry-run
+      // If missing in actual import, this should have been caught in controller, but safety check
+      if (!pipelineId || pipelineId === null || typeof pipelineId !== 'string' || (typeof pipelineId === 'string' && pipelineId.trim() === '')) {
+        if (dryRun) {
+          warnings.push('Pipeline ID is missing, stage validation will be skipped');
+        } else {
+          // For actual import, pipelineId is required
+          globalErrors.push('Pipeline ID is required for deal import');
+          if (globalErrors.length > 0) {
+            return { summary, errors, globalErrors, warnings };
+          }
+        }
       }
 
       // CRITICAL: Safe access to userId - user is already validated above
@@ -680,7 +688,7 @@ export class CsvImportService {
       let stagesCount = 0;
       
       // CRITICAL: Only load pipeline if pipelineId is provided and valid
-      if (pipelineId && typeof pipelineId === 'string' && pipelineId.trim() !== '') {
+      if (pipelineId && pipelineId !== null && typeof pipelineId === 'string' && pipelineId.trim() !== '') {
         try {
           // CRITICAL: Always try to load pipeline, even in dry-run
           // Pipeline model doesn't have workspaceId, so we load it by ID only
@@ -819,7 +827,7 @@ export class CsvImportService {
       title: string;
       amount?: number | string | null;
       budget?: number | string | null;
-      pipelineId: string;
+      pipelineId: string | undefined; // Optional - may be undefined for dry-run
       stageId?: string;
       stageValue?: string; // Оригинальное значение стадии из CSV (для создания стадий)
       assignedToId?: string | null;
@@ -1324,7 +1332,9 @@ export class CsvImportService {
                     // Pipeline is OPTIONAL - used only for soft validation of stageId
                     // If pipelineId is missing in row, use pipelineId from function parameter
                     // Pipeline object (for validation) is optional - import continues without it
-                    const rowPipelineId = row.pipelineId && row.pipelineId.trim() ? row.pipelineId : pipelineId;
+                    const rowPipelineId = (row.pipelineId && typeof row.pipelineId === 'string' && row.pipelineId.trim()) 
+                      ? row.pipelineId 
+                      : (pipelineId && typeof pipelineId === 'string' && pipelineId.trim() ? pipelineId : undefined);
                     
                     // SOFT VALIDATION: If pipeline is loaded, validate that stageId belongs to pipeline
                     // This is soft validation - does NOT block import if validation fails
@@ -1338,12 +1348,13 @@ export class CsvImportService {
                     }
                     
                     // Все валидации пройдены - добавляем в dealsWithNumber (same as actual import)
+                    // For dry-run, pipelineId can be undefined, so we use empty string as fallback for type compatibility
                     dealsWithNumber.push({
                       ...row,
                       number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
                       stageId: row.stageId, // НИКОГДА не передаем пустую строку
                       title: row.title, // НИКОГДА не передаем пустую строку
-                      pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
+                      pipelineId: rowPipelineId || '', // Use row.pipelineId or fallback to function parameter (empty string for dry-run if missing)
                     });
                   }
                   
@@ -1500,10 +1511,22 @@ export class CsvImportService {
                           continue;
                         }
                         
-                        // Pipeline is OPTIONAL - used only for soft validation of stageId
-                        // If pipelineId is missing in row, use pipelineId from function parameter
-                        // Pipeline object (for validation) is optional - import continues without it
-                        const rowPipelineId = row.pipelineId && row.pipelineId.trim() ? row.pipelineId : pipelineId;
+                        // Pipeline ID: use row.pipelineId if present, otherwise use function parameter
+                        // For actual import, pipelineId should always be set (validated in controller)
+                        const rowPipelineId = (row.pipelineId && typeof row.pipelineId === 'string' && row.pipelineId.trim()) 
+                          ? row.pipelineId 
+                          : (pipelineId && typeof pipelineId === 'string' && pipelineId.trim() ? pipelineId : undefined);
+                        
+                        // For actual import, pipelineId is required
+                        if (!rowPipelineId || typeof rowPipelineId !== 'string' || rowPipelineId.trim() === '') {
+                          errors.push({
+                            row: rowNumber,
+                            field: 'pipelineId',
+                            error: 'Pipeline ID is required for deal import',
+                          });
+                          summary.failed++;
+                          continue;
+                        }
                         
                         // SOFT VALIDATION: If pipeline is loaded, validate that stageId belongs to pipeline
                         // This is soft validation - does NOT block import if validation fails
@@ -1512,7 +1535,7 @@ export class CsvImportService {
                           if (!stageExists) {
                             // Soft validation warning - stageId may not belong to pipeline
                             // But import continues - this is a warning, not an error
-                            warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" may not belong to pipeline "${pipelineId}"`);
+                            warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" may not belong to pipeline "${rowPipelineId}"`);
                           }
                         }
                         
@@ -1522,7 +1545,7 @@ export class CsvImportService {
                           number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
                           stageId: row.stageId, // НИКОГДА не передаем пустую строку
                           title: row.title, // НИКОГДА не передаем пустую строку
-                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter
+                          pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter (always string here)
                         });
                       }
                       
@@ -2036,7 +2059,7 @@ export class CsvImportService {
     mapping: DealFieldMapping,
     rowNumber: number,
     errors: ImportError[],
-    pipelineId: string,
+    pipelineId: string | undefined, // Optional - may be undefined for dry-run
     stagesMap: Map<string, string>, // stageName -> stageId
     usersMap: Map<string, string>, // userName/email -> userId
     defaultAssignedToId?: string,
@@ -2047,7 +2070,7 @@ export class CsvImportService {
     title: string;
     amount?: number | string | null;
     budget?: number | string | null;
-    pipelineId: string;
+    pipelineId: string | undefined; // Optional - may be undefined for dry-run
     stageId?: string;
     stageValue?: string; // Оригинальное значение стадии из CSV
     assignedToId?: string | null;

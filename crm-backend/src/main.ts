@@ -4,6 +4,7 @@ import { BaseExceptionFilter } from '@nestjs/core';
 import { ArgumentsHost } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -11,7 +12,17 @@ async function bootstrap() {
   // 🔥 DIAGNOSTIC TEST: Remove this after verification
   // throw new Error('BACKEND RELOADED TEST');
   
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false, // Disable default body parser to configure custom limit
+  });
+  
+  // CRITICAL: Increase body size limit for import endpoints (CSV files can be large)
+  // Default limit is 100kb, we increase it to 50mb for import operations
+  // Get underlying Express instance and configure body parser
+  const httpAdapter = app.getHttpAdapter();
+  const expressApp = httpAdapter.getInstance();
+  expressApp.use(express.json({ limit: '50mb' }));
+  expressApp.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Global process-level error logging
   process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
