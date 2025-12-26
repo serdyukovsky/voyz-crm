@@ -8,6 +8,7 @@ import {
   sanitizeTextFields,
   sanitizeOptionalTextFields,
 } from '@/common/utils/normalization.utils';
+import { SystemFieldOptionsService } from '@/system-field-options/system-field-options.service';
 
 /**
  * Import Batch Service
@@ -21,7 +22,10 @@ import {
 export class ImportBatchService {
   private readonly BATCH_SIZE = 1000; // Размер batch для обработки
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly systemFieldOptionsService: SystemFieldOptionsService,
+  ) {}
 
   /**
    * Batch поиск существующих контактов по email или phone
@@ -189,6 +193,55 @@ export class ImportBatchService {
 
     if (contactsData.length === 0) {
       return result;
+    }
+
+    // CRITICAL: Update system field options with new values from CSV
+    // Collect all unique directions and contactMethods values from all rows
+    const allDirections = new Set<string>();
+    const allContactMethods = new Set<string>();
+    contactsData.forEach((row) => {
+      if (row.directions && row.directions.length > 0) {
+        row.directions.forEach((direction) => {
+          if (direction && direction.trim()) {
+            allDirections.add(direction.trim());
+          }
+        });
+      }
+      if (row.contactMethods && row.contactMethods.length > 0) {
+        row.contactMethods.forEach((method) => {
+          if (method && method.trim()) {
+            allContactMethods.add(method.trim());
+          }
+        });
+      }
+    });
+
+    // Add new directions to system options if they don't exist
+    if (allDirections.size > 0) {
+      try {
+        await this.systemFieldOptionsService.addOptionsIfMissing(
+          'contact',
+          'directions',
+          Array.from(allDirections),
+        );
+      } catch (error) {
+        console.error('[BATCH CREATE CONTACTS] Failed to update directions options:', error);
+        // Don't fail the import if options update fails
+      }
+    }
+
+    // Add new contactMethods to system options if they don't exist
+    if (allContactMethods.size > 0) {
+      try {
+        await this.systemFieldOptionsService.addOptionsIfMissing(
+          'contact',
+          'contactMethods',
+          Array.from(allContactMethods),
+        );
+      } catch (error) {
+        console.error('[BATCH CREATE CONTACTS] Failed to update contactMethods options:', error);
+        // Don't fail the import if options update fails
+      }
     }
 
     // Нормализация данных
@@ -368,6 +421,33 @@ export class ImportBatchService {
 
     if (dealsData.length === 0) {
       return result;
+    }
+
+    // CRITICAL: Update system field options with new values from CSV
+    // Collect all unique rejectionReasons values from all rows
+    const allRejectionReasons = new Set<string>();
+    dealsData.forEach((row) => {
+      if (row.rejectionReasons && row.rejectionReasons.length > 0) {
+        row.rejectionReasons.forEach((reason) => {
+          if (reason && reason.trim()) {
+            allRejectionReasons.add(reason.trim());
+          }
+        });
+      }
+    });
+
+    // Add new rejectionReasons to system options if they don't exist
+    if (allRejectionReasons.size > 0) {
+      try {
+        await this.systemFieldOptionsService.addOptionsIfMissing(
+          'deal',
+          'rejectionReasons',
+          Array.from(allRejectionReasons),
+        );
+      } catch (error) {
+        console.error('[BATCH CREATE DEALS] Failed to update rejectionReasons options:', error);
+        // Don't fail the import if options update fails
+      }
     }
 
     // Поиск существующих сделок по number

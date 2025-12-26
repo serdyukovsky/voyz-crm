@@ -6,9 +6,10 @@ import { AutoMappingService } from './auto-mapping.service';
 import { ImportExportController } from './import-export.controller';
 import { CommonModule } from '@/common/common.module';
 import { PrismaService } from '@/common/services/prisma.service';
+import { SystemFieldOptionsModule } from '@/system-field-options/system-field-options.module';
 
 @Module({
-  imports: [CommonModule],
+  imports: [CommonModule, SystemFieldOptionsModule],
   controllers: [ImportExportController],
   providers: [
     ImportExportService,
