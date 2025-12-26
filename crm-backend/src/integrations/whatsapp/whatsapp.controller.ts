@@ -6,6 +6,10 @@ import { WebhookGuard } from '../common/webhook.guard';
 export class WhatsAppController {
   constructor(private readonly whatsappService: WhatsAppService) {}
 
+  private async validateWebhookSignature(payload: any, signature: string, headers: Record<string, string>): Promise<boolean> {
+    return await this.whatsappService.validateWebhook(payload, signature, headers);
+  }
+
   @Get('webhook')
   @HttpCode(200)
   async verifyWebhook(
@@ -24,11 +28,9 @@ export class WhatsAppController {
   @HttpCode(200)
   @UseGuards(
     new WebhookGuard({
-      validateSignature: async (payload, signature, headers) => {
-        if (!this.whatsappService) {
-          return false;
-        }
-        return await this.whatsappService.validateWebhook(payload, signature, headers);
+      validateSignature: (payload: any, signature: string, headers: Record<string, string>) => {
+        const controller = this as WhatsAppController;
+        return controller.validateWebhookSignature(payload, signature, headers);
       },
     }),
   )
