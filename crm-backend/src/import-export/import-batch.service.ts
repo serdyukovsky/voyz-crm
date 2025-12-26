@@ -168,6 +168,12 @@ export class ImportBatchService {
       tags?: string[];
       notes?: string | null;
       social?: any;
+      link?: string | null;
+      subscriberCount?: string | null;
+      directions?: string[];
+      contactMethods?: string[];
+      websiteOrTgChannel?: string | null;
+      contactInfo?: string | null;
     }>,
     userId: string,
   ): Promise<{
@@ -204,6 +210,12 @@ export class ImportBatchService {
             tags: row.tags || [],
             notes: sanitizeOptionalTextFields(row.notes),
             social: normalizedSocial || {},
+            link: sanitizeOptionalTextFields(row.link),
+            subscriberCount: sanitizeOptionalTextFields(row.subscriberCount),
+            directions: row.directions || [],
+            contactMethods: row.contactMethods || [],
+            websiteOrTgChannel: sanitizeOptionalTextFields(row.websiteOrTgChannel),
+            contactInfo: sanitizeOptionalTextFields(row.contactInfo),
           },
           lookupKey: normalizedEmail ? `email:${normalizedEmail}` : normalizedPhone ? `phone:${normalizedPhone}` : null,
         };
@@ -438,22 +450,77 @@ export class ImportBatchService {
 
         if (existing) {
           // Обновление существующей сделки
-          // CRITICAL: Don't include amount if it's null - Prisma doesn't allow null for amount
-          // Only update amount if it has a valid value
-          const updateData: any = { ...baseDealData };
+          // CRITICAL: For Prisma update, use connect syntax for relations (pipeline, stage)
+          const updateData: any = {};
+          
+          // Copy non-relation fields from baseDealData
+          if (baseDealData.title !== undefined) updateData.title = baseDealData.title;
+          if (baseDealData.description !== undefined) updateData.description = baseDealData.description;
+          if (baseDealData.tags !== undefined) updateData.tags = baseDealData.tags;
+          if (baseDealData.rejectionReasons !== undefined) updateData.rejectionReasons = baseDealData.rejectionReasons;
+          // CRITICAL: reason field does not exist in Prisma schema - skip it
+          // if (baseDealData.reason !== undefined) updateData.reason = baseDealData.reason;
+          if (baseDealData.expectedCloseAt !== undefined) updateData.expectedCloseAt = baseDealData.expectedCloseAt;
+          if (baseDealData.budget !== undefined && baseDealData.budget !== null) updateData.budget = baseDealData.budget;
+          
+          // Handle relations using connect syntax
+          if (baseDealData.pipelineId) {
+            updateData.pipeline = { connect: { id: baseDealData.pipelineId } };
+          }
+          if (baseDealData.stageId) {
+            updateData.stage = { connect: { id: baseDealData.stageId } };
+          }
+          if (baseDealData.assignedToId !== undefined) {
+            if (baseDealData.assignedToId) {
+              updateData.assignedTo = { connect: { id: baseDealData.assignedToId } };
+            } else {
+              updateData.assignedTo = { disconnect: true };
+            }
+          }
+          if (baseDealData.contactId !== undefined) {
+            if (baseDealData.contactId) {
+              updateData.contact = { connect: { id: baseDealData.contactId } };
+            } else {
+              updateData.contact = { disconnect: true };
+            }
+          }
+          if (baseDealData.companyId !== undefined) {
+            if (baseDealData.companyId) {
+              updateData.company = { connect: { id: baseDealData.companyId } };
+            } else {
+              updateData.company = { disconnect: true };
+            }
+          }
           
           // CRITICAL: Only add amount if it has a valid numeric value
           if (amountValue !== null && amountValue !== undefined && !isNaN(Number(amountValue))) {
             updateData.amount = Number(amountValue);
           }
-          // Explicitly ensure amount is NOT in updateData if it's null/undefined
-          // This prevents Prisma from trying to set amount to null
           
-          // Log update data to verify amount is not included
+          // CRITICAL: Ensure pipelineId and stageId are NEVER in updateData (must use connect syntax)
+          if ('pipelineId' in updateData) {
+            delete updateData.pipelineId;
+            console.warn(`[BATCH UPDATE DATA] WARNING: pipelineId found in updateData for deal ${existing.id} - removed. Use pipeline: { connect: { id } } instead.`);
+          }
+          if ('stageId' in updateData) {
+            delete updateData.stageId;
+            console.warn(`[BATCH UPDATE DATA] WARNING: stageId found in updateData for deal ${existing.id} - removed. Use stage: { connect: { id } } instead.`);
+          }
+          // CRITICAL: Ensure reason is NEVER in updateData (field doesn't exist in Prisma schema)
+          if ('reason' in updateData) {
+            delete updateData.reason;
+            console.warn(`[BATCH UPDATE DATA] WARNING: reason found in updateData for deal ${existing.id} - removed. Field doesn't exist in Prisma schema.`);
+          }
+          
+          // Log update data to verify structure
           console.log(`[BATCH UPDATE DATA] Row ${index + 1}, Deal ${existing.id}:`, {
             hasAmount: 'amount' in updateData,
             amountValue: 'amount' in updateData ? updateData.amount : 'NOT INCLUDED',
             updateDataKeys: Object.keys(updateData),
+            hasPipeline: !!updateData.pipeline,
+            hasStage: !!updateData.stage,
+            hasPipelineId: 'pipelineId' in updateData,
+            hasStageId: 'stageId' in updateData,
           });
           
           toUpdate.push({
@@ -463,9 +530,11 @@ export class ImportBatchService {
         } else {
           // Создание новой сделки
           // CRITICAL: amount must be 0 (not null) for new deals
+          // CRITICAL: Remove reason field - it doesn't exist in Prisma schema
+          const { reason, ...dealDataWithoutReason } = baseDealData;
           toCreate.push({
             number: row.number,
-            ...baseDealData,
+            ...dealDataWithoutReason,
             amount: amountValue !== null && amountValue !== undefined ? amountValue : 0,
             createdById: userId,
           });
@@ -630,6 +699,7 @@ export class ImportBatchService {
       try {
         // CRITICAL: Filter out amount from update data if it's null/undefined
         // Prisma doesn't allow null for amount field
+        // CRITICAL: Also remove pipelineId and stageId - they must use connect syntax, not direct IDs
         const sanitizedBatch = batch.map((item) => {
           const sanitizedData: any = { ...item.data };
           
@@ -637,6 +707,21 @@ export class ImportBatchService {
           if ('amount' in sanitizedData && (sanitizedData.amount === null || sanitizedData.amount === undefined || isNaN(Number(sanitizedData.amount)))) {
             delete sanitizedData.amount;
             console.log(`[BATCH UPDATE SANITIZE] Removed null/undefined amount from deal ${item.id}`);
+          }
+          
+          // CRITICAL: Remove pipelineId and stageId - they must use connect syntax (pipeline: { connect: { id } })
+          if ('pipelineId' in sanitizedData) {
+            delete sanitizedData.pipelineId;
+            console.log(`[BATCH UPDATE SANITIZE] Removed pipelineId from deal ${item.id} - must use pipeline: { connect: { id } }`);
+          }
+          if ('stageId' in sanitizedData) {
+            delete sanitizedData.stageId;
+            console.log(`[BATCH UPDATE SANITIZE] Removed stageId from deal ${item.id} - must use stage: { connect: { id } }`);
+          }
+          // CRITICAL: Remove reason - this field doesn't exist in Prisma schema
+          if ('reason' in sanitizedData) {
+            delete sanitizedData.reason;
+            console.log(`[BATCH UPDATE SANITIZE] Removed reason from deal ${item.id} - field doesn't exist in Prisma schema`);
           }
           
           return {
