@@ -49,12 +49,8 @@ export class PipelinesController {
     type: [PipelineResponseDto],
   })
   async findAll(@CurrentUser() user?: any) {
-    console.log('🔥🔥🔥 PipelinesController.findAll - START');
-    console.log('🔥 PipelinesController.findAll - user:', user ? { id: user.id, role: user.role, permissions: user.permissions } : 'no user');
     try {
-      console.log('🔥 PipelinesController.findAll - calling pipelinesService.findAll()...');
       const result = await this.pipelinesService.findAll();
-      console.log('🔥 PipelinesController.findAll - success, pipelines count:', Array.isArray(result) ? result.length : 'not array');
       return result;
     } catch (error) {
       console.error('🔥🔥🔥 PipelinesController.findAll - ERROR:', {
@@ -79,9 +75,7 @@ export class PipelinesController {
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
   async create(@Body() createPipelineDto: CreatePipelineDto) {
     try {
-      console.log('PipelinesController.create called with:', createPipelineDto);
       const result = await this.pipelinesService.create(createPipelineDto);
-      console.log('PipelinesController.create result:', result);
       return result;
     } catch (error) {
       console.error('PipelinesController.create error:', error);

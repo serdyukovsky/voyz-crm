@@ -157,12 +157,12 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     if (isOpen) {
       const loadData = async () => {
         try {
-          const [usersData, dealsData] = await Promise.all([
+          const [usersData, dealsResponse] = await Promise.all([
             getUsers(),
             getDeals(),
           ])
           setUsers(usersData)
-          setDeals(dealsData)
+          setDeals(dealsResponse.data || [])
         } catch (error) {
           console.error('Failed to load data:', error)
         }

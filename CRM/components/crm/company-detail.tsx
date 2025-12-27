@@ -77,7 +77,7 @@ export function CompanyDetail({ companyId }: CompanyDetailProps) {
   const loadDeals = async () => {
     try {
       const dealsData = await getDeals({ companyId })
-      setDeals(dealsData)
+      setDeals(dealsData.data || [])
     } catch (error) {
       console.error('Failed to load deals:', error)
     }

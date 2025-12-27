@@ -139,8 +139,8 @@ export function CreateUserModal({
     if (!password) {
       return [t('users.errors.passwordRequired') || 'Пароль обязателен']
     }
-    if (password.length < 8) {
-      errors.push(t('users.errors.passwordMinLength') || 'Минимум 8 символов')
+    if (password.length < 6) {
+      errors.push(t('users.errors.passwordMinLength') || 'Минимум 6 символов')
     }
     if (!/[A-Za-z]/.test(password)) {
       errors.push(t('users.errors.passwordLetter') || 'Хотя бы одна буква')
@@ -234,7 +234,17 @@ export function CreateUserModal({
       onClose()
     } catch (error) {
       console.error('Failed to create user:', error instanceof Error ? error.message : String(error))
-      // Error is already handled by parent component
+      // Show error to user in modal
+      const errorMessage = error instanceof Error ? error.message : 'Не удалось создать пользователя'
+      setErrors({ 
+        general: errorMessage.includes('already exists') || errorMessage.includes('уже существует')
+          ? 'Пользователь с таким email уже существует'
+          : errorMessage.includes('email') || errorMessage.includes('Email')
+          ? 'Некорректный формат email'
+          : errorMessage.includes('password') || errorMessage.includes('Пароль')
+          ? 'Пароль не соответствует требованиям'
+          : errorMessage
+      })
     } finally {
       setLoading(false)
     }
@@ -248,6 +258,12 @@ export function CreateUserModal({
     }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-5 space-y-4 rounded-br-3xl">
         <div className="space-y-4">
+          {/* General Error */}
+          {errors.general && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
+            </div>
+          )}
           {/* First Name */}
           <div>
             <Input
@@ -381,9 +397,9 @@ export function CreateUserModal({
                         {t('users.passwordRequirements') || 'Требования к паролю:'}
                       </p>
                       <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className={cn("flex items-center gap-2", password.length >= 8 && "text-green-600")}>
-                          <span className={cn("w-1.5 h-1.5 rounded-full", password.length >= 8 ? "bg-green-600" : "bg-muted-foreground")} />
-                          {t('users.passwordRequirement.length') || 'Минимум 8 символов'}
+                        <li className={cn("flex items-center gap-2", password.length >= 6 && "text-green-600")}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", password.length >= 6 ? "bg-green-600" : "bg-muted-foreground")} />
+                          {t('users.passwordRequirement.length') || 'Минимум 6 символов'}
                         </li>
                         <li className={cn("flex items-center gap-2", /[A-Za-z]/.test(password) && "text-green-600")}>
                           <span className={cn("w-1.5 h-1.5 rounded-full", /[A-Za-z]/.test(password) ? "bg-green-600" : "bg-muted-foreground")} />

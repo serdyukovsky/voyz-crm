@@ -12,11 +12,8 @@ export class PipelinesService {
 
   async create(createPipelineDto: CreatePipelineDto) {
     try {
-      console.log('PipelinesService.create called with DTO:', createPipelineDto);
-      
       // Validate required fields
       if (!createPipelineDto.name || !createPipelineDto.name.trim()) {
-        console.error('Pipeline name validation failed:', createPipelineDto.name);
         throw new BadRequestException('Pipeline name is required');
       }
 
@@ -35,8 +32,6 @@ export class PipelinesService {
         isActive: true,
         order: 0,
       };
-
-      console.log('Creating pipeline with data:', pipelineData);
 
       const pipeline = await this.prisma.pipeline.create({
         data: {
@@ -63,7 +58,6 @@ export class PipelinesService {
         include: { stages: { orderBy: { order: 'asc' } } },
       });
 
-      console.log('Pipeline created successfully:', pipeline.id, pipeline.name);
       return pipeline;
     } catch (error) {
       console.error('Error creating pipeline:', error);
@@ -81,16 +75,12 @@ export class PipelinesService {
   }
 
   async findAll() {
-    console.log('[PIPELINES SERVICE] findAll called - START');
-    console.log('[PIPELINES SERVICE] prisma available:', !!this.prisma);
     try {
-      console.log('[PIPELINES SERVICE] Fetching pipelines from DB...');
       const pipelines = await this.prisma.pipeline.findMany({
         where: { isActive: true },
         include: { stages: { orderBy: { order: 'asc' } } },
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
       });
-      console.log('[PIPELINES SERVICE] Found pipelines:', pipelines.length);
       return pipelines;
     } catch (error) {
       console.error('[PIPELINES SERVICE ERROR] Error in findAll:', {
@@ -230,12 +220,6 @@ export class PipelinesService {
   }
 
   async reorderStages(pipelineId: string, stageOrders: { id: string; order: number }[]) {
-    console.log('[PIPELINES SERVICE] reorderStages called', {
-      pipelineId,
-      stageOrdersCount: stageOrders.length,
-      stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
-    });
-
     // Verify pipeline exists
     const pipeline = await this.findOne(pipelineId);
     if (!pipeline) {
@@ -254,8 +238,6 @@ export class PipelinesService {
     // two stages with the same order in the same pipeline
     // So we update in two steps: first set to temporary values, then to final values
     return this.prisma.$transaction(async (tx) => {
-      console.log('[PIPELINES SERVICE] Starting transaction for reorder');
-      
       // Step 1: Set all stages to negative orders to avoid conflicts
       // We use negative values that are guaranteed to be unique
       const negativeUpdates = stageOrders.map(({ id }, index) =>
@@ -265,7 +247,6 @@ export class PipelinesService {
         }),
       );
       await Promise.all(negativeUpdates);
-      console.log('[PIPELINES SERVICE] Step 1 complete: Set negative orders');
 
       // Step 2: Set all stages to their correct orders
       const positiveUpdates = stageOrders.map(({ id, order }) =>
@@ -275,7 +256,6 @@ export class PipelinesService {
         }),
       );
       await Promise.all(positiveUpdates);
-      console.log('[PIPELINES SERVICE] Step 2 complete: Set final orders');
 
       // Return the updated pipeline using the transaction client
       const updatedPipeline = await tx.pipeline.findUnique({
@@ -286,10 +266,6 @@ export class PipelinesService {
       if (!updatedPipeline) {
         throw new NotFoundException(`Pipeline with ID ${pipelineId} not found`);
       }
-
-      console.log('[PIPELINES SERVICE] Transaction complete, returning pipeline with stages:', 
-        updatedPipeline.stages.map(s => ({ id: s.id, name: s.name, order: s.order }))
-      );
 
       return updatedPipeline;
     });

@@ -6,6 +6,7 @@ import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
 import { Task, TaskStatus, ActivityType } from '@prisma/client';
+import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
 
 @Injectable()
 export class TasksService {
@@ -51,16 +52,7 @@ export class TasksService {
 
     // Log action
     try {
-      // Get deal and contact names for metadata
-      const deal = task.dealId ? await this.prisma.deal.findUnique({
-        where: { id: task.dealId },
-        select: { title: true },
-      }) : null;
-      const contact = task.contactId ? await this.prisma.contact.findUnique({
-        where: { id: task.contactId },
-        select: { fullName: true },
-      }) : null;
-      
+      // Use already loaded deal and contact data (optimization: avoid extra queries)
       await this.loggingService.create({
         level: 'info',
         action: 'create',
@@ -73,9 +65,9 @@ export class TasksService {
           status: task.status,
           priority: task.priority,
           dealId: task.dealId,
-          dealTitle: deal?.title,
+          dealTitle: task.deal?.title,
           contactId: task.contactId,
-          contactName: contact?.fullName,
+          contactName: task.contact?.fullName,
         },
       });
     } catch (logError) {
@@ -91,63 +83,244 @@ export class TasksService {
     return task;
   }
 
+  /**
+   * Encode cursor to base64 string
+   */
+  private encodeCursor(cursor: PaginationCursor): string {
+    return Buffer.from(JSON.stringify(cursor)).toString('base64');
+  }
+
+  /**
+   * Decode cursor from base64 string
+   */
+  private decodeCursor(cursorString: string): PaginationCursor | null {
+    try {
+      const decoded = Buffer.from(cursorString, 'base64').toString('utf-8');
+      const cursor = JSON.parse(decoded) as PaginationCursor;
+      if (!cursor.updatedAt || !cursor.id) {
+        return null;
+      }
+      return cursor;
+    } catch (error) {
+      return null;
+    }
+  }
+
   async findAll(filters?: {
     dealId?: string;
     contactId?: string;
     assignedToId?: string;
     status?: TaskStatus;
-  }) {
+    limit?: number;
+    cursor?: string; // base64 encoded cursor
+  }): Promise<PaginatedResponse<any> | any[]> {
+    const where: any = {};
+
+    // Base filters
+    if (filters?.dealId) where.dealId = filters.dealId;
+    if (filters?.contactId) where.contactId = filters.contactId;
+    if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
+    if (filters?.status) where.status = filters.status;
+
+    // Hard limit for performance (optimization: prevent loading all tasks)
+    const limit = filters?.limit ? Math.min(filters.limit, 100) : 50;
+    const take = limit + 1; // +1 to check if hasMore
+
+    // Decode cursor if provided (for tasks we use createdAt, but cursor format uses updatedAt field name)
+    const decodedCursor = filters?.cursor ? this.decodeCursor(filters.cursor) : null;
+
+    // Add cursor condition for pagination (tasks use createdAt for sorting)
+    if (decodedCursor) {
+      const cursorCondition = {
+        OR: [
+          { createdAt: { lt: new Date(decodedCursor.updatedAt) } }, // Note: cursor.updatedAt contains createdAt value for tasks
+          {
+            createdAt: new Date(decodedCursor.updatedAt),
+            id: { lt: decodedCursor.id },
+          },
+        ],
+      };
+
+      // Merge cursor condition into existing where
+      Object.assign(where, cursorCondition);
+    }
+
+    // Use select instead of include to avoid overfetching (optimization: load only needed fields)
     const tasks = await this.prisma.task.findMany({
-      where: filters,
-      include: {
+      where,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        type: true,
+        deadline: true,
+        completedAt: true,
+        result: true,
+        dealId: true,
+        contactId: true,
+        assignedToId: true,
+        createdById: true,
+        createdAt: true,
+        updatedAt: true,
         deal: {
-          include: {
-            stage: true,
-            contact: true,
+          select: {
+            id: true,
+            title: true,
+            stage: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         contact: {
-          include: {
-            company: true,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            position: true,
+            companyName: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' }, // Secondary sort for stable pagination
+      ],
+      take,
     });
 
-    // Format tasks with contact stats if contact exists
-    return Promise.all(
-      tasks.map(async (task) => {
-        if (!task.contact) {
-          return task;
-        }
+    // Always return an array, even if empty
+    if (tasks.length === 0) {
+      // If cursor was provided, return paginated response, otherwise return empty array (backward compatibility)
+      if (decodedCursor) {
+        return { data: [], nextCursor: undefined, hasMore: false };
+      }
+      return [];
+    }
 
-        // Get contact stats
-        const contactStats = await this.getContactStats(task.contact.id);
+    // Check if there are more items
+    const hasMore = tasks.length > limit;
+    const data = hasMore ? tasks.slice(0, limit) : tasks;
 
-        return {
-          ...task,
-          contact: {
-            id: task.contact.id,
-            fullName: task.contact.fullName,
-            email: task.contact.email,
-            phone: task.contact.phone,
-            position: task.contact.position,
-            companyName: task.contact.company?.name,
-            company: task.contact.company,
-            social: task.contact.social as {
-              instagram?: string;
-              telegram?: string;
-              whatsapp?: string;
-              vk?: string;
-            },
-            stats: contactStats,
-          },
-        };
-      }),
-    );
+    // Format tasks without stats (optimization: stats not needed for list view)
+    const formattedTasks = data.map((task) => this.formatTaskResponseForList(task));
+
+    // If cursor was provided, return paginated response
+    if (decodedCursor) {
+      const lastTask = data[data.length - 1];
+      const nextCursor = hasMore
+        ? this.encodeCursor({
+            updatedAt: lastTask.createdAt.toISOString(), // Use updatedAt field name in cursor, but store createdAt value
+            id: lastTask.id,
+          })
+        : undefined;
+
+      return {
+        data: formattedTasks,
+        nextCursor,
+        hasMore,
+      };
+    }
+
+    // Backward compatibility: return array if no cursor
+    return formattedTasks;
+  }
+
+  /**
+   * Batch load contact stats for multiple contacts (optimization: avoid N+1 queries)
+   */
+  private async getContactStatsBatch(contactIds: string[]): Promise<Map<string, any>> {
+    if (contactIds.length === 0) {
+      return new Map();
+    }
+
+    const deals = await this.prisma.deal.findMany({
+      where: { contactId: { in: contactIds } },
+      select: {
+        id: true,
+        contactId: true,
+        amount: true,
+        closedAt: true,
+      },
+    });
+
+    // Group deals by contactId
+    const statsMap = new Map<string, any>();
+    
+    // Initialize stats for all contacts
+    contactIds.forEach(id => {
+      statsMap.set(id, {
+        activeDeals: 0,
+        closedDeals: 0,
+        totalDeals: 0,
+        totalDealVolume: 0,
+      });
+    });
+
+    // Calculate stats for each contact
+    deals.forEach(deal => {
+      if (!deal.contactId) return;
+      
+      const stats = statsMap.get(deal.contactId);
+      if (!stats) return;
+
+      stats.totalDeals++;
+      if (deal.closedAt) {
+        stats.closedDeals++;
+        stats.totalDealVolume += Number(deal.amount);
+      } else {
+        stats.activeDeals++;
+      }
+    });
+
+    return statsMap;
+  }
+
+  /**
+   * Format task response for list view (optimized - no stats)
+   */
+  private formatTaskResponseForList(task: any) {
+    return {
+      ...task,
+      deal: task.deal ? {
+        id: task.deal.id,
+        title: task.deal.title,
+        stage: task.deal.stage,
+      } : null,
+      contact: task.contact ? {
+        id: task.contact.id,
+        fullName: task.contact.fullName,
+        email: task.contact.email,
+        phone: task.contact.phone,
+        position: task.contact.position,
+        companyName: task.contact.companyName,
+        company: task.contact.company,
+      } : null,
+      assignedTo: task.assignedTo ? {
+        id: task.assignedTo.id,
+        name: `${task.assignedTo.firstName || ''} ${task.assignedTo.lastName || ''}`.trim() || 'Unknown User',
+        avatar: task.assignedTo.avatar || null,
+      } : null,
+    };
   }
 
   private async getContactStats(contactId: string) {
@@ -178,20 +351,66 @@ export class TasksService {
   async findOne(id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        dealId: true,
+        contactId: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        type: true,
+        deadline: true,
+        completedAt: true,
+        result: true,
+        createdById: true,
+        assignedToId: true,
+        createdAt: true,
+        updatedAt: true,
         deal: {
-          include: {
-            stage: true,
-            contact: true,
+          select: {
+            id: true,
+            title: true,
+            stageId: true,
+            // Загружаем только базовые поля deal, stage и contact не нужны для детального просмотра задачи
           },
         },
         contact: {
-          include: {
-            company: true,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            position: true,
+            companyName: true,
+            social: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+                industry: true,
+              },
+            },
           },
         },
-        assignedTo: true,
-        createdBy: true,
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
+        },
       },
     });
 
@@ -205,19 +424,7 @@ export class TasksService {
       return {
         ...task,
         contact: {
-          id: task.contact.id,
-          fullName: task.contact.fullName,
-          email: task.contact.email,
-          phone: task.contact.phone,
-          position: task.contact.position,
-          companyName: task.contact.companyName,
-          company: task.contact.company,
-          social: task.contact.social as {
-            instagram?: string;
-            telegram?: string;
-            whatsapp?: string;
-            vk?: string;
-          },
+          ...task.contact,
           stats: contactStats,
         },
       };
@@ -227,9 +434,7 @@ export class TasksService {
   }
 
   async update(id: string, updateTaskDto: UpdateTaskDto, userId: string): Promise<Task> {
-    console.log('TasksService.update - Called with:', { id, updateTaskDto, userId });
     const existing = await this.findOne(id);
-    console.log('TasksService.update - Existing task:', existing.id, existing.title);
 
     const updates: any = {};
     const changes: Record<string, { old: any; new: any }> = {};
@@ -303,9 +508,6 @@ export class TasksService {
         updates.completedAt = new Date();
       }
     }
-
-    console.log('TasksService.update - Updates to apply:', updates);
-    console.log('TasksService.update - Changes detected:', Object.keys(changes));
     
     const task = await this.prisma.task.update({
       where: { id },
@@ -317,12 +519,8 @@ export class TasksService {
       },
     });
 
-    console.log('TasksService.update - Task updated successfully:', task.id);
-
     // Log activity for changes - create activities for each changed field
-    console.log('TasksService.update - Creating activities for changes:', Object.keys(changes));
     for (const [field, change] of Object.entries(changes)) {
-      console.log('TasksService.update - Logging activity for field:', field, 'Change:', change);
       const activityType =
         field === 'status' && change.new === TaskStatus.DONE
           ? ActivityType.TASK_COMPLETED
@@ -341,29 +539,17 @@ export class TasksService {
             newValue: change.new,
           },
         });
-        console.log('TasksService.update - Activity created successfully:', activity.id, 'Type:', activity.type, 'Field:', field);
       } catch (activityError) {
         console.error('TasksService.update - Failed to create activity for field:', field, activityError);
       }
     }
-    console.log('TasksService.update - All activities created for task:', id);
 
     // Log action - only if there are actual changes
     if (Object.keys(changes).length > 0) {
       try {
         const changeFields = Object.keys(changes);
-        console.log('TasksService.update - Creating log for task:', task.id, 'Changes:', changeFields, 'UserId:', userId);
         
-        // Get deal and contact names for metadata
-        const deal = task.dealId ? await this.prisma.deal.findUnique({
-          where: { id: task.dealId },
-          select: { title: true },
-        }) : null;
-        const contact = task.contactId ? await this.prisma.contact.findUnique({
-          where: { id: task.contactId },
-          select: { fullName: true },
-        }) : null;
-        
+        // Use already loaded deal and contact data (optimization: avoid extra queries)
         const logData = {
           level: 'info',
           action: 'update',
@@ -376,21 +562,17 @@ export class TasksService {
             changes,
             status: task.status,
             dealId: task.dealId,
-            dealTitle: deal?.title,
+            dealTitle: task.deal?.title,
             contactId: task.contactId,
-            contactName: contact?.fullName,
+            contactName: task.contact?.fullName,
           },
         };
         
-        console.log('TasksService.update - Log data:', JSON.stringify(logData, null, 2));
-        const createdLog = await this.loggingService.create(logData);
-        console.log('TasksService.update - Log created successfully:', createdLog.id, 'Entity:', createdLog.entity, 'EntityId:', createdLog.entityId);
+        await this.loggingService.create(logData);
       } catch (logError) {
         console.error('TasksService.update - failed to create log:', logError);
         console.error('TasksService.update - log error details:', logError instanceof Error ? logError.stack : logError);
       }
-    } else {
-      console.log('TasksService.update - No changes detected, skipping log creation');
     }
 
     // Emit WebSocket events

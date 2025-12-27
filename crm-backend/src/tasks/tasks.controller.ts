@@ -37,19 +37,24 @@ export class TasksController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
-  @ApiOperation({ summary: 'Get all tasks with optional filters' })
-  @ApiResponse({ status: 200, description: 'List of tasks' })
+  @ApiOperation({ summary: 'Get all tasks with optional filters and pagination' })
+  @ApiResponse({ status: 200, description: 'List of tasks (array if no cursor, paginated response if cursor provided)' })
   findAll(
     @Query('dealId') dealId?: string,
     @Query('contactId') contactId?: string,
     @Query('assignedToId') assignedToId?: string,
     @Query('status') status?: TaskStatus,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
+    const limitNum = limit ? Math.min(parseInt(limit, 10) || 50, 100) : 50;
     return this.tasksService.findAll({
       dealId,
       contactId,
       assignedToId,
       status,
+      limit: limitNum,
+      cursor,
     });
   }
 

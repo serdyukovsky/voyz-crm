@@ -99,7 +99,7 @@ export function CreateTaskModal({
               }
               return []
             }),
-            getDeals().catch(err => {
+            getDeals().then(r => r.data).catch(err => {
               console.error('CreateTaskModal: Failed to load deals:', err)
               const errorMessage = err instanceof Error ? err.message : 'Unknown error'
               if (errorMessage === 'UNAUTHORIZED') {

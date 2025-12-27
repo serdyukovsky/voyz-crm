@@ -2,7 +2,7 @@
 
 import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
-import { Trash2, MoveRight, Link as LinkIcon, Users, Hash } from 'lucide-react'
+import { Trash2, MoveRight, Link as LinkIcon, Users, Hash, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -25,6 +25,9 @@ interface DealsListViewProps {
   selectedDealId?: string | null
   onDealClick?: (dealId: string | null) => void
   searchQuery?: string
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 export function DealsListView({ 
@@ -36,7 +39,10 @@ export function DealsListView({
   stages = [],
   selectedDealId: externalSelectedDealId,
   onDealClick,
-  searchQuery = ''
+  searchQuery = '',
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore
 }: DealsListViewProps) {
   const { t } = useTranslation()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
@@ -349,6 +355,27 @@ export function DealsListView({
           </tbody>
         </table>
       </div>
+
+      {/* Load More Button */}
+      {hasMore && onLoadMore && (
+        <div className="flex justify-center mt-4 pb-4">
+          <Button
+            variant="outline"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="min-w-[200px]"
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Загрузка...
+              </>
+            ) : (
+              'Загрузить еще'
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Deal Detail Modal */}
       {selectedDealId && (

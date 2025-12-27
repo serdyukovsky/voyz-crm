@@ -569,10 +569,10 @@ export default function DealsPage() {
       if (selectedPipelineForList) {
         console.log('📋 Loading deals for list view, pipelineId:', selectedPipelineForList)
         setListLoading(true)
-        getDeals({ pipelineId: selectedPipelineForList })
-          .then((deals) => {
-            console.log('📋 Loaded deals for list view:', deals.length, 'deals')
-            setListDeals(deals)
+        getDeals({ pipelineId: selectedPipelineForList, limit: 50 })
+          .then((response) => {
+            console.log('📋 Loaded deals for list view:', response.data.length, 'deals')
+            setListDeals(response.data)
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)
@@ -585,10 +585,10 @@ export default function DealsPage() {
         console.log('📋 List view but no pipeline selected yet')
         // Try to load all deals if no pipeline is selected
         setListLoading(true)
-        getDeals()
-          .then((deals) => {
-            console.log('📋 Loaded all deals for list view:', deals.length, 'deals')
-            setListDeals(deals)
+        getDeals({ limit: 50 })
+          .then((response) => {
+            console.log('📋 Loaded all deals for list view:', response.data.length, 'deals')
+            setListDeals(response.data)
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)

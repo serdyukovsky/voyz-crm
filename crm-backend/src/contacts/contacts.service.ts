@@ -206,8 +206,26 @@ export class ContactsService {
 
     const contacts = await this.prisma.contact.findMany({
       where,
-      include: {
-        company: true,
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        position: true,
+        companyName: true,
+        companyId: true,
+        tags: true,
+        notes: true,
+        social: true,
+        link: true,
+        subscriberCount: true,
+        directions: true,
+        contactMethods: true,
+        websiteOrTgChannel: true,
+        contactInfo: true,
+        createdAt: true,
+        updatedAt: true,
+        // company не используется в formatContactResponse, только companyName
         deals: {
           select: {
             id: true,
@@ -228,9 +246,7 @@ export class ContactsService {
   async findOne(id: string): Promise<ContactResponseDto> {
     const contact = await this.prisma.contact.findUnique({
       where: { id },
-      include: {
-        company: true,
-      },
+      // company не используется в formatContactResponse, только companyName
     });
 
     if (!contact) {

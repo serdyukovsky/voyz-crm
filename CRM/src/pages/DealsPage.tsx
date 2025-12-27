@@ -615,6 +615,9 @@ function DealsPageContent() {
   const { showSuccess, showError } = useToastNotification()
   const [listDeals, setListDeals] = useState<APIDeal[]>([])
   const [listLoading, setListLoading] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
   const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -690,14 +693,20 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
+          limit: 50,
         })
-          .then((deals) => {
-            console.log('📋 DealsPage: Loaded deals for list:', deals.length, 'deals')
-            setListDeals(deals)
+          .then((response) => {
+            // API now always returns paginated response
+            console.log('📋 DealsPage: Loaded deals for list:', response.data.length, 'deals (paginated format)')
+            setListDeals(response.data)
+            setNextCursor(response.nextCursor)
+            setHasMore(response.hasMore)
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)
             setListDeals([])
+            setNextCursor(undefined)
+            setHasMore(false)
           })
           .finally(() => {
             setListLoading(false)
@@ -711,14 +720,20 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
+          limit: 50,
         })
-          .then((deals) => {
-            console.log('📋 DealsPage: Loaded all deals for list view:', deals.length, 'deals')
-            setListDeals(deals)
+          .then((response) => {
+            // API now always returns paginated response
+            console.log('📋 DealsPage: Loaded all deals for list view:', response.data.length, 'deals (paginated format)')
+            setListDeals(response.data)
+            setNextCursor(response.nextCursor)
+            setHasMore(response.hasMore)
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)
             setListDeals([])
+            setNextCursor(undefined)
+            setHasMore(false)
           })
           .finally(() => {
             setListLoading(false)
@@ -727,8 +742,47 @@ function DealsPageContent() {
     } else {
       // Clear deals when switching away from list view
       setListDeals([])
+      setNextCursor(undefined)
+      setHasMore(false)
     }
   }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
+
+  // Load more deals handler
+  const handleLoadMore = async () => {
+    if (!nextCursor || loadingMore) return
+
+    setLoadingMore(true)
+    try {
+      const params: any = {
+        companyId: filters.companyId,
+        contactId: filters.contactId,
+        assignedToId: filters.assignedUserId,
+        search: filters.title,
+        limit: 50,
+        cursor: nextCursor,
+      }
+      if (selectedPipelineForList) {
+        params.pipelineId = selectedPipelineForList
+      }
+      
+      console.log('📋 Loading more deals with cursor:', nextCursor.substring(0, 20) + '...')
+      const response = await getDeals(params)
+      console.log('📋 Loaded more deals:', response.data.length, 'hasMore:', response.hasMore)
+
+      // API now always returns paginated response
+      if (response && response.data) {
+        setListDeals(prev => [...prev, ...response.data])
+        setNextCursor(response.nextCursor)
+        setHasMore(response.hasMore)
+      }
+    } catch (error) {
+      console.error('Failed to load more deals:', error)
+      showError('Ошибка загрузки', 'Не удалось загрузить дополнительные сделки. Попробуйте еще раз.')
+      // Don't update state on error, let user try again
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const handleCreateNewDeal = async (stageId?: string) => {
     try {
@@ -1169,6 +1223,9 @@ function DealsPageContent() {
                 // Return empty array if no pipeline selected or no stages
                 return []
               })()}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={handleLoadMore}
               />
             </>
           )

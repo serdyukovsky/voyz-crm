@@ -54,9 +54,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Current user', type: UserResponseDto })
   async getMe(@CurrentUser() currentUser: any) {
     const userId = currentUser.userId || currentUser.id;
-    console.log('UsersController.getMe: Current user ID:', userId, 'User object:', currentUser);
     const user = await this.usersService.findOne(userId);
-    console.log('UsersController.getMe: Returning user data:', user);
     return user;
   }
 

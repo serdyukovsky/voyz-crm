@@ -33,23 +33,7 @@ export class DealsController {
   @ApiResponse({ status: 201, description: 'Deal created' })
   async create(@Body() createDealDto: any, @CurrentUser() user: any) {
     try {
-      console.log('DealsController.create called with:', { createDealDto, userId: user.userId || user.id });
       const result = await this.dealsService.create(createDealDto, user.userId || user.id);
-      console.log('DealsController.create - deal created successfully:', result?.id || 'no id', result?.title || 'no title');
-      // Log result without circular references
-      try {
-        const resultLog = {
-          id: result?.id,
-          number: result?.number,
-          title: result?.title,
-          amount: result?.amount,
-          pipelineId: result?.pipelineId,
-          stageId: result?.stageId,
-        }
-        console.log('DealsController.create - returning result:', JSON.stringify(resultLog, null, 2));
-      } catch (e) {
-        console.log('DealsController.create - result (could not stringify):', result?.id);
-      }
       return result;
     } catch (error) {
       console.error('DealsController.create - error:', error);
@@ -60,8 +44,8 @@ export class DealsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
-  @ApiOperation({ summary: 'Get all deals with optional filters' })
-  @ApiResponse({ status: 200, description: 'List of deals' })
+  @ApiOperation({ summary: 'Get all deals with optional filters and pagination' })
+  @ApiResponse({ status: 200, description: 'List of deals (array if no cursor, paginated response if cursor provided)' })
   findAll(
     @Query('pipelineId') pipelineId?: string,
     @Query('stageId') stageId?: string,
@@ -69,7 +53,10 @@ export class DealsController {
     @Query('contactId') contactId?: string,
     @Query('companyId') companyId?: string,
     @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
   ) {
+    const limitNum = limit ? Math.min(parseInt(limit, 10) || 50, 100) : 50;
     return this.dealsService.findAll({
       pipelineId,
       stageId,
@@ -77,6 +64,8 @@ export class DealsController {
       contactId,
       companyId,
       search,
+      limit: limitNum,
+      cursor,
     });
   }
 

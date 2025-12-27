@@ -1324,20 +1324,10 @@ export function DealsKanbanBoard({
         assignedToId: filters.assignedUserId,
       })
       
-      console.log('Loaded deals count:', Array.isArray(dealsData) ? dealsData.length : 'Not an array!')
-      if (Array.isArray(dealsData) && dealsData.length > 0) {
-        console.log('First deal sample:', {
-          id: dealsData[0].id,
-          title: dealsData[0].title,
-          amount: dealsData[0].amount,
-        })
-      }
-      
-      // Always ensure we have an array - even if empty
-      const safeDealsData = Array.isArray(dealsData) ? dealsData : []
+      // API now returns paginated response, extract data array
+      const safeDealsData = dealsData.data || []
       
       const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
-        console.log(`Processing deal ${index}:`, deal.id, deal.title, deal.stage?.id, 'assignedTo:', deal.assignedTo)
         return {
           id: deal.id,
           title: deal.title || 'Untitled Deal',
@@ -1365,7 +1355,6 @@ export function DealsKanbanBoard({
         }
       })
       
-      console.log('Transformed deals:', transformedDeals.length)
       setDeals(transformedDeals)
     } catch (error) {
       // Only show error if it's not a network/empty response issue

@@ -246,8 +246,6 @@ export class ActivityService {
       orderBy: { createdAt: 'desc' }, // Changed to desc to show latest first
     });
 
-    console.log('ActivityService.findAll - Found', activities.length, 'activities');
-
     // Transform activities to include computed 'name' field for user
     const transformed = activities.map(activity => ({
       ...activity,
@@ -260,7 +258,6 @@ export class ActivityService {
         : undefined,
     }));
     
-    console.log('ActivityService.findAll - Transformed activities:', transformed.length);
     return transformed;
   }
 }
