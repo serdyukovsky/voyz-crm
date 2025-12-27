@@ -4,6 +4,11 @@ import { CustomField, CustomFieldType } from '@prisma/client';
 
 @Injectable()
 export class CustomFieldsService {
+  // Simple in-memory cache for custom fields by entity type
+  // Key: entityType, Value: { fields: CustomField[], timestamp: number }
+  private customFieldsCache = new Map<string, { fields: CustomField[]; timestamp: number }>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
@@ -15,19 +20,50 @@ export class CustomFieldsService {
     isRequired?: boolean;
     options?: any;
   }) {
-    return this.prisma.customField.create({
+    const field = await this.prisma.customField.create({
       data,
     });
+    // Invalidate cache for this entity type
+    this.invalidateCache(data.entityType);
+    return field;
   }
 
+  /**
+   * Find custom fields by entity type - OPTIMIZED: uses in-memory cache
+   * Cache is invalidated when fields are created/updated/deleted
+   */
   async findByEntity(entityType: string) {
-    return this.prisma.customField.findMany({
+    const cached = this.customFieldsCache.get(entityType);
+    const now = Date.now();
+
+    // Return cached data if still valid
+    if (cached && (now - cached.timestamp) < this.CACHE_TTL_MS) {
+      return cached.fields;
+    }
+
+    // Fetch from database
+    const fields = await this.prisma.customField.findMany({
       where: {
         entityType,
         isActive: true,
       },
       orderBy: [{ group: 'asc' }, { order: 'asc' }],
     });
+
+    // Update cache
+    this.customFieldsCache.set(entityType, {
+      fields,
+      timestamp: now,
+    });
+
+    return fields;
+  }
+
+  /**
+   * Invalidate cache for a specific entity type (call after create/update/delete)
+   */
+  private invalidateCache(entityType: string) {
+    this.customFieldsCache.delete(entityType);
   }
 
   async setValue(
@@ -146,6 +182,9 @@ export class CustomFieldsService {
         options: { options: updatedOptions },
       },
     });
+
+    // Invalidate cache for this entity type
+    this.invalidateCache(field.entityType);
 
     console.log(
       `[CUSTOM FIELD OPTIONS] Added ${valuesToAdd.length} new options to field ${field.name} (${customFieldId}):`,
