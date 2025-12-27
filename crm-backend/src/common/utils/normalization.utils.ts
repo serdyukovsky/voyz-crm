@@ -4,6 +4,9 @@
  */
 
 import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from 'libphonenumber-js';
+
+// Re-export CountryCode for use in decorators
+export type { CountryCode };
 import { promises as dns } from 'dns';
 
 export interface SocialLinks {

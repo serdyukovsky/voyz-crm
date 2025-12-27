@@ -68,7 +68,7 @@ export class CompaniesService {
         industry: sanitizeOptionalTextFields(createCompanyDto.industry),
         email: normalizedEmail || undefined,
         phone: normalizedPhone || undefined,
-        social: normalizedSocial || {},
+        social: normalizedSocial ? (normalizedSocial as any) : {},
         address: sanitizeOptionalTextFields(createCompanyDto.address),
         notes: sanitizeOptionalTextFields(createCompanyDto.notes),
         employees: createCompanyDto.employees,

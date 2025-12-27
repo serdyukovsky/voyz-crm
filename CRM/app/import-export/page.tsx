@@ -7,6 +7,7 @@ import { ImportPreviewTable } from "@/components/crm/import-preview-table"
 import { AutoMappingForm } from "@/components/crm/auto-mapping-form"
 import { PipelineSelector } from "@/components/crm/pipeline-selector"
 import { AssignedToSelector } from "@/components/crm/assigned-to-selector"
+import { AssignedToValueMapping } from "@/components/crm/assigned-to-value-mapping"
 import { DryRunSummary } from "@/components/crm/dry-run-summary"
 import { ImportResult } from "@/components/crm/import-result"
 import { ExportPanel } from "@/components/crm/export-panel"
@@ -41,6 +42,9 @@ function ImportExportContent() {
   // Default assigned user для combined import (опционально, для "apply to all")
   const [defaultAssignedToId, setDefaultAssignedToId] = useState<string | undefined>(undefined)
   const [applyAssignedToAll, setApplyAssignedToAll] = useState(false)
+  
+  // Manual user value mapping: { "CSV value": "user-id" }
+  const [userValueMapping, setUserValueMapping] = useState<Record<string, string>>({})
   
   // Dry-run
   const [dryRunResult, setDryRunResult] = useState<ImportResultType | null>(null)
@@ -98,6 +102,7 @@ function ImportExportContent() {
       setSelectedPipelineId(undefined)
       setDefaultAssignedToId(undefined)
       setApplyAssignedToAll(false)
+      setUserValueMapping({})
       setDryRunResult(null)
       setImportResult(null)
       setError(null)
@@ -169,7 +174,8 @@ function ImportExportContent() {
         mapping, 
         selectedPipelineId!, 
         true, // dryRun
-        applyAssignedToAll ? defaultAssignedToId : undefined
+        applyAssignedToAll ? defaultAssignedToId : undefined,
+        userValueMapping // Manual mapping: { "CSV value": "user-id" }
       )
 
       setDryRunResult(result)
@@ -203,7 +209,8 @@ function ImportExportContent() {
         mapping, 
         selectedPipelineId!, 
         false, // dryRun = false (actual import)
-        applyAssignedToAll ? defaultAssignedToId : undefined
+        applyAssignedToAll ? defaultAssignedToId : undefined,
+        userValueMapping // Manual mapping: { "CSV value": "user-id" }
       )
 
       setImportResult(result)
@@ -255,8 +262,16 @@ function ImportExportContent() {
   }
 
   const hasAssignedToMapping = () => {
-    // Проверяем есть ли маппинг для assignedToId
-    return Object.values(mapping).includes('assignedToId')
+    // Проверяем есть ли маппинг для assignedToId или ownerId
+    return Object.values(mapping).includes('assignedToId') || Object.values(mapping).includes('ownerId')
+  }
+  
+  // Получить название CSV колонки для assignedToId/ownerId
+  const getAssignedToColumnName = (): string | undefined => {
+    const assignedToField = Object.entries(mapping).find(([_, value]) => 
+      value === 'assignedToId' || value === 'ownerId'
+    )
+    return assignedToField ? assignedToField[0] : undefined
   }
   
   // Validation: Check if required mappings are present
@@ -471,6 +486,17 @@ function ImportExportContent() {
                     />
                   </div>
                   
+                  {/* Manual User Value Mapping Section - показываем только если есть маппинг для assignedToId */}
+                  {hasAssignedToMapping() && getAssignedToColumnName() && (
+                    <div className="space-y-4">
+                      <AssignedToValueMapping
+                        csvColumnName={getAssignedToColumnName()!}
+                        csvRows={csvRows}
+                        mapping={userValueMapping}
+                        onMappingChange={setUserValueMapping}
+                      />
+                    </div>
+                  )}
                   
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-4 border-t border-border">

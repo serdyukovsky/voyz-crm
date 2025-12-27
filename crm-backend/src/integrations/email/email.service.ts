@@ -31,7 +31,8 @@ export class EmailService extends BaseIntegration {
 
   async sendMessage(options: SendMessageOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const fromEmail = (this.transporter.options.auth as any)?.user || options.metadata?.from || 'noreply@crm.local';
+      const transporterOptions = this.transporter.options as any;
+      const fromEmail = transporterOptions?.auth?.user || options.metadata?.from || 'noreply@crm.local';
       const info = await this.transporter.sendMail({
         from: fromEmail,
         to: options.recipient,

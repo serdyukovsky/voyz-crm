@@ -336,6 +336,9 @@ export class DealsService {
 
   private async formatDealResponse(deal: any) {
     try {
+      // Log rejectionReasons for debugging
+      console.log(`[FORMAT DEAL RESPONSE] Deal ${deal.id}: rejectionReasons =`, deal.rejectionReasons);
+      
       const result: any = { 
         ...deal,
         // Ensure amount is always a number, default to 0 if null/undefined
@@ -344,6 +347,8 @@ export class DealsService {
         title: deal.title || 'Untitled Deal',
         // Ensure stageId exists
         stageId: deal.stageId || deal.stage?.id || '',
+        // Explicitly include rejectionReasons
+        rejectionReasons: deal.rejectionReasons || [],
       };
 
       // Add contact with stats if contact exists

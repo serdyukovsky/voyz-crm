@@ -54,6 +54,27 @@ export interface DealFieldMapping {
   rejectionReasons?: string; // Причина отказа (значения будут разделены запятой)
   tags?: string;
   
+  // Contact fields (для создания/обновления контакта при импорте сделки)
+  fullName?: string; // CSV column name для имени контакта
+  position?: string; // CSV column name для должности контакта
+  companyName?: string; // CSV column name для названия компании контакта
+  link?: string; // CSV column name для ссылки контакта
+  subscriberCount?: string; // CSV column name для количества подписчиков
+  directions?: string; // CSV column name для направлений (через запятую)
+  contactMethods?: string; // CSV column name для способов связи (через запятую)
+  websiteOrTgChannel?: string; // CSV column name для сайта/тг канала
+  contactInfo?: string; // CSV column name для контактной информации
+  notes?: string; // CSV column name для заметок контакта
+  
+  // Social links для контакта
+  social?: {
+    instagram?: string;
+    telegram?: string;
+    whatsapp?: string;
+    vk?: string;
+    linkedin?: string;
+  };
+  
   // Custom fields
   customFields?: Record<string, string>;
 }

@@ -14,3 +14,5 @@ rm -rf dist node_modules/.cache .nest 2>/dev/null
 echo "✅ Starting server in FOREGROUND (you will see logs here)..."
 npm run start:dev
 
+
+

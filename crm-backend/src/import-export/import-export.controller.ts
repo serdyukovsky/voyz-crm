@@ -276,6 +276,7 @@ export class ImportExportController {
         dto.defaultAssignedToId, // Дефолтный ответственный для всех строк
         undefined, // contactEmailPhoneMap - опционально
         isDryRun,
+        dto.userValueMapping, // Manual mapping: { "CSV value": "user-id" }
       );
       
       console.log('[IMPORT CONTROLLER] csvImportService.importDeals completed successfully');

@@ -85,7 +85,7 @@ export class ContactsService {
         companyName,
         tags: createContactDto.tags || [],
         notes: sanitizeOptionalTextFields(createContactDto.notes),
-        social: normalizedSocial || {},
+        social: normalizedSocial ? (normalizedSocial as any) : {},
         // New fields
         link: sanitizeOptionalTextFields(createContactDto.link),
         subscriberCount: sanitizeOptionalTextFields(createContactDto.subscriberCount),
@@ -246,7 +246,13 @@ export class ContactsService {
     updateContactDto: UpdateContactDto,
     userId: string,
   ): Promise<ContactResponseDto> {
-    const existing = await this.findOne(id);
+    const existing = await this.prisma.contact.findUnique({
+      where: { id },
+    });
+    
+    if (!existing) {
+      throw new NotFoundException(`Contact with ID ${id} not found`);
+    }
 
     // Normalize email if provided
     let normalizedEmail: string | undefined;
