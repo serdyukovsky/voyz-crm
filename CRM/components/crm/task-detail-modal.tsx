@@ -189,12 +189,10 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     if (!isOpen || !canEditThisTask) return
     if (!isEditingDescription && description !== (task.description || "")) {
       const timeoutId = setTimeout(async () => {
-        console.log('TaskDetailModal: Auto-saving description:', description)
         const updatedTask = {
           ...task,
           description,
         }
-        console.log('TaskDetailModal: Updated task with description:', updatedTask)
         await onUpdate(updatedTask, true)
         // Refresh history after update
         setHistoryRefreshTrigger(prev => prev + 1)
@@ -284,7 +282,6 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
     }
 
     const formattedDate = format(newDate, "yyyy-MM-dd")
-    console.log('TaskDetailModal: Changing dueDate from', dueDate, 'to', formattedDate)
     setDueDate(formattedDate)
     
     // Immediately save the change
