@@ -2,7 +2,7 @@
 
 import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
-import { Trash2, MoveRight } from 'lucide-react'
+import { Trash2, MoveRight, Link as LinkIcon, Users, Hash } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -188,33 +188,51 @@ export function DealsListView({
       )}
 
       <div className="border border-border/40 rounded-lg overflow-hidden">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead>
             <tr className="border-b border-border/40 bg-surface/30">
-              <th className="px-4 py-3 w-12">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected
-                  }}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
-                  aria-label={t('deals.selectAllDeals')}
-                />
+              <th className="w-12 px-2 py-2 align-middle">
+                <div className="flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected
+                    }}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
+                    aria-label={t('deals.selectAllDeals')}
+                  />
+                </div>
               </th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.title')}</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.client')}</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.amount')}</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.stage')}</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.responsible')}</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3">{t('deals.lastModified')}</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[200px]">{t('deals.title')}</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[180px]">
+                <div className="flex items-center gap-1.5">
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  <span>Ссылка</span>
+                </div>
+              </th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Подписчики</span>
+                </div>
+              </th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[180px]">
+                <div className="flex items-center gap-1.5">
+                  <Hash className="h-3.5 w-3.5" />
+                  <span>Направления</span>
+                </div>
+              </th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[120px]">{t('deals.stage')}</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">{t('deals.responsible')}</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">{t('deals.lastModified')}</th>
             </tr>
           </thead>
           <tbody>
             {deals.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {t('deals.noDeals') || 'Нет сделок'}
                 </td>
               </tr>
@@ -229,53 +247,101 @@ export function DealsListView({
                     isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
                   )}
                 >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedDeals.includes(deal.id)}
-                      onChange={(e) => handleSelectDeal(deal.id, e.target.checked)}
-                      className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
-                      aria-label={`${t('deals.selectDeal')} ${deal.title}`}
-                    />
+                  <td className="px-2 py-2 align-middle">
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedDeals.includes(deal.id)}
+                        onChange={(e) => handleSelectDeal(deal.id, e.target.checked)}
+                        className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
+                        aria-label={`${t('deals.selectDeal')} ${deal.title}`}
+                      />
+                    </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2">
                     <button
                       onClick={(e) => handleDealClick(deal.id, e)}
-                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left truncate block w-full"
+                      title={deal.title}
                     >
                       {deal.title}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{deal.client}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-foreground">
-                    {formatCurrency(deal.amount)}
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
+                    {deal.contact?.link ? (
+                      <a 
+                        href={deal.contact.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-primary hover:underline truncate"
+                        onClick={(e) => e.stopPropagation()}
+                        title={deal.contact.link}
+                      >
+                        <LinkIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate">{deal.contact.link}</span>
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
+                    {deal.contact?.subscriberCount ? (
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
+                        <span className="truncate">{deal.contact.subscriberCount}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {deal.contact?.directions && deal.contact.directions.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {deal.contact.directions.slice(0, 2).map((direction, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/50 text-xs text-muted-foreground truncate max-w-full"
+                            title={direction}
+                          >
+                            <Hash className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{direction}</span>
+                          </span>
+                        ))}
+                        {deal.contact.directions.length > 2 && (
+                          <span className="text-xs text-muted-foreground/70">+{deal.contact.directions.length - 2}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
                     {(() => {
                       const stageInfo = getStageInfo(deal.stage, (deal as any).stageName)
                       return (
                         <span 
-                          className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border"
+                          className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium border truncate max-w-full"
                           style={{
                             backgroundColor: `${stageInfo.color}15`,
                             borderColor: `${stageInfo.color}40`,
                             color: stageInfo.color
                           }}
+                          title={stageInfo.name}
                         >
-                          {stageInfo.name}
+                          <span className="truncate">{stageInfo.name}</span>
                         </span>
                       )
                     })()}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
                         {deal.assignedTo.avatar}
                       </div>
-                      <span className="text-sm text-muted-foreground">{deal.assignedTo.name}</span>
+                      <span className="text-xs text-muted-foreground truncate">{deal.assignedTo.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(deal.updatedAt)}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(deal.updatedAt)}</td>
                 </tr>
                 )
               })

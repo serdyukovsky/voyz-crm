@@ -230,15 +230,69 @@ export class PipelinesService {
   }
 
   async reorderStages(pipelineId: string, stageOrders: { id: string; order: number }[]) {
-    const updates = stageOrders.map(({ id, order }) =>
-      this.prisma.stage.update({
-        where: { id },
-        data: { order },
-      }),
-    );
+    console.log('[PIPELINES SERVICE] reorderStages called', {
+      pipelineId,
+      stageOrdersCount: stageOrders.length,
+      stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
+    });
 
-    await Promise.all(updates);
-    return this.findOne(pipelineId);
+    // Verify pipeline exists
+    const pipeline = await this.findOne(pipelineId);
+    if (!pipeline) {
+      throw new NotFoundException(`Pipeline with ID ${pipelineId} not found`);
+    }
+
+    // Verify all stage IDs belong to this pipeline
+    const pipelineStageIds = new Set(pipeline.stages.map(s => s.id));
+    const invalidStages = stageOrders.filter(so => !pipelineStageIds.has(so.id));
+    if (invalidStages.length > 0) {
+      throw new BadRequestException(`Invalid stage IDs: ${invalidStages.map(s => s.id).join(', ')}`);
+    }
+
+    // Use a transaction to avoid unique constraint conflicts
+    // The unique constraint on (pipelineId, order) means we can't have
+    // two stages with the same order in the same pipeline
+    // So we update in two steps: first set to temporary values, then to final values
+    return this.prisma.$transaction(async (tx) => {
+      console.log('[PIPELINES SERVICE] Starting transaction for reorder');
+      
+      // Step 1: Set all stages to negative orders to avoid conflicts
+      // We use negative values that are guaranteed to be unique
+      const negativeUpdates = stageOrders.map(({ id }, index) =>
+        tx.stage.update({
+          where: { id },
+          data: { order: -(index + 1) },
+        }),
+      );
+      await Promise.all(negativeUpdates);
+      console.log('[PIPELINES SERVICE] Step 1 complete: Set negative orders');
+
+      // Step 2: Set all stages to their correct orders
+      const positiveUpdates = stageOrders.map(({ id, order }) =>
+        tx.stage.update({
+          where: { id },
+          data: { order },
+        }),
+      );
+      await Promise.all(positiveUpdates);
+      console.log('[PIPELINES SERVICE] Step 2 complete: Set final orders');
+
+      // Return the updated pipeline using the transaction client
+      const updatedPipeline = await tx.pipeline.findUnique({
+        where: { id: pipelineId },
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
+
+      if (!updatedPipeline) {
+        throw new NotFoundException(`Pipeline with ID ${pipelineId} not found`);
+      }
+
+      console.log('[PIPELINES SERVICE] Transaction complete, returning pipeline with stages:', 
+        updatedPipeline.stages.map(s => ({ id: s.id, name: s.name, order: s.order }))
+      );
+
+      return updatedPipeline;
+    });
   }
 }
 
