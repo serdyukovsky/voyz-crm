@@ -190,6 +190,8 @@
     "createPipelineWithStages": "Пожалуйста, создайте воронку со стадиями сначала",
     "dealCreatedSuccess": "Сделка успешно создана",
     "failedToCreateDeal": "Не удалось создать сделку",
+    "dealsDeleted": "Удалено {{count}} {{count, plural, one {сделка} few {сделки} other {сделок}}}",
+    "deleteError": "Ошибка при удалении сделок",
     "rejectionReasons": "Причина отказа",
     "selectRejectionReason": "Выберите причину отказа",
     "rejectionReason": {
