@@ -136,6 +136,45 @@ export async function logout() {
   localStorage.removeItem('userId')
 }
 
+/**
+ * Refresh access token using refresh token from HttpOnly cookie
+ * Returns new access token
+ */
+export async function refreshToken(): Promise<{ access_token: string }> {
+  try {
+    const API_BASE_URL = getApiBaseUrl()
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Important: include cookies (refresh token is in HttpOnly cookie)
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Refresh token expired or invalid
+        throw new Error('UNAUTHORIZED')
+      }
+      throw new Error('Failed to refresh token')
+    }
+
+    const data = await response.json()
+    
+    // Update access token in localStorage
+    if (data.access_token) {
+      localStorage.setItem('access_token', data.access_token)
+    }
+    
+    return data
+  } catch (error) {
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new NetworkError('Cannot connect to server')
+    }
+    throw error
+  }
+}
+
 // Legacy function - kept for backward compatibility but should not be used
 export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false

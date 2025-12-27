@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config'
+import { refreshToken } from './auth'
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -12,6 +13,10 @@ let globalUnauthorizedHandler: (() => void) | null = null
 
 // Guard to ensure logout is only triggered once per session
 let isHandlingUnauthorized = false
+
+// Guard to prevent multiple simultaneous refresh attempts
+let isRefreshing = false
+let refreshPromise: Promise<string | null> | null = null
 
 /**
  * Set global handler for 401 unauthorized responses
@@ -66,6 +71,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include', // Include cookies (for refresh token)
     })
     
     console.log('API Response:', { url, status: response.status, ok: response.ok })
@@ -75,8 +81,75 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       globalBackendUnavailableHandler(false)
     }
 
-    // Check for authentication errors - ONLY logout on HTTP 401
+    // Check for authentication errors - try refresh token first, then logout
     if (response.status === 401) {
+      // Try to refresh token first
+      try {
+        // Wait for any ongoing refresh to complete
+        if (refreshPromise) {
+          const newToken = await refreshPromise
+          if (newToken) {
+            // Retry the original request with new token
+            const retryHeaders: HeadersInit = {
+              'Content-Type': 'application/json',
+              ...options.headers,
+              'Authorization': `Bearer ${newToken}`,
+            }
+            
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers: retryHeaders,
+              credentials: 'include', // Include cookies for retry
+            })
+            
+            // If retry succeeds, return the response
+            if (retryResponse.ok || retryResponse.status !== 401) {
+              return retryResponse
+            }
+          }
+        } else if (!isRefreshing) {
+          // Start refresh process
+          isRefreshing = true
+          refreshPromise = refreshToken()
+            .then((result) => {
+              isRefreshing = false
+              return result.access_token
+            })
+            .catch((error) => {
+              isRefreshing = false
+              console.error('Failed to refresh token:', error)
+              return null
+            })
+          
+          const newToken = await refreshPromise
+          refreshPromise = null
+          
+          if (newToken) {
+            // Retry the original request with new token
+            const retryHeaders: HeadersInit = {
+              'Content-Type': 'application/json',
+              ...options.headers,
+              'Authorization': `Bearer ${newToken}`,
+            }
+            
+            const retryResponse = await fetch(url, {
+              ...options,
+              headers: retryHeaders,
+              credentials: 'include', // Include cookies for retry
+            })
+            
+            // If retry succeeds, return the response
+            if (retryResponse.ok || retryResponse.status !== 401) {
+              return retryResponse
+            }
+          }
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError)
+        // Continue to logout logic below
+      }
+      
+      // If refresh failed or retry still returned 401, logout
       // Only handle unauthorized once per session to prevent multiple logouts
       if (!isHandlingUnauthorized) {
         isHandlingUnauthorized = true
