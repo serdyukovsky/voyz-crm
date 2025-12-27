@@ -43,9 +43,7 @@ export class LoggingController {
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
       };
-      console.log('LoggingController.findAll called with filters:', filters);
       const logs = await this.loggingService.findAll(filters);
-      console.log('LoggingController.findAll returning', logs.length, 'logs');
       return logs;
     } catch (error) {
       console.error('LoggingController.findAll error:', error);

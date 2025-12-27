@@ -5,6 +5,7 @@ import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
 import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 import { Deal, ActivityType, UserRole } from '@prisma/client';
+import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
 
 @Injectable()
 export class DealsService {
@@ -18,8 +19,6 @@ export class DealsService {
 
   async create(data: any, userId: string) {
     try {
-      console.log('DealsService.create called with:', { data, userId });
-      
       // Ensure required fields have defaults
       const dealData = {
         title: data.title || 'New Deal',
@@ -34,8 +33,6 @@ export class DealsService {
         expectedCloseAt: data.expectedCloseAt || null,
         rejectionReasons: data.rejectionReasons || [],
       };
-
-      console.log('DealsService.create - dealData:', dealData);
 
       // Validate required fields
       if (!dealData.pipelineId) {
@@ -69,8 +66,6 @@ export class DealsService {
       // Generate unique deal number
       const dealNumber = await this.generateDealNumber();
 
-      console.log('DealsService.create - generated deal number:', dealNumber);
-      console.log('DealsService.create - creating deal in database...');
       const deal = await this.prisma.deal.create({
       data: {
         ...dealData,
@@ -90,8 +85,6 @@ export class DealsService {
       },
     });
 
-    console.log('DealsService.create - deal created successfully:', deal.id);
-
     // Create activity
     try {
       await this.activityService.create({
@@ -103,7 +96,6 @@ export class DealsService {
           dealTitle: deal.title,
         },
       });
-      console.log('DealsService.create - activity created');
     } catch (activityError) {
       console.error('DealsService.create - failed to create activity:', activityError);
       // Don't fail the deal creation if activity creation fails
@@ -111,16 +103,7 @@ export class DealsService {
 
     // Log action
     try {
-      // Get stage and pipeline names for metadata
-      const stage = await this.prisma.stage.findUnique({
-        where: { id: deal.stageId },
-        select: { name: true },
-      });
-      const pipeline = await this.prisma.pipeline.findUnique({
-        where: { id: deal.pipelineId },
-        select: { name: true },
-      });
-      
+      // Use already loaded stage and pipeline data (optimization: avoid extra queries)
       await this.loggingService.create({
         level: 'info',
         action: 'create',
@@ -133,9 +116,9 @@ export class DealsService {
           dealNumber: deal.number,
           amount: deal.amount,
           stageId: deal.stageId,
-          stageName: stage?.name,
+          stageName: deal.stage?.name,
           pipelineId: deal.pipelineId,
-          pipelineName: pipeline?.name,
+          pipelineName: deal.pipeline?.name,
         },
       });
     } catch (logError) {
@@ -152,13 +135,11 @@ export class DealsService {
         if (deal.contactId) {
           this.websocketGateway.emitContactDealUpdated(deal.contactId, deal.id, formattedDeal);
         }
-        console.log('DealsService.create - WebSocket events emitted');
       } catch (wsError) {
         console.error('DealsService.create - failed to emit WebSocket events:', wsError);
         // Don't fail the request if WebSocket fails
       }
       
-      console.log('DealsService.create - returning formatted deal');
       return formattedDeal;
     } catch (formatError) {
       console.error('DealsService.create - failed to format deal:', formatError);
@@ -233,6 +214,29 @@ export class DealsService {
     }
   }
 
+  /**
+   * Encode cursor to base64 string
+   */
+  private encodeCursor(cursor: PaginationCursor): string {
+    return Buffer.from(JSON.stringify(cursor)).toString('base64');
+  }
+
+  /**
+   * Decode cursor from base64 string
+   */
+  private decodeCursor(cursorString: string): PaginationCursor | null {
+    try {
+      const decoded = Buffer.from(cursorString, 'base64').toString('utf-8');
+      const cursor = JSON.parse(decoded) as PaginationCursor;
+      if (!cursor.updatedAt || !cursor.id) {
+        return null;
+      }
+      return cursor;
+    } catch (error) {
+      return null;
+    }
+  }
+
   async findAll(filters?: {
     pipelineId?: string;
     stageId?: string;
@@ -240,7 +244,9 @@ export class DealsService {
     contactId?: string;
     companyId?: string;
     search?: string;
-  }) {
+    limit?: number;
+    cursor?: string; // base64 encoded cursor
+  }): Promise<PaginatedResponse<any>> {
     const where: any = {};
 
     // Base filters
@@ -258,70 +264,273 @@ export class DealsService {
 
     // Managers can see all deals (no filtering by user)
 
+    // Hard limit for performance (optimization: prevent loading all deals)
+    const limit = filters?.limit ? Math.min(filters.limit, 100) : 50;
+    const take = limit + 1; // +1 to check if hasMore
+
+    // Decode cursor if provided
+    const decodedCursor = filters?.cursor ? this.decodeCursor(filters.cursor) : null;
+
+    // Add cursor condition for pagination
+    if (decodedCursor) {
+      const cursorCondition = {
+        OR: [
+          { updatedAt: { lt: new Date(decodedCursor.updatedAt) } },
+          {
+            updatedAt: new Date(decodedCursor.updatedAt),
+            id: { lt: decodedCursor.id },
+          },
+        ],
+      };
+
+      // If we already have OR conditions (from search), combine with AND
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          cursorCondition,
+        ];
+        delete where.OR;
+      } else {
+        // Merge cursor condition into existing where
+        Object.assign(where, cursorCondition);
+      }
+    }
+
+    // Use select instead of include to avoid overfetching (optimization: load only needed fields)
     const deals = await this.prisma.deal.findMany({
       where,
-      include: {
-        stage: true,
-        pipeline: {
-          include: {
-            stages: {
-              orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        amount: true,
+        stageId: true,
+        pipelineId: true,
+        assignedToId: true,
+        contactId: true,
+        companyId: true,
+        updatedAt: true,
+        createdAt: true,
+        tags: true,
+        rejectionReasons: true,
+        stage: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+            isClosed: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            position: true,
+            companyName: true,
+            link: true,
+            subscriberCount: true,
+            directions: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
-        createdBy: true,
-        assignedTo: true,
-        contact: {
-          include: {
-            company: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            industry: true,
           },
         },
-        company: true,
-        customFieldValues: {
-          include: { customField: true },
-        },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'desc' }, // Secondary sort for stable pagination
+      ],
+      take,
     });
 
-    // Always return an array, even if empty
-    // Format deals with contact stats and null-safe handling
+    // Always return paginated response format (even if empty)
     if (deals.length === 0) {
-      return [];
+      return { data: [], nextCursor: undefined, hasMore: false };
     }
 
-    return Promise.all(deals.map((deal) => this.formatDealResponse(deal)));
+    // Check if there are more items
+    const hasMore = deals.length > limit;
+    const data = hasMore ? deals.slice(0, limit) : deals;
+
+    // Format deals without stats (optimization: stats not needed for list view)
+    const formattedDeals = data.map((deal) => this.formatDealResponseForList(deal));
+
+    // Always return paginated response if limit is specified (or using default limit)
+    // This allows frontend to show "Load More" button even on first load
+    const lastDeal = data[data.length - 1];
+    const nextCursor = hasMore && lastDeal
+      ? this.encodeCursor({
+          updatedAt: lastDeal.updatedAt.toISOString(),
+          id: lastDeal.id,
+        })
+      : undefined;
+
+    return {
+      data: formattedDeals,
+      nextCursor,
+      hasMore,
+    };
   }
 
   async findOne(id: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { id },
-      include: {
-        stage: true,
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        amount: true,
+        budget: true,
+        pipelineId: true,
+        stageId: true,
+        assignedToId: true,
+        createdById: true,
+        contactId: true,
+        companyId: true,
+        expectedCloseAt: true,
+        closedAt: true,
+        description: true,
+        tags: true,
+        rejectionReasons: true,
+        createdAt: true,
+        updatedAt: true,
+        stage: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            order: true,
+            isClosed: true,
+          },
+        },
         pipeline: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            isDefault: true,
+            isActive: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
             stages: {
+              select: {
+                id: true,
+                name: true,
+                order: true,
+                color: true,
+                isDefault: true,
+                isClosed: true,
+                createdAt: true,
+                updatedAt: true,
+              },
               orderBy: { order: 'asc' },
             },
           },
         },
-        createdBy: true,
-        assignedTo: true,
-        contact: {
-          include: {
-            company: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
           },
         },
-        tasks: true,
-        comments: true,
-        activities: {
-          include: { user: true },
-          orderBy: { createdAt: 'desc' },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatar: true,
+          },
         },
-        files: true,
+        contact: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            position: true,
+            companyName: true,
+            link: true,
+            subscriberCount: true,
+            directions: true,
+            contactMethods: true,
+            websiteOrTgChannel: true,
+            contactInfo: true,
+            social: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+                industry: true,
+                website: true,
+                email: true,
+                phone: true,
+                address: true,
+                notes: true,
+                social: true,
+              },
+            },
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            industry: true,
+            website: true,
+            email: true,
+            phone: true,
+            address: true,
+            notes: true,
+            social: true,
+          },
+        },
         customFieldValues: {
-          include: { customField: true },
+          select: {
+            id: true,
+            customFieldId: true,
+            value: true,
+            customField: {
+              select: {
+                id: true,
+                name: true,
+                key: true,
+                type: true,
+                group: true,
+                order: true,
+                isRequired: true,
+                description: true,
+                options: true,
+                defaultValue: true,
+              },
+            },
+          },
         },
+        // НЕ загружаем tasks, comments, activities, files - они загружаются отдельно через хуки на фронтенде
       },
     });
 
@@ -334,11 +543,62 @@ export class DealsService {
     return this.formatDealResponse(deal);
   }
 
-  private async formatDealResponse(deal: any) {
+  /**
+   * Format deal response for list view (optimized - no stats, no customFields, no pipeline)
+   */
+  private formatDealResponseForList(deal: any) {
+    return {
+      id: deal.id,
+      title: deal.title || 'Untitled Deal',
+      amount: deal.amount ? Number(deal.amount) : 0,
+      stageId: deal.stageId || deal.stage?.id || '',
+      pipelineId: deal.pipelineId,
+      assignedToId: deal.assignedToId,
+      contactId: deal.contactId,
+      companyId: deal.companyId,
+      tags: deal.tags || [],
+      rejectionReasons: deal.rejectionReasons || [],
+      createdAt: deal.createdAt,
+      updatedAt: deal.updatedAt,
+      stage: deal.stage ? {
+        id: deal.stage.id,
+        name: deal.stage.name || 'Unknown Stage',
+        color: deal.stage.color || '#6B7280',
+        order: deal.stage.order || 0,
+        isClosed: deal.stage.isClosed || false,
+      } : null,
+      assignedTo: deal.assignedTo ? {
+        id: deal.assignedTo.id,
+        name: `${deal.assignedTo.firstName || ''} ${deal.assignedTo.lastName || ''}`.trim() || 'Unknown User',
+        avatar: deal.assignedTo.avatar || null,
+      } : null,
+      contact: deal.contact ? {
+        id: deal.contact.id,
+        fullName: deal.contact.fullName || 'Unknown Contact',
+        email: deal.contact.email || null,
+        phone: deal.contact.phone || null,
+        position: deal.contact.position || null,
+        companyName: deal.contact.companyName || null,
+        link: deal.contact.link || null,
+        subscriberCount: deal.contact.subscriberCount || null,
+        directions: deal.contact.directions || [],
+        company: deal.contact.company || null,
+      } : null,
+      company: deal.company ? {
+        id: deal.company.id,
+        name: deal.company.name || 'Unknown Company',
+        industry: deal.company.industry || null,
+      } : null,
+    };
+  }
+
+  private async formatDealResponse(
+    deal: any, 
+    allCustomFields?: any[],
+    contactStatsMap?: Map<string, any>,
+    companyStatsMap?: Map<string, any>
+  ) {
     try {
-      // Log rejectionReasons for debugging
-      console.log(`[FORMAT DEAL RESPONSE] Deal ${deal.id}: rejectionReasons =`, deal.rejectionReasons);
-      
       const result: any = { 
         ...deal,
         // Ensure amount is always a number, default to 0 if null/undefined
@@ -354,7 +614,13 @@ export class DealsService {
       // Add contact with stats if contact exists
       if (deal.contact) {
         try {
-          const contactStats = await this.getContactStats(deal.contact.id);
+          // Use batch-loaded stats if available, otherwise load individually
+          const contactStats = contactStatsMap?.get(deal.contact.id) || 
+            (contactStatsMap ? null : await this.getContactStats(deal.contact.id));
+          
+          // If stats not found in batch map, use default (shouldn't happen, but safe fallback)
+          const stats = contactStats || { activeDeals: 0, closedDeals: 0, totalDeals: 0, totalDealVolume: 0 };
+          
           result.contact = {
             id: deal.contact.id,
             fullName: deal.contact.fullName || 'Unknown Contact',
@@ -378,7 +644,7 @@ export class DealsService {
             contactMethods: deal.contact.contactMethods || [],
             websiteOrTgChannel: deal.contact.websiteOrTgChannel || null,
             contactInfo: deal.contact.contactInfo || null,
-            stats: contactStats,
+            stats: stats,
           };
         } catch (contactError) {
           console.error('formatDealResponse - failed to get contact stats:', contactError);
@@ -404,7 +670,13 @@ export class DealsService {
       // Add company with stats if company exists
       if (deal.company) {
         try {
-          const companyStats = await this.getCompanyStats(deal.company.id);
+          // Use batch-loaded stats if available, otherwise load individually
+          const companyStats = companyStatsMap?.get(deal.company.id) || 
+            (companyStatsMap ? null : await this.getCompanyStats(deal.company.id));
+          
+          // If stats not found in batch map, use default (shouldn't happen, but safe fallback)
+          const stats = companyStats || { totalDeals: 0, activeDeals: 0, closedDeals: 0, totalDealVolume: 0 };
+          
           result.company = {
             id: deal.company.id,
             name: deal.company.name || 'Unknown Company',
@@ -417,7 +689,7 @@ export class DealsService {
               : {},
             address: deal.company.address || null,
             notes: deal.company.notes || null,
-            stats: companyStats,
+            stats: stats,
           };
         } catch (companyError) {
           console.error('formatDealResponse - failed to get company stats:', companyError);
@@ -489,26 +761,21 @@ export class DealsService {
 
       // Load and merge custom fields
       try {
-        // Get all active custom fields for deals
-        const allCustomFields = await this.customFieldsService.findByEntity('deal');
-        console.log(`formatDealResponse - Found ${allCustomFields.length} custom fields for deal ${deal.id}`);
+        // Use provided custom fields or load them (optimization: avoid N+1 query in findAll)
+        const customFields = allCustomFields || await this.customFieldsService.findByEntity('deal');
         
         // Create a map of field values by customFieldId for quick lookup
         const fieldValuesMap = new Map<string, any>();
         if (deal.customFieldValues && Array.isArray(deal.customFieldValues)) {
-          console.log(`formatDealResponse - Found ${deal.customFieldValues.length} custom field values for deal ${deal.id}`);
           deal.customFieldValues.forEach((fieldValue: any) => {
             if (fieldValue.customFieldId) {
               fieldValuesMap.set(fieldValue.customFieldId, fieldValue.value);
             }
           });
-        } else {
-          console.log(`formatDealResponse - No custom field values found for deal ${deal.id}`);
         }
 
         // Merge all custom fields with their values
-        console.log(`formatDealResponse - Merging ${allCustomFields.length} custom fields for deal ${deal.id}`);
-        result.customFields = allCustomFields.map((field: any) => {
+        result.customFields = customFields.map((field: any) => {
           const value = fieldValuesMap.get(field.id) ?? field.defaultValue ?? null;
           
           // Parse options if it's a JSON string
@@ -556,7 +823,6 @@ export class DealsService {
           }
           return (a.order || 0) - (b.order || 0);
         });
-        console.log(`formatDealResponse - Final custom fields count for deal ${deal.id}: ${result.customFields.length}`);
       } catch (customFieldsError) {
         console.error('formatDealResponse - failed to load custom fields:', customFieldsError);
         console.error('formatDealResponse - custom fields error stack:', customFieldsError instanceof Error ? customFieldsError.stack : 'No stack');
@@ -620,6 +886,106 @@ export class DealsService {
       closedDeals: closedDeals.length,
       totalDealVolume,
     };
+  }
+
+  /**
+   * Batch load contact stats for multiple contacts (optimization: avoid N+1 queries)
+   */
+  private async getContactStatsBatch(contactIds: string[]): Promise<Map<string, any>> {
+    if (contactIds.length === 0) {
+      return new Map();
+    }
+
+    const deals = await this.prisma.deal.findMany({
+      where: { contactId: { in: contactIds } },
+      select: {
+        id: true,
+        contactId: true,
+        amount: true,
+        closedAt: true,
+      },
+    });
+
+    // Group deals by contactId
+    const statsMap = new Map<string, any>();
+    
+    // Initialize stats for all contacts
+    contactIds.forEach(id => {
+      statsMap.set(id, {
+        activeDeals: 0,
+        closedDeals: 0,
+        totalDeals: 0,
+        totalDealVolume: 0,
+      });
+    });
+
+    // Calculate stats for each contact
+    deals.forEach(deal => {
+      if (!deal.contactId) return;
+      
+      const stats = statsMap.get(deal.contactId);
+      if (!stats) return;
+
+      stats.totalDeals++;
+      if (deal.closedAt) {
+        stats.closedDeals++;
+        stats.totalDealVolume += Number(deal.amount);
+      } else {
+        stats.activeDeals++;
+      }
+    });
+
+    return statsMap;
+  }
+
+  /**
+   * Batch load company stats for multiple companies (optimization: avoid N+1 queries)
+   */
+  private async getCompanyStatsBatch(companyIds: string[]): Promise<Map<string, any>> {
+    if (companyIds.length === 0) {
+      return new Map();
+    }
+
+    const deals = await this.prisma.deal.findMany({
+      where: { companyId: { in: companyIds } },
+      select: {
+        id: true,
+        companyId: true,
+        amount: true,
+        closedAt: true,
+      },
+    });
+
+    // Group deals by companyId
+    const statsMap = new Map<string, any>();
+    
+    // Initialize stats for all companies
+    companyIds.forEach(id => {
+      statsMap.set(id, {
+        totalDeals: 0,
+        activeDeals: 0,
+        closedDeals: 0,
+        totalDealVolume: 0,
+      });
+    });
+
+    // Calculate stats for each company
+    deals.forEach(deal => {
+      if (!deal.companyId) return;
+      
+      const stats = statsMap.get(deal.companyId);
+      if (!stats) return;
+
+      stats.totalDeals++;
+      if (deal.closedAt) {
+        stats.closedDeals++;
+        stats.totalDealVolume += Number(deal.amount);
+      } else {
+        stats.activeDeals++;
+      }
+    });
+
+    return statsMap;
   }
 
   private async getContactStats(contactId: string) {
@@ -831,16 +1197,7 @@ export class DealsService {
     // Log action
     try {
       const changeFields = Object.keys(changes);
-      // Get stage and pipeline names for metadata
-      const stage = await this.prisma.stage.findUnique({
-        where: { id: deal.stageId },
-        select: { name: true },
-      });
-      const pipeline = await this.prisma.pipeline.findUnique({
-        where: { id: deal.pipelineId },
-        select: { name: true },
-      });
-      
+      // Use already loaded stage and pipeline data (optimization: avoid extra queries)
       await this.loggingService.create({
         level: 'info',
         action: 'update',
@@ -853,9 +1210,9 @@ export class DealsService {
           dealNumber: deal.number,
           changes,
           stageId: deal.stageId,
-          stageName: stage?.name,
+          stageName: deal.stage?.name,
           pipelineId: deal.pipelineId,
-          pipelineName: pipeline?.name,
+          pipelineName: deal.pipeline?.name,
         },
       });
     } catch (logError) {

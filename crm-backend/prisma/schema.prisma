@@ -222,6 +222,7 @@ model Deal {
   @@index([companyId])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([updatedAt, id]) // Composite index for cursor-based pagination
   @@map("deals")
 }
 
@@ -302,6 +303,7 @@ model Task {
   @@index([status])
   @@index([deadline])
   @@index([type])
+  @@index([createdAt, id]) // Composite index for cursor-based pagination
   @@map("tasks")
 }
 

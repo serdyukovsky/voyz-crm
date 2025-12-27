@@ -32,6 +32,12 @@ export interface Deal {
   updatedAt?: string
 }
 
+export interface PaginatedDealsResponse {
+  data: Deal[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
 export async function getDeals(params?: {
   search?: string
   pipelineId?: string
@@ -39,10 +45,12 @@ export async function getDeals(params?: {
   assignedToId?: string
   contactId?: string
   companyId?: string
-}): Promise<Deal[]> {
+  limit?: number
+  cursor?: string
+}): Promise<PaginatedDealsResponse> {
   // Check if we're on the client side
   if (typeof window === 'undefined') {
-    return []
+    return { data: [], nextCursor: undefined, hasMore: false }
   }
 
   const token = localStorage.getItem('access_token')
@@ -55,7 +63,7 @@ export async function getDeals(params?: {
       window.location.href = '/login'
     }
     
-    return []
+    return { data: [], nextCursor: undefined, hasMore: false }
   }
 
   const queryParams = new URLSearchParams()
@@ -65,6 +73,8 @@ export async function getDeals(params?: {
   if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.companyId) queryParams.append('companyId', params.companyId)
+  if (params?.limit) queryParams.append('limit', String(params.limit))
+  if (params?.cursor) queryParams.append('cursor', params.cursor)
 
   try {
     const API_BASE_URL = getApiBaseUrl()
@@ -86,7 +96,7 @@ export async function getDeals(params?: {
           window.location.href = '/login'
         }
         
-        return []
+        return { data: [], nextCursor: undefined, hasMore: false }
       }
       const errorText = await response.text().catch(() => 'Unknown error')
       console.error('Failed to fetch deals:', response.status, errorText)
@@ -94,14 +104,31 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
-    return data
-  } catch (error) {
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      return [] // Return empty array instead of throwing
+    
+    // API always returns paginated response now
+    if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
+      return data as PaginatedDealsResponse
     }
-    // For other errors, still return empty array to prevent app crash
+    
+    // Fallback: if somehow we get an array, convert it to paginated format
+    if (Array.isArray(data)) {
+      return {
+        data: data,
+        nextCursor: undefined,
+        hasMore: false,
+      }
+    }
+    
+    // Fallback: return empty paginated response
+    return {
+      data: [],
+      nextCursor: undefined,
+      hasMore: false,
+    }
+  } catch (error) {
     console.error('Error fetching deals:', error)
-    return []
+    // Re-throw error so caller can handle it
+    throw error
   }
 }
 

@@ -101,7 +101,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
           getContacts().catch(() => []),
           getCompanies().catch(() => []),
           getUsers().catch(() => []),
-          getDeals().catch(() => [])
+          getDeals().then(r => r.data).catch(() => [])
         ])
 
         setPipelines(pipelinesData)
