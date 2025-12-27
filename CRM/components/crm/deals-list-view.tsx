@@ -54,7 +54,7 @@ export function DealsListView({
   }, [externalSelectedDealId])
 
   // Helper function to get stage info by ID
-  const getStageInfo = (stageId: string): { name: string; color: string } => {
+  const getStageInfo = (stageId: string, stageName?: string): { name: string; color: string } => {
     const stage = stages.find(s => s.id === stageId)
     if (stage) {
       return {
@@ -62,6 +62,14 @@ export function DealsListView({
         color: stage.color || '#6B7280'
       }
     }
+    // If stage not found in current pipeline stages, use name from deal if available
+    if (stageName) {
+      return {
+        name: stageName,
+        color: '#6B7280'
+      }
+    }
+    // Fallback to stageId if no name available
     return {
       name: stageId,
       color: '#6B7280'
@@ -204,66 +212,74 @@ export function DealsListView({
             </tr>
           </thead>
           <tbody>
-            {deals.map((deal) => {
-              const isHighlighted = finalSearchQuery && deal.title.toLowerCase().includes(finalSearchQuery.toLowerCase())
-              return (
-              <tr
-                key={deal.id}
-                className={cn(
-                  "border-b border-border/40 hover:bg-surface/30 transition-colors",
-                  isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
-                )}
-              >
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedDeals.includes(deal.id)}
-                    onChange={(e) => handleSelectDeal(deal.id, e.target.checked)}
-                    className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
-                    aria-label={`${t('deals.selectDeal')} ${deal.title}`}
-                  />
+            {deals.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  {t('deals.noDeals') || 'Нет сделок'}
                 </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={(e) => handleDealClick(deal.id, e)}
-                    className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
-                  >
-                    {deal.title}
-                  </button>
-                </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{deal.client}</td>
-                <td className="px-4 py-3 text-sm font-medium text-foreground">
-                  {formatCurrency(deal.amount)}
-                </td>
-                <td className="px-4 py-3">
-                  {(() => {
-                    const stageInfo = getStageInfo(deal.stage)
-                    return (
-                      <span 
-                        className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border"
-                        style={{
-                          backgroundColor: `${stageInfo.color}15`,
-                          borderColor: `${stageInfo.color}40`,
-                          color: stageInfo.color
-                        }}
-                      >
-                        {stageInfo.name}
-                      </span>
-                    )
-                  })()}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                      {deal.assignedTo.avatar}
-                    </div>
-                    <span className="text-sm text-muted-foreground">{deal.assignedTo.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(deal.updatedAt)}</td>
               </tr>
-              )
-            })}
+            ) : (
+              deals.map((deal) => {
+                const isHighlighted = finalSearchQuery && deal.title.toLowerCase().includes(finalSearchQuery.toLowerCase())
+                return (
+                <tr
+                  key={deal.id}
+                  className={cn(
+                    "border-b border-border/40 hover:bg-surface/30 transition-colors",
+                    isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
+                  )}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedDeals.includes(deal.id)}
+                      onChange={(e) => handleSelectDeal(deal.id, e.target.checked)}
+                      className="w-4 h-4 rounded border-border/40 bg-background text-primary focus:ring-2 focus:ring-primary/20"
+                      aria-label={`${t('deals.selectDeal')} ${deal.title}`}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={(e) => handleDealClick(deal.id, e)}
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                    >
+                      {deal.title}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{deal.client}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">
+                    {formatCurrency(deal.amount)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const stageInfo = getStageInfo(deal.stage, (deal as any).stageName)
+                      return (
+                        <span 
+                          className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border"
+                          style={{
+                            backgroundColor: `${stageInfo.color}15`,
+                            borderColor: `${stageInfo.color}40`,
+                            color: stageInfo.color
+                          }}
+                        >
+                          {stageInfo.name}
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                        {deal.assignedTo.avatar}
+                      </div>
+                      <span className="text-sm text-muted-foreground">{deal.assignedTo.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(deal.updatedAt)}</td>
+                </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

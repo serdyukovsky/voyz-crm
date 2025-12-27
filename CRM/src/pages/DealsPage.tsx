@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2, ArrowUpDown, X, Building2, User } from 'lucide-react'
+import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2, ArrowUpDown, X, Building2, User, Trash2, Loader2 } from 'lucide-react'
 import { PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeleton"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { usePipelines, useCreatePipeline } from "@/hooks/use-pipelines"
@@ -18,11 +18,15 @@ import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
-import { getDeals, type Deal as APIDeal } from "@/lib/api/deals"
+import { getDeals, deleteDeal, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines } from "@/lib/api/pipelines"
 import { useTranslation } from "@/lib/i18n/i18n-context"
 import { useSearch } from "@/components/crm/search-context"
 import { useUserRole } from "@/hooks/use-user-role"
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog"
 
 // Lazy load heavy kanban board component (998 lines)
 const DealsKanbanBoard = lazy(() => import("@/components/crm/deals-kanban-board").then(m => ({ default: m.DealsKanbanBoard })))
@@ -513,8 +517,59 @@ function DealsPageContent() {
   }
 
   const handleBulkDelete = () => {
-    setDeals(deals.filter(d => !selectedDeals.includes(d.id)))
-    setSelectedDeals([])
+    if (selectedDeals.length === 0) {
+      return
+    }
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmBulkDelete = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    
+    if (selectedDeals.length === 0) {
+      return
+    }
+
+    const dealsCount = selectedDeals.length
+    const dealsToDelete = [...selectedDeals]
+    
+    try {
+      setIsDeleting(true)
+      setDeletionProgress({ current: 0, total: dealsCount })
+      
+      // Delete deals one by one to show progress
+      for (let i = 0; i < dealsToDelete.length; i++) {
+        const dealId = dealsToDelete[i]
+        try {
+          await deleteDeal(dealId)
+          setDeletionProgress({ current: i + 1, total: dealsCount })
+          // Small delay to make progress visible
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } catch (error) {
+          console.error(`Failed to delete deal ${dealId}:`, error)
+          // Continue with other deals even if one fails
+          setDeletionProgress({ current: i + 1, total: dealsCount })
+        }
+      }
+      
+      // Remove deleted deals from listDeals
+      setListDeals(prevDeals => prevDeals.filter(deal => !dealsToDelete.includes(deal.id)))
+      
+      // Clear selection
+      setSelectedDeals([])
+      
+      // Close dialog and show success
+      setIsDeleting(false)
+      setDeletionProgress({ current: 0, total: 0 })
+      setIsDeleteDialogOpen(false)
+      showSuccess(t('deals.dealsDeleted', { count: dealsCount }) || `${dealsCount} ${dealsCount === 1 ? 'сделка удалена' : 'сделок удалено'}`)
+    } catch (error) {
+      console.error('Failed to delete deals:', error)
+      setIsDeleting(false)
+      setDeletionProgress({ current: 0, total: 0 })
+      showError(t('deals.deleteError') || 'Ошибка при удалении сделок', error instanceof Error ? error.message : 'Unknown error')
+    }
   }
 
   const handleBulkChangeStage = (newStage: string) => {
@@ -529,6 +584,9 @@ function DealsPageContent() {
   const [listLoading, setListLoading] = useState(false)
   const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
   const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deletionProgress, setDeletionProgress] = useState({ current: 0, total: 0 })
   
   // Filters and sort state
   const [showFilters, setShowFilters] = useState(false)
@@ -556,41 +614,88 @@ function DealsPageContent() {
     }))
   }, [searchValue])
 
+  // Sync selectedPipelineForList with currentFunnelId when switching to list view
   useEffect(() => {
-    if (viewMode === 'list' && selectedPipelineForList) {
-      console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList)
-      setListLoading(true)
-      getDeals({ pipelineId: selectedPipelineForList })
-        .then((deals) => {
-          console.log('📋 DealsPage: Loaded deals for list:', deals.length)
-          setListDeals(deals)
-        })
-        .catch((error) => {
-          console.error('Failed to load deals for list:', error)
-          setListDeals([])
-        })
-        .finally(() => {
-          setListLoading(false)
-        })
-    } else if (viewMode === 'list' && !selectedPipelineForList) {
-      console.log('📋 DealsPage: List view but no pipeline selected')
+    if (viewMode === 'list' && currentFunnelId && currentFunnelId !== '') {
+      console.log('📋 DealsPage: Syncing selectedPipelineForList with currentFunnelId:', currentFunnelId)
+      setSelectedPipelineForList(currentFunnelId)
     }
-  }, [viewMode, selectedPipelineForList])
+  }, [viewMode, currentFunnelId])
 
+  // Get default pipeline ID for list view if no pipeline is selected
   useEffect(() => {
-    if (viewMode === 'list' && !selectedPipelineForList) {
+    if (viewMode === 'list' && !selectedPipelineForList && (!currentFunnelId || currentFunnelId === '')) {
+      console.log('📋 DealsPage: No pipeline selected for list view, loading default pipeline')
       getPipelines()
         .then((pipelines) => {
           const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
           if (defaultPipeline) {
+            console.log('📋 DealsPage: Setting default pipeline for list view:', defaultPipeline.id)
             setSelectedPipelineForList(defaultPipeline.id)
+            if (!currentFunnelId || currentFunnelId === '') {
+              setCurrentFunnelId(defaultPipeline.id)
+            }
+          } else {
+            console.log('📋 DealsPage: No pipelines available')
           }
         })
         .catch((error) => {
           console.error('Failed to load pipelines for list:', error)
         })
     }
-  }, [viewMode, selectedPipelineForList])
+  }, [viewMode, selectedPipelineForList, currentFunnelId])
+
+  // Load deals for list view
+  useEffect(() => {
+    if (viewMode === 'list') {
+      if (selectedPipelineForList) {
+        console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList, 'filters:', filters)
+        setListLoading(true)
+        getDeals({ 
+          pipelineId: selectedPipelineForList,
+          companyId: filters.companyId,
+          contactId: filters.contactId,
+          assignedToId: filters.assignedUserId,
+          search: filters.title,
+        })
+          .then((deals) => {
+            console.log('📋 DealsPage: Loaded deals for list:', deals.length, 'deals')
+            setListDeals(deals)
+          })
+          .catch((error) => {
+            console.error('Failed to load deals for list:', error)
+            setListDeals([])
+          })
+          .finally(() => {
+            setListLoading(false)
+          })
+      } else {
+        console.log('📋 DealsPage: List view but no pipeline selected yet')
+        // Try to load all deals if no pipeline is selected
+        setListLoading(true)
+        getDeals({
+          companyId: filters.companyId,
+          contactId: filters.contactId,
+          assignedToId: filters.assignedUserId,
+          search: filters.title,
+        })
+          .then((deals) => {
+            console.log('📋 DealsPage: Loaded all deals for list view:', deals.length, 'deals')
+            setListDeals(deals)
+          })
+          .catch((error) => {
+            console.error('Failed to load deals for list:', error)
+            setListDeals([])
+          })
+          .finally(() => {
+            setListLoading(false)
+          })
+      }
+    } else {
+      // Clear deals when switching away from list view
+      setListDeals([])
+    }
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
 
   const handleCreateNewDeal = async (stageId?: string) => {
     try {
@@ -983,18 +1088,29 @@ function DealsPageContent() {
                   }
                   return true
                 })
-                .map(deal => ({
-                id: deal.id,
-                title: deal.title,
-                client: deal.contact?.fullName || deal.company?.name || 'No client',
-                amount: deal.amount || 0,
-                stage: deal.stage?.id || 'new',
-                assignedTo: deal.assignedTo ? {
-                  name: deal.assignedTo.name || 'Unknown',
-                  avatar: deal.assignedTo.avatar || deal.assignedTo.name?.substring(0, 2).toUpperCase() || 'U'
-                } : { name: 'Unassigned', avatar: 'U' },
-                updatedAt: deal.updatedAt || new Date().toISOString(),
-              }))}
+                .map(deal => {
+                  // Use stageId from deal object or from nested stage object
+                  const stageId = (deal as any).stageId || deal.stage?.id || 'new'
+                  // Use stage name directly from deal.stage if available
+                  const stageName = deal.stage?.name
+                  return {
+                    id: deal.id,
+                    title: deal.title,
+                    client: deal.contact?.fullName || deal.company?.name || 'No client',
+                    amount: deal.amount || 0,
+                    stage: stageId,
+                    stageName: stageName, // Store stage name for fallback
+                    assignedTo: deal.assignedTo ? {
+                      name: deal.assignedTo.firstName && deal.assignedTo.lastName 
+                        ? `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}`
+                        : deal.assignedTo.name || deal.assignedTo.email || 'Unknown',
+                      avatar: deal.assignedTo.avatar || (deal.assignedTo.firstName && deal.assignedTo.lastName
+                        ? `${deal.assignedTo.firstName[0]}${deal.assignedTo.lastName[0]}`.toUpperCase()
+                        : deal.assignedTo.name?.substring(0, 2).toUpperCase() || deal.assignedTo.email?.substring(0, 2).toUpperCase() || 'U')
+                    } : { name: 'Unassigned', avatar: 'U' },
+                    updatedAt: deal.updatedAt || deal.createdAt || new Date().toISOString(),
+                  }
+                })}
               selectedDeals={selectedDeals}
               onSelectDeals={setSelectedDeals}
               onBulkDelete={handleBulkDelete}
@@ -1002,8 +1118,9 @@ function DealsPageContent() {
               searchQuery={searchValue}
               stages={(() => {
                 // Convert API stages (with 'name') to component format (with 'label')
+                // Use stages ONLY from selected pipeline
                 const currentPipeline = pipelines.find(p => p.id === selectedPipelineForList)
-                if (currentPipeline?.stages) {
+                if (currentPipeline?.stages && currentPipeline.stages.length > 0) {
                   return currentPipeline.stages.map(s => ({
                     id: s.id,
                     label: s.name,
@@ -1011,7 +1128,8 @@ function DealsPageContent() {
                     isCustom: !s.isDefault
                   }))
                 }
-                return stages
+                // Return empty array if no pipeline selected or no stages
+                return []
               })()}
               />
             </>
@@ -1030,6 +1148,120 @@ function DealsPageContent() {
           onAddFunnel={handleAddFunnel}
           onDeleteFunnel={handleDeleteFunnel}
         />
+
+        {/* Delete Deals Confirmation Dialog */}
+        <Dialog 
+          open={isDeleteDialogOpen} 
+          onOpenChange={(open) => {
+            // Prevent closing during deletion
+            if (!open && isDeleting) {
+              return
+            }
+            setIsDeleteDialogOpen(open)
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-5 space-y-4 rounded-br-3xl">
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-2 border-b border-border/40">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                  <Trash2 className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Удаление сделок
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {isDeleting 
+                      ? `Удаление ${deletionProgress.current} из ${deletionProgress.total}...`
+                      : `Вы уверены, что хотите удалить ${selectedDeals.length} ${selectedDeals.length === 1 ? 'сделку' : 'сделок'}? Это действие нельзя отменить.`
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              {isDeleting && (
+                <div className="space-y-3 py-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Прогресс удаления</span>
+                    <span className="font-semibold text-foreground">
+                      {deletionProgress.current} / {deletionProgress.total}
+                    </span>
+                  </div>
+                  <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                      style={{ width: `${deletionProgress.total > 0 ? (deletionProgress.current / deletionProgress.total) * 100 : 0}%` }}
+                    >
+                      {deletionProgress.current > 0 && (
+                        <span className="text-[10px] font-medium text-primary-foreground">
+                          {Math.round((deletionProgress.current / deletionProgress.total) * 100)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Удаление сделок, пожалуйста, подождите...
+                  </p>
+                </div>
+              )}
+
+              {/* Deals List */}
+              {!isDeleting && selectedDeals.length > 0 && (
+                <div className="max-h-[300px] overflow-y-auto rounded-md border border-border/40 bg-surface/30 p-4">
+                  <p className="mb-3 text-sm font-medium text-foreground">
+                    Сделки для удаления ({selectedDeals.length}):
+                  </p>
+                  <div className="space-y-2">
+                    {listDeals
+                      .filter(deal => selectedDeals.includes(deal.id))
+                      .slice(0, 10)
+                      .map(deal => (
+                        <div key={deal.id} className="flex items-center gap-2 text-sm py-1">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                          <span className="truncate text-foreground">{deal.title || 'Untitled Deal'}</span>
+                        </div>
+                      ))}
+                    {selectedDeals.length > 10 && (
+                      <p className="text-xs text-muted-foreground pt-1">
+                        и еще {selectedDeals.length - 10}...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  disabled={isDeleting}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  onClick={confirmBulkDelete}
+                  disabled={isDeleting}
+                  className="bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Удаление...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Удалить
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
   )

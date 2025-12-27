@@ -490,37 +490,77 @@ export default function DealsPage() {
   const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
   const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0) // For forcing Kanban refresh
 
-  // Load deals for list view
+  // Sync selectedPipelineForList with currentFunnelId when switching to list view or when currentFunnelId changes
   useEffect(() => {
-    if (viewMode === 'list' && selectedPipelineForList) {
-      setListLoading(true)
-      getDeals({ pipelineId: selectedPipelineForList })
-        .then((deals) => {
-          setListDeals(deals)
-        })
-        .catch((error) => {
-          console.error('Failed to load deals for list:', error)
-          setListDeals([])
-        })
-        .finally(() => {
-          setListLoading(false)
-        })
+    if (viewMode === 'list') {
+      if (currentFunnelId && currentFunnelId !== '') {
+        console.log('📋 Syncing selectedPipelineForList with currentFunnelId:', currentFunnelId)
+        setSelectedPipelineForList(currentFunnelId)
+      }
     }
-  }, [viewMode, selectedPipelineForList])
+  }, [viewMode, currentFunnelId])
 
-  // Get default pipeline ID for list view
+  // Get default pipeline ID for list view if no pipeline is selected
   useEffect(() => {
     if (viewMode === 'list' && !selectedPipelineForList) {
+      console.log('📋 No pipeline selected for list view, loading default pipeline')
       getPipelines()
         .then((pipelines) => {
           const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
           if (defaultPipeline) {
+            console.log('📋 Setting default pipeline for list view:', defaultPipeline.id)
             setSelectedPipelineForList(defaultPipeline.id)
+            if (!currentFunnelId || currentFunnelId === '') {
+              setCurrentFunnelId(defaultPipeline.id)
+            }
+          } else {
+            console.log('📋 No pipelines available')
           }
         })
         .catch((error) => {
           console.error('Failed to load pipelines for list:', error)
         })
+    }
+  }, [viewMode, selectedPipelineForList, currentFunnelId])
+
+  // Load deals for list view
+  useEffect(() => {
+    if (viewMode === 'list') {
+      if (selectedPipelineForList) {
+        console.log('📋 Loading deals for list view, pipelineId:', selectedPipelineForList)
+        setListLoading(true)
+        getDeals({ pipelineId: selectedPipelineForList })
+          .then((deals) => {
+            console.log('📋 Loaded deals for list view:', deals.length, 'deals')
+            setListDeals(deals)
+          })
+          .catch((error) => {
+            console.error('Failed to load deals for list:', error)
+            setListDeals([])
+          })
+          .finally(() => {
+            setListLoading(false)
+          })
+      } else {
+        console.log('📋 List view but no pipeline selected yet')
+        // Try to load all deals if no pipeline is selected
+        setListLoading(true)
+        getDeals()
+          .then((deals) => {
+            console.log('📋 Loaded all deals for list view:', deals.length, 'deals')
+            setListDeals(deals)
+          })
+          .catch((error) => {
+            console.error('Failed to load deals for list:', error)
+            setListDeals([])
+          })
+          .finally(() => {
+            setListLoading(false)
+          })
+      }
+    } else {
+      // Clear deals when switching away from list view
+      setListDeals([])
     }
   }, [viewMode, selectedPipelineForList])
 
@@ -777,18 +817,25 @@ export default function DealsPage() {
             <PageSkeleton />
           ) : (
             <DealsListView
-              deals={listDeals.map(deal => ({
-                id: deal.id,
-                title: deal.title,
-                client: deal.contact?.fullName || deal.company?.name || 'No client',
-                amount: deal.amount || 0,
-                stage: deal.stage?.id || 'new',
-                assignedTo: deal.assignedTo ? {
-                  name: deal.assignedTo.name || 'Unknown',
-                  avatar: deal.assignedTo.avatar || deal.assignedTo.name?.substring(0, 2).toUpperCase() || 'U'
-                } : { name: 'Unassigned', avatar: 'U' },
-                updatedAt: deal.updatedAt || new Date().toISOString(),
-              }))}
+              deals={listDeals.map(deal => {
+                console.log('📋 Mapping deal:', deal.id, deal.title)
+                return {
+                  id: deal.id,
+                  title: deal.title || 'Untitled Deal',
+                  client: deal.contact?.fullName || deal.company?.name || 'No client',
+                  amount: deal.amount || 0,
+                  stage: deal.stage?.id || deal.stageId || 'new',
+                  assignedTo: deal.assignedTo ? {
+                    name: deal.assignedTo.firstName && deal.assignedTo.lastName 
+                      ? `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}`
+                      : deal.assignedTo.name || deal.assignedTo.email || 'Unknown',
+                    avatar: deal.assignedTo.avatar || (deal.assignedTo.firstName && deal.assignedTo.lastName
+                      ? `${deal.assignedTo.firstName[0]}${deal.assignedTo.lastName[0]}`.toUpperCase()
+                      : deal.assignedTo.name?.substring(0, 2).toUpperCase() || deal.assignedTo.email?.substring(0, 2).toUpperCase() || 'U')
+                  } : { name: 'Unassigned', avatar: 'U' },
+                  updatedAt: deal.updatedAt || deal.createdAt || new Date().toISOString(),
+                }
+              })}
               selectedDeals={selectedDeals}
               onSelectDeals={setSelectedDeals}
               onBulkDelete={handleBulkDelete}
