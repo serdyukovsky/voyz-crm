@@ -62,6 +62,9 @@ export class ActivityService {
         ...activity.user,
         name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
       },
+      payload: activity.payload && typeof activity.payload === 'object' && !Array.isArray(activity.payload) 
+        ? activity.payload as Record<string, any>
+        : undefined,
     }));
   }
 
@@ -107,6 +110,9 @@ export class ActivityService {
         ...activity.user,
         name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
       },
+      payload: activity.payload && typeof activity.payload === 'object' && !Array.isArray(activity.payload) 
+        ? activity.payload as Record<string, any>
+        : undefined,
     }));
   }
 
@@ -152,6 +158,9 @@ export class ActivityService {
         ...activity.user,
         name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
       },
+      payload: activity.payload && typeof activity.payload === 'object' && !Array.isArray(activity.payload) 
+        ? activity.payload as Record<string, any>
+        : undefined,
     }));
   }
 
@@ -246,6 +255,9 @@ export class ActivityService {
         ...activity.user,
         name: `${activity.user.firstName} ${activity.user.lastName}`.trim() || activity.user.email,
       } : null,
+      payload: activity.payload && typeof activity.payload === 'object' && !Array.isArray(activity.payload) 
+        ? activity.payload as Record<string, any>
+        : undefined,
     }));
     
     console.log('ActivityService.findAll - Transformed activities:', transformed.length);

@@ -3,6 +3,7 @@ import { PrismaService } from '@/common/services/prisma.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { CreateThreadDto } from './dto/create-thread.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { IntegrationType, MessageDirection } from '@prisma/client';
 
 @Injectable()
 export class ChatService {
@@ -119,12 +120,6 @@ export class ChatService {
             id: true,
             title: true,
             number: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
           },
         },
       },
@@ -255,28 +250,13 @@ export class ChatService {
             number: true,
           },
         },
-        task: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
         messages: {
           include: {
-            sender: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                avatar: true,
-              },
-            },
-            recipient: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                avatar: true,
               },
             },
             deal: {
@@ -284,12 +264,6 @@ export class ChatService {
                 id: true,
                 title: true,
                 number: true,
-              },
-            },
-            task: {
-              select: {
-                id: true,
-                title: true,
               },
             },
           },
@@ -305,17 +279,19 @@ export class ChatService {
     }
 
     // Mark messages as read
-    await this.prisma.internalMessage.updateMany({
-      where: {
-        threadId: threadId,
-        recipientId: userId,
-        isRead: false,
-      },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
-    });
+    // NOTE: internalMessage model was removed, using Message instead
+    // TODO: Implement message read status using Message model
+    // await this.prisma.internalMessage.updateMany({
+    //   where: {
+    //     threadId: threadId,
+    //     recipientId: userId,
+    //     isRead: false,
+    //   },
+    //   data: {
+    //     isRead: true,
+    //     readAt: new Date(),
+    //   },
+    // });
 
     return this.formatThreadResponse(thread);
   }
@@ -363,30 +339,38 @@ export class ChatService {
       }
     }
 
-    const message = await this.prisma.internalMessage.create({
+    // NOTE: internalMessage model was removed, using Message instead
+    // Get user email for sender
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, firstName: true, lastName: true },
+    });
+    const senderEmail = user?.email || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || userId;
+    
+    const recipient = recipientId ? await this.prisma.user.findUnique({
+      where: { id: recipientId },
+      select: { email: true },
+    }) : null;
+    const recipientEmail = recipient?.email || recipientId || '';
+    
+    const message = await this.prisma.message.create({
       data: {
         threadId: threadId,
-        senderId: userId,
-        recipientId: recipientId,
+        userId: userId,
+        sender: senderEmail,
+        recipient: recipientEmail,
         content: dto.content,
+        externalMessageId: `internal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        integrationType: IntegrationType.EMAIL,
+        direction: MessageDirection.OUTGOING,
         dealId: dto.dealId || thread.dealId || null,
-        taskId: dto.taskId || thread.taskId || null,
       },
       include: {
-        sender: {
+        user: {
           select: {
             id: true,
             firstName: true,
             lastName: true,
-            avatar: true,
-          },
-        },
-        recipient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
           },
         },
         deal: {
@@ -394,12 +378,6 @@ export class ChatService {
             id: true,
             title: true,
             number: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
           },
         },
       },

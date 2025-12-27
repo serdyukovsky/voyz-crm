@@ -37,7 +37,6 @@ export async function cleanupDatabase(prisma: PrismaClient) {
   await prisma.company.deleteMany();
   await prisma.stage.deleteMany();
   await prisma.pipeline.deleteMany();
-  await prisma.internalMessage.deleteMany();
   await prisma.chatThreadParticipant.deleteMany();
   await prisma.chatThread.deleteMany();
   await prisma.message.deleteMany();

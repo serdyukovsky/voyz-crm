@@ -40,7 +40,6 @@ import {
   X,
   Calendar,
   Building2,
-  User,
   Plus
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -274,6 +273,26 @@ function DealCard({
           </DropdownMenu>
         </div>
 
+        {/* Responsible */}
+        {deal.assignedTo && (
+          <div className="mb-2" data-no-navigate>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-5 w-5">
+                <AvatarFallback className="text-xs">
+                  {deal.assignedTo.name
+                    .split(' ')
+                    .map(n => n[0])
+                    .join('')
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium text-foreground">
+                {deal.assignedTo.name}
+              </span>
+            </div>
+          </div>
+        )}
+
         {deal.company && (
           <div className="mb-2" data-no-navigate>
             <CompanyBadge 
@@ -284,19 +303,6 @@ function DealCard({
               }}
               className="text-xs"
             />
-          </div>
-        )}
-
-        {deal.contact && (
-          <div className="mb-2" data-no-navigate>
-            <Link
-              to={`/contacts/${deal.contact.id}`}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-accent/50 transition-colors text-xs"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <User className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{deal.contact.fullName}</span>
-            </Link>
           </div>
         )}
 
@@ -341,24 +347,6 @@ function DealCard({
             {formatRelativeTime(deal.updatedAt)}
           </div>
         </div>
-
-        {/* Responsible */}
-        {deal.assignedTo && (
-          <div className="flex items-center gap-2 mt-2">
-            <Avatar className="h-5 w-5">
-              <AvatarFallback className="text-xs">
-                {deal.assignedTo.name
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-xs text-muted-foreground">
-              {deal.assignedTo.name}
-            </span>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
@@ -705,7 +693,7 @@ export function DealsKanbanBoard({
       const safeDealsData = Array.isArray(dealsData) ? dealsData : []
       
       const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
-        console.log(`Processing deal ${index}:`, deal.id, deal.title, deal.stage?.id)
+        console.log(`Processing deal ${index}:`, deal.id, deal.title, deal.stage?.id, 'assignedTo:', deal.assignedTo)
         return {
           id: deal.id,
           title: deal.title || 'Untitled Deal',

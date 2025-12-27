@@ -193,7 +193,7 @@ export class AuthController {
   })
   async getCurrentUser(@CurrentUser() user: any) {
     const userData = await this.authService.getCurrentUser(user.userId || user.id);
-    const { password: _, permissions: __, ...userResponse } = userData;
+    const { permissions: __, ...userResponse } = userData;
     return userResponse;
   }
 
@@ -222,9 +222,9 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken;
 
     // Delete refresh token from database
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-    await this.authService.logout(user.userId || user.id, refreshToken, ipAddress, userAgent);
+    const ipAddress = req.ip || (Array.isArray(req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'][0] : req.headers['x-forwarded-for']) || req.connection.remoteAddress || '';
+    const userAgent = req.headers['user-agent'] || '';
+    await this.authService.logout(user.userId || user.id, refreshToken, typeof ipAddress === 'string' ? ipAddress : String(ipAddress), userAgent);
 
     // Clear refresh token cookie
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';

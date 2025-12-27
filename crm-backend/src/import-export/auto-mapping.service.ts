@@ -31,18 +31,40 @@ export class AutoMappingService {
     budget: ['budget', 'planned', 'planned amount', 'plannedamount', 'planned amount', 'planned_amount'],
     description: ['description', 'desc', 'details', 'detail', 'deal description', 'dealdescription', 'deal description', 'deal_description'],
     expectedCloseAt: ['expected close', 'expectedclose', 'expected close date', 'expectedclosedate', 'close date', 'closedate', 'closing date', 'closingdate', 'deadline'],
+    rejectionReasons: ['rejection reasons', 'rejectionreasons', 'rejection_reasons', 'причина отказа', 'причинаотказа', 'причина_отказа', 'rejection reason', 'rejectionreason', 'rejection_reason', 'отказ', 'reasons', 'rejection'],
+    reason: ['reason', 'причина', 'основание', 'cause'],
   };
+
+  /**
+   * Транслитерация русских символов в латиницу
+   */
+  private transliterate(str: string): string {
+    const translitMap: Record<string, string> = {
+      'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+      'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+      'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+      'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+      'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    };
+    
+    return str
+      .toLowerCase()
+      .split('')
+      .map(char => translitMap[char] || char)
+      .join('');
+  }
 
   /**
    * Нормализация строки для сравнения
    * - lowercase
    * - trim
+   * - transliterate Russian to Latin
    * - remove symbols (_ - .)
    * - remove spaces (для exact match)
    */
   private normalize(str: string): string {
-    return str
-      .toLowerCase()
+    const transliterated = this.transliterate(str);
+    return transliterated
       .trim()
       .replace(/[_.-\s]/g, ''); // Удаляем все пробелы и символы для точного сравнения
   }
@@ -166,6 +188,8 @@ export class AutoMappingService {
         'expectedCloseAt',
         'description',
         'tags',
+        'rejectionReasons',
+        'reason',
       ];
     }
   }

@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, UnauthorizedException, HttpException, 
 // CRITICAL: CSV parsing is done on frontend, no need for csv-parser or Readable stream
 import { ImportBatchService } from './import-batch.service';
 import { PrismaService } from '@/common/services/prisma.service';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
+import { SystemFieldOptionsService } from '@/system-field-options/system-field-options.service';
 import {
   normalizeEmail,
   normalizePhone,
@@ -33,6 +35,8 @@ export class CsvImportService {
   constructor(
     private readonly importBatchService: ImportBatchService,
     private readonly prisma: PrismaService,
+    private readonly customFieldsService: CustomFieldsService,
+    private readonly systemFieldOptionsService: SystemFieldOptionsService,
   ) {
     // CRITICAL: Verify PrismaService injection in constructor
     if (!this.prisma) {
@@ -141,6 +145,17 @@ export class CsvImportService {
       { key: 'reason', label: 'Reason', required: false, type: 'string', description: 'Причина/основание', group: 'other', entity: 'deal' },
       { key: 'rejectionReasons', label: 'Rejection Reasons', required: false, type: 'string', description: 'Причина отказа (через запятую)', group: 'other', entity: 'deal' },
       { key: 'tags', label: 'Tags', required: false, type: 'string', description: 'Теги (через запятую)', group: 'other', entity: 'deal' },
+      // Contact fields (для создания/обновления связанного контакта)
+      { key: 'fullName', label: 'Contact Full Name', required: false, type: 'string', description: 'Полное имя контакта', group: 'contact', entity: 'deal' },
+      { key: 'position', label: 'Contact Position', required: false, type: 'string', description: 'Должность контакта', group: 'contact', entity: 'deal' },
+      { key: 'companyName', label: 'Contact Company Name', required: false, type: 'string', description: 'Название компании контакта', group: 'contact', entity: 'deal' },
+      { key: 'contactMethods', label: 'Contact Methods', required: false, type: 'string', description: 'Способ связи (через запятую): Whatsapp, Telegram, Direct', group: 'contact', entity: 'deal' },
+      { key: 'directions', label: 'Contact Directions', required: false, type: 'string', description: 'Направление (через запятую)', group: 'contact', entity: 'deal' },
+      { key: 'link', label: 'Contact Link', required: false, type: 'string', description: 'Ссылка контакта', group: 'contact', entity: 'deal' },
+      { key: 'subscriberCount', label: 'Contact Subscriber Count', required: false, type: 'string', description: 'Кол-во подписчиков', group: 'contact', entity: 'deal' },
+      { key: 'websiteOrTgChannel', label: 'Contact Website/TG Channel', required: false, type: 'string', description: 'Сайт, тг канал', group: 'contact', entity: 'deal' },
+      { key: 'contactInfo', label: 'Contact Info', required: false, type: 'string', description: 'Контакт (номер телефона или никнейм в телеграме)', group: 'contact', entity: 'deal' },
+      { key: 'notes', label: 'Contact Notes', required: false, type: 'text', description: 'Заметки контакта', group: 'contact', entity: 'deal' },
     ];
 
     // Получение кастомных полей сделок
@@ -572,17 +587,31 @@ export class CsvImportService {
     defaultAssignedToId?: string, // Дефолтный ответственный для всех строк (для "apply to all")
     contactEmailPhoneMap?: Map<string, string>, // Map для резолва contactId по email/phone
     dryRun: boolean = false,
+    userValueMapping?: Record<string, string>, // Manual mapping: { "CSV value": "user-id" }
   ): Promise<ImportResultDto> {
     // 🔥 DIAGNOSTIC: Log entry point
     console.log('🔥 IMPORT ENTRY - importDeals called');
     console.log('🔥 Parameters:', {
       rowsCount: rows?.length || 0,
       hasMapping: !!mapping,
+      mappingKeys: mapping ? Object.keys(mapping) : [],
+      hasRejectionReasonsMapping: !!mapping?.rejectionReasons,
+      rejectionReasonsMappingColumn: mapping?.rejectionReasons,
       pipelineId,
       dryRun,
       hasUser: !!user,
       userId: user?.id || user?.userId,
     });
+    
+    // 🔥 DIAGNOSTIC: Log first row sample
+    if (rows && rows.length > 0) {
+      console.log('🔥 First row sample:', {
+        rowKeys: Object.keys(rows[0]),
+        hasRejectionReasonsColumn: mapping?.rejectionReasons ? rows[0].hasOwnProperty(mapping.rejectionReasons) : false,
+        rejectionReasonsValue: mapping?.rejectionReasons ? rows[0][mapping.rejectionReasons] : undefined,
+        sampleData: Object.entries(rows[0]).slice(0, 5),
+      });
+    }
     
     // CRITICAL: Top-level try/catch to prevent 500 errors
     try {
@@ -946,6 +975,7 @@ export class CsvImportService {
               defaultAssignedToId,
               contactEmailPhoneMap,
               csvStagesMap,
+              userValueMapping,
             );
           
             if (dealData) {
@@ -1293,6 +1323,7 @@ export class CsvImportService {
                   // Filter out rows without valid stageId, title, pipelineId
                   const dealsWithNumber: Array<{
                     number: string;
+                    customFields?: Record<string, any>;
                     title: string;
                     amount?: number | string | null;
                     budget?: number | string | null;
@@ -1304,11 +1335,13 @@ export class CsvImportService {
                     expectedCloseAt?: Date | string | null;
                     description?: string | null;
                     tags?: string[];
+                    rejectionReasons?: string[];
+                    reason?: string | null;
                   }> = [];
                   
                   // CRITICAL: Execute the SAME validation loop as actual import
                   for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
-                    const row = validRows[rowIndex];
+                    const row: any = validRows[rowIndex];
                     const rowNumber = rowIndex + 1;
                     
                     // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен (same as actual import)
@@ -1486,12 +1519,22 @@ export class CsvImportService {
                         expectedCloseAt?: Date | string | null;
                         description?: string | null;
                         tags?: string[];
+                        rejectionReasons?: string[];
+                        reason?: string | null;
                       }> = [];
+                  
+                  // Store contact data for each deal (deal number -> contact data and CSV row index)
+                  // validRows corresponds to processedRows, which corresponds to rows by index
+                  const dealContactDataMap = new Map<string, { contactData: any; csvRowIndex: number }>();
                   
                   try {
                       for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
-                        const row = validRows[rowIndex];
+                        const row: any = validRows[rowIndex];
                         const rowNumber = rowIndex + 1;
+                        
+                        // validRows index corresponds to processedRows index, which corresponds to rows index
+                        // Since processedRows is created sequentially from rows, the index should match
+                        const csvRowIndex = rowIndex;
                         
                         // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен
                         if (!row.stageId || row.stageId.trim() === '') {
@@ -1550,26 +1593,73 @@ export class CsvImportService {
                           continue;
                         }
                         
-                        // SOFT VALIDATION: If pipeline is loaded, validate that stageId belongs to pipeline
-                        // This is soft validation - does NOT block import if validation fails
+                        // CRITICAL: Fix stageId if it doesn't belong to current pipeline
+                        // When importing to a new pipeline, stageId from old pipeline needs to be resolved
+                        let resolvedStageId = row.stageId;
                         if (pipeline && row.stageId && pipeline.stages) {
                           const stageExists = pipeline.stages.some((s: any) => s.id === row.stageId);
                           if (!stageExists) {
-                            // Soft validation warning - stageId may not belong to pipeline
-                            // But import continues - this is a warning, not an error
-                            warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" may not belong to pipeline "${rowPipelineId}"`);
+                            // StageId doesn't belong to current pipeline - need to resolve
+                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: StageId "${row.stageId}" doesn't belong to pipeline "${rowPipelineId}", attempting to resolve...`);
+                            
+                            // Try to resolve by stageValue (stage name from CSV)
+                            if (row.stageValue) {
+                              const stageValueStr = typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || '');
+                              const normalizedStageName = stageValueStr.trim().toLowerCase();
+                              
+                              // Find stage with matching name in current pipeline
+                              const matchingStage = pipeline.stages.find((s: any) => {
+                                const stageName = typeof s.name === 'string' ? s.name : String(s.name || '');
+                                return stageName.trim().toLowerCase() === normalizedStageName;
+                              });
+                              
+                              if (matchingStage) {
+                                resolvedStageId = matchingStage.id;
+                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Found matching stage "${matchingStage.name}" (${matchingStage.id}) in pipeline`);
+                              } else {
+                                // No matching stage found - use default stage
+                                if (defaultStageId) {
+                                  resolvedStageId = defaultStageId;
+                                  console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: No matching stage found, using default stage "${defaultStageId}"`);
+                                  warnings.push(`Row ${rowNumber}: Stage "${row.stageValue}" not found in pipeline, using default stage`);
+                                } else {
+                                  console.error(`[IMPORT STAGE FIX] Row ${rowNumber}: Cannot resolve stage - no matching stage and no default stage`);
+                                  errors.push({
+                                    row: rowNumber,
+                                    error: `Stage "${row.stageValue}" not found in pipeline and no default stage available`,
+                                  });
+                                  summary.failed++;
+                                  continue;
+                                }
+                              }
+                            } else {
+                              // No stageValue - use default stage
+                              if (defaultStageId) {
+                                resolvedStageId = defaultStageId;
+                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: No stageValue, using default stage "${defaultStageId}"`);
+                                warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" doesn't belong to pipeline, using default stage`);
+                              } else {
+                                console.error(`[IMPORT STAGE FIX] Row ${rowNumber}: Cannot resolve stage - no stageValue and no default stage`);
+                                errors.push({
+                                  row: rowNumber,
+                                  error: `Stage "${row.stageId}" doesn't belong to pipeline and no default stage available`,
+                                });
+                                summary.failed++;
+                                continue;
+                              }
+                            }
                           }
                         }
                         
                         // Все валидации пройдены - добавляем в dealsWithNumber
                         // CRITICAL: Include ALL fields from mapDealRow, not just number, stageId, title, pipelineId
-                        const dealToCreate = {
+                        const dealToCreate: any = {
                           number: row.number || `DEAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate if missing
                           title: row.title, // НИКОГДА не передаем пустую строку
                           amount: row.amount !== undefined ? row.amount : null,
                           budget: row.budget !== undefined ? row.budget : null,
                           pipelineId: rowPipelineId, // Use row.pipelineId or fallback to function parameter (always string here)
-                          stageId: row.stageId, // НИКОГДА не передаем пустую строку
+                          stageId: resolvedStageId, // Use resolved stageId (may be fixed if it didn't belong to pipeline)
                           assignedToId: row.assignedToId !== undefined ? row.assignedToId : null,
                           contactId: row.contactId !== undefined ? row.contactId : null,
                           companyId: row.companyId !== undefined ? row.companyId : null,
@@ -1578,6 +1668,7 @@ export class CsvImportService {
                           tags: row.tags !== undefined ? row.tags : undefined,
                           rejectionReasons: row.rejectionReasons !== undefined ? row.rejectionReasons : undefined,
                           reason: row.reason !== undefined ? row.reason : null,
+                          customFields: row.customFields !== undefined ? row.customFields : undefined,
                         };
                         
                         console.log(`[IMPORT DEAL DATA] Row ${rowNumber} deal data:`, {
@@ -1596,6 +1687,44 @@ export class CsvImportService {
                         });
                         
                         dealsWithNumber.push(dealToCreate);
+                        
+                        // Store contact data for this deal if contact fields are present
+                        const hasContactFields = mapping.email || mapping.phone || mapping.fullName || 
+                                                 mapping.contactMethods || mapping.directions || mapping.link ||
+                                                 mapping.subscriberCount || mapping.websiteOrTgChannel || 
+                                                 mapping.contactInfo || mapping.position || mapping.companyName ||
+                                                 mapping.notes || mapping.social;
+                        
+                        if (hasContactFields) {
+                          // Find corresponding processedRow to get original CSV row index
+                          const processedRow = processedRows.find(r => r.title === row.title && r.stageId === row.stageId);
+                          if (processedRow) {
+                            // processedRows are created sequentially from rows, so we can use findIndex
+                            const processedRowIndex = processedRows.indexOf(processedRow);
+                            if (processedRowIndex >= 0 && processedRowIndex < rows.length) {
+                              const csvRow = rows[processedRowIndex];
+                              
+                              // Trim row values
+                              const trimmedRow: Record<string, string> = {};
+                              for (const [key, value] of Object.entries(csvRow)) {
+                                if (value && typeof value === 'string') {
+                                  trimmedRow[key] = value.trim();
+                                } else {
+                                  trimmedRow[key] = value || '';
+                                }
+                              }
+                              
+                              // Extract contact fields
+                              const contactData = this.mapContactFieldsFromDealRow(trimmedRow, mapping, processedRowIndex + 1, errors);
+                              if (contactData) {
+                                dealContactDataMap.set(dealToCreate.number, {
+                                  contactData,
+                                  csvRowIndex: processedRowIndex,
+                                });
+                              }
+                            }
+                          }
+                        }
                       }
                       
                       console.log('[IMPORT DEALS] Calling batchCreateDeals:', {
@@ -1606,7 +1735,15 @@ export class CsvImportService {
                           title: dealsWithNumber[0].title,
                           pipelineId: dealsWithNumber[0].pipelineId,
                           stageId: dealsWithNumber[0].stageId,
+                          hasRejectionReasons: !!dealsWithNumber[0].rejectionReasons,
+                          rejectionReasons: dealsWithNumber[0].rejectionReasons,
+                          rejectionReasonsLength: dealsWithNumber[0].rejectionReasons?.length || 0,
                         } : null,
+                        allDealsRejectionReasons: dealsWithNumber.slice(0, 3).map(d => ({
+                          number: d.number,
+                          hasRejectionReasons: !!d.rejectionReasons,
+                          rejectionReasons: d.rejectionReasons,
+                        })),
                       });
                       
                       const result = await this.importBatchService.batchCreateDeals(dealsWithNumber, userId);
@@ -1622,10 +1759,174 @@ export class CsvImportService {
                       summary.updated += result.updated;
                       summary.failed += result.errors.length;
                       
+                      // CRITICAL: After creating deals, create contacts for each deal if contact fields are present
+                      // Check if mapping contains contact fields
+                      const hasContactFields = mapping.email || mapping.phone || mapping.fullName || 
+                                               mapping.contactMethods || mapping.directions || mapping.link ||
+                                               mapping.subscriberCount || mapping.websiteOrTgChannel || 
+                                               mapping.contactInfo || mapping.position || mapping.companyName ||
+                                               mapping.notes || mapping.social;
+                      
+                      if (hasContactFields && dealsWithNumber.length > 0) {
+                        console.log('[IMPORT CONTACTS] Contact fields detected, creating contacts for deals...');
+                        
+                        // Find created deals by numbers
+                        const dealNumbers = dealsWithNumber.map(d => d.number).filter((n): n is string => Boolean(n));
+                        const createdDealsMap = await this.importBatchService.batchFindDealsByNumbers(dealNumbers);
+                        
+                        // CRITICAL: Collect all directions and contactMethods from contact data for updating system options
+                        const allDirectionsFromDeals = new Set<string>();
+                        const allContactMethodsFromDeals = new Set<string>();
+                        
+                        console.log(`[IMPORT DEALS] Processing ${dealContactDataMap.size} contacts for deals`);
+                        
+                        // Create contacts for each deal
+                        for (const [dealNumber, { contactData, csvRowIndex }] of dealContactDataMap.entries()) {
+                          try {
+                            const deal = createdDealsMap.get(dealNumber);
+                            if (!deal) continue;
+                            
+                            // Collect directions and contactMethods for system options update
+                            console.log(`[IMPORT DEALS] Processing contact for deal ${dealNumber}:`, {
+                              hasDirections: !!contactData.directions,
+                              directionsType: Array.isArray(contactData.directions) ? 'array' : typeof contactData.directions,
+                              directionsValue: contactData.directions,
+                              directionsLength: Array.isArray(contactData.directions) ? contactData.directions.length : 0,
+                              hasContactMethods: !!contactData.contactMethods,
+                              contactMethodsType: Array.isArray(contactData.contactMethods) ? 'array' : typeof contactData.contactMethods,
+                              contactMethodsValue: contactData.contactMethods,
+                              contactMethodsLength: Array.isArray(contactData.contactMethods) ? contactData.contactMethods.length : 0,
+                            });
+                            
+                            if (contactData.directions && Array.isArray(contactData.directions) && contactData.directions.length > 0) {
+                              contactData.directions.forEach((direction) => {
+                                if (direction && typeof direction === 'string' && direction.trim()) {
+                                  allDirectionsFromDeals.add(direction.trim());
+                                  console.log(`[IMPORT DEALS] Added direction "${direction.trim()}" to collection`);
+                                }
+                              });
+                            }
+                            if (contactData.contactMethods && Array.isArray(contactData.contactMethods) && contactData.contactMethods.length > 0) {
+                              contactData.contactMethods.forEach((method) => {
+                                if (method && typeof method === 'string' && method.trim()) {
+                                  allContactMethodsFromDeals.add(method.trim());
+                                  console.log(`[IMPORT DEALS] Added contactMethod "${method.trim()}" to collection`);
+                                }
+                              });
+                            }
+                            
+                            // Generate fullName if missing (required by Prisma schema)
+                            const fullName = contactData.fullName || 
+                                           contactData.email || 
+                                           contactData.phone || 
+                                           `Contact for deal ${dealNumber}`;
+                            
+                            // Create contact
+                            const contact = await this.prisma.contact.create({
+                              data: {
+                                fullName: sanitizeTextFields(fullName)!,
+                                email: contactData.email || undefined,
+                                phone: contactData.phone || undefined,
+                                position: contactData.position || undefined,
+                                companyName: contactData.companyName || undefined,
+                                companyId: contactData.companyId || undefined,
+                                tags: contactData.tags || [],
+                                notes: contactData.notes || undefined,
+                                social: contactData.social || {},
+                                link: contactData.link || undefined,
+                                subscriberCount: contactData.subscriberCount || undefined,
+                                directions: contactData.directions || [],
+                                contactMethods: contactData.contactMethods || [],
+                                websiteOrTgChannel: contactData.websiteOrTgChannel || undefined,
+                                contactInfo: contactData.contactInfo || undefined,
+                              },
+                            });
+                            
+                            // Update deal with contactId
+                            await this.prisma.deal.update({
+                              where: { id: deal.id },
+                              data: { contactId: contact.id },
+                            });
+                            
+                            // CRITICAL: Also collect directions and contactMethods from the created contact
+                            // This ensures we get the actual values that were saved to the database
+                            if (contact.directions && Array.isArray(contact.directions) && contact.directions.length > 0) {
+                              contact.directions.forEach((direction) => {
+                                if (direction && typeof direction === 'string' && direction.trim()) {
+                                  allDirectionsFromDeals.add(direction.trim());
+                                  console.log(`[IMPORT DEALS] Added direction "${direction.trim()}" from created contact ${contact.id}`);
+                                }
+                              });
+                            }
+                            if (contact.contactMethods && Array.isArray(contact.contactMethods) && contact.contactMethods.length > 0) {
+                              contact.contactMethods.forEach((method) => {
+                                if (method && typeof method === 'string' && method.trim()) {
+                                  allContactMethodsFromDeals.add(method.trim());
+                                  console.log(`[IMPORT DEALS] Added contactMethod "${method.trim()}" from created contact ${contact.id}`);
+                                }
+                              });
+                            }
+                            
+                            console.log(`[IMPORT CONTACT] Created contact ${contact.id} for deal ${deal.number}`);
+                          } catch (error) {
+                            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                            console.error(`[IMPORT CONTACT ERROR] Failed to create contact for deal ${dealNumber}:`, errorMessage);
+                            errors.push({
+                              row: csvRowIndex + 1,
+                              error: `Failed to create contact: ${errorMessage}`,
+                            });
+                          }
+                        }
+                        
+                        // CRITICAL: Update system field options with directions and contactMethods from contacts created during deal import
+                        console.log('[IMPORT DEALS] Collected directions from contacts:', {
+                          count: allDirectionsFromDeals.size,
+                          values: Array.from(allDirectionsFromDeals),
+                        });
+                        console.log('[IMPORT DEALS] Collected contactMethods from contacts:', {
+                          count: allContactMethodsFromDeals.size,
+                          values: Array.from(allContactMethodsFromDeals),
+                        });
+                        
+                        if (allDirectionsFromDeals.size > 0) {
+                          try {
+                            console.log('[IMPORT DEALS] Updating directions options from contacts created during deal import:', Array.from(allDirectionsFromDeals));
+                            const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
+                              'contact',
+                              'directions',
+                              Array.from(allDirectionsFromDeals),
+                            );
+                            console.log('[IMPORT DEALS] directions options updated successfully. Total options:', updatedOptions.length);
+                          } catch (error) {
+                            console.error('[IMPORT DEALS] Failed to update directions options from contacts:', error);
+                            // Don't fail the import if options update fails
+                          }
+                        } else {
+                          console.log('[IMPORT DEALS] No directions found in contacts, skipping system options update');
+                        }
+                        
+                        if (allContactMethodsFromDeals.size > 0) {
+                          try {
+                            console.log('[IMPORT DEALS] Updating contactMethods options from contacts created during deal import:', Array.from(allContactMethodsFromDeals));
+                            const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
+                              'contact',
+                              'contactMethods',
+                              Array.from(allContactMethodsFromDeals),
+                            );
+                            console.log('[IMPORT DEALS] contactMethods options updated successfully. Total options:', updatedOptions.length);
+                          } catch (error) {
+                            console.error('[IMPORT DEALS] Failed to update contactMethods options from contacts:', error);
+                            // Don't fail the import if options update fails
+                          }
+                        } else {
+                          console.log('[IMPORT DEALS] No contactMethods found in contacts, skipping system options update');
+                        }
+                      }
+                      
                       console.log('[IMPORT RESULT MUTATION]', { 
                         summary: { ...summary }, 
                         dryRun: false, 
-                        reason: 'after batchCreateDeals',
+                        reason: 'after batchCreateDeals and contacts',
                         batchResult: { created: result.created, updated: result.updated, errors: result.errors.length }
                       });
 
@@ -2114,6 +2415,7 @@ export class CsvImportService {
     defaultAssignedToId?: string,
     contactEmailPhoneMap?: Map<string, string>,
     csvStagesMap?: Map<string, number>, // stageName -> firstRowNumber (для сбора стадий из CSV)
+    userValueMapping?: Record<string, string>, // Manual mapping: { "CSV value": "user-id" }
   ): {
     number?: string;
     title: string;
@@ -2130,6 +2432,7 @@ export class CsvImportService {
     tags?: string[];
     rejectionReasons?: string[];
     reason?: string | null;
+    customFields?: Record<string, any>;
   } | null {
     const getValue = (fieldName?: string): string | undefined => {
       if (!fieldName) return undefined;
@@ -2302,27 +2605,35 @@ export class CsvImportService {
     } else if (ownerField) {
       const ownerValue = getValue(ownerField);
       if (ownerValue) {
-        // Resolve owner by email OR fullName (case-insensitive)
-        const lookupValue = ownerValue.toLowerCase().trim();
         let foundUserId: string | undefined;
         
-        // Try exact match first (email:xxx or name:xxx)
-        for (const [key, id] of usersMap.entries()) {
-          const keyLower = key.toLowerCase();
-          if (keyLower === `email:${lookupValue}` || keyLower === `name:${lookupValue}`) {
-            foundUserId = id;
-            break;
-          }
+        // Priority 1: Check manual userValueMapping first (exact match, case-sensitive)
+        if (userValueMapping && userValueMapping[ownerValue]) {
+          foundUserId = userValueMapping[ownerValue];
         }
         
-        // If not found, try partial match (email or name part)
+        // Priority 2: Try automatic resolution by email OR fullName (case-insensitive)
         if (!foundUserId) {
+          const lookupValue = ownerValue.toLowerCase().trim();
+          
+          // Try exact match first (email:xxx or name:xxx)
           for (const [key, id] of usersMap.entries()) {
             const keyLower = key.toLowerCase();
-            const keyValue = keyLower.split(':')[1] || '';
-            if (keyValue === lookupValue) {
+            if (keyLower === `email:${lookupValue}` || keyLower === `name:${lookupValue}`) {
               foundUserId = id;
               break;
+            }
+          }
+          
+          // If not found, try partial match (email or name part)
+          if (!foundUserId) {
+            for (const [key, id] of usersMap.entries()) {
+              const keyLower = key.toLowerCase();
+              const keyValue = keyLower.split(':')[1] || '';
+              if (keyValue === lookupValue) {
+                foundUserId = id;
+                break;
+              }
             }
           }
         }
@@ -2345,19 +2656,60 @@ export class CsvImportService {
 
     // Парсинг rejectionReasons (разделенные запятой)
     const rejectionReasons: string[] = [];
+    console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons mapping check:`, {
+      hasMapping: !!mapping.rejectionReasons,
+      mappingColumn: mapping.rejectionReasons,
+      csvRowKeys: Object.keys(csvRow),
+      csvRowHasColumn: mapping.rejectionReasons ? csvRow.hasOwnProperty(mapping.rejectionReasons) : false,
+    });
+    
     if (mapping.rejectionReasons) {
       const reasonsValue = getValue(mapping.rejectionReasons);
+      console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons value extraction:`, {
+        mappingColumn: mapping.rejectionReasons,
+        rawValue: reasonsValue,
+        csvRowValue: csvRow[mapping.rejectionReasons],
+      });
+      
       if (reasonsValue) {
-        rejectionReasons.push(...reasonsValue.split(',').map((r) => r.trim()).filter(Boolean));
+        const parsedReasons = reasonsValue.split(',').map((r) => r.trim()).filter(Boolean);
+        rejectionReasons.push(...parsedReasons);
+        console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons parsed:`, {
+          parsedReasons,
+          count: parsedReasons.length,
+        });
+      } else {
+        console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons value is empty or undefined`);
       }
+    } else {
+      console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons mapping not found in mapping object`);
     }
+    
+    console.log(`[MAP DEAL ROW] Row ${rowNumber} - final rejectionReasons:`, {
+      rejectionReasons,
+      length: rejectionReasons.length,
+      willBeIncluded: rejectionReasons.length > 0,
+    });
 
 
 
     // Парсинг reason (причина/основание)
     const reasonValue = getValue(mapping.reason);
 
-    return {
+    // Парсинг кастомных полей
+    const customFields: Record<string, any> = {};
+    if (mapping.customFields) {
+      for (const [customFieldKey, csvColumnName] of Object.entries(mapping.customFields)) {
+        if (csvColumnName && csvRow[csvColumnName] !== undefined) {
+          const value = csvRow[csvColumnName];
+          if (value && value.trim()) {
+            customFields[customFieldKey] = value.trim();
+          }
+        }
+      }
+    }
+
+    const result = {
       number: numberValue,
       title: titleValue,
       amount: getValue(mapping.amount) || null,
@@ -2373,7 +2725,216 @@ export class CsvImportService {
       tags: tags.length > 0 ? tags : undefined,
       rejectionReasons: rejectionReasons.length > 0 ? rejectionReasons : undefined,
       reason: reasonValue || null,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
     };
+    
+    console.log(`[MAP DEAL ROW] Row ${rowNumber} - RETURN result:`, {
+      hasRejectionReasons: !!result.rejectionReasons,
+      rejectionReasons: result.rejectionReasons,
+      rejectionReasonsLength: result.rejectionReasons?.length || 0,
+      allFields: Object.keys(result),
+    });
+    
+    return result;
+  }
+
+  /**
+   * Извлечение полей контакта из CSV строки при импорте сделок
+   * Используется для создания/обновления контакта, связанного со сделкой
+   */
+  private mapContactFieldsFromDealRow(
+    csvRow: Record<string, string>,
+    mapping: DealFieldMapping,
+    rowNumber: number,
+    errors: ImportError[],
+  ): {
+    fullName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    position?: string | null;
+    companyName?: string | null;
+    companyId?: string | null;
+    tags?: string[];
+    notes?: string | null;
+    social?: any;
+    link?: string | null;
+    subscriberCount?: string | null;
+    directions?: string[];
+    contactMethods?: string[];
+    websiteOrTgChannel?: string | null;
+    contactInfo?: string | null;
+  } | null {
+    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Called with mapping:`, {
+      hasDirectionsMapping: !!mapping.directions,
+      directionsColumn: mapping.directions,
+      csvRowKeys: Object.keys(csvRow).slice(0, 10),
+      csvRowHasDirectionsColumn: mapping.directions ? csvRow.hasOwnProperty(mapping.directions) : false,
+    });
+    
+    const getValue = (fieldName?: string): string | undefined => {
+      if (!fieldName) return undefined;
+      const value = csvRow[fieldName];
+      if (value === null || value === undefined) {
+        return undefined;
+      }
+      const stringValue = typeof value === 'string' ? value : String(value);
+      return stringValue.trim() || undefined;
+    };
+
+    // Нормализация email и phone (если есть)
+    const emailValue = getValue(mapping.email);
+    const phoneValue = getValue(mapping.phone);
+    
+    let normalizedEmail: string | null = null;
+    let normalizedPhone: string | null = null;
+
+    if (emailValue) {
+      normalizedEmail = normalizeEmail(emailValue);
+      if (!normalizedEmail) {
+        errors.push({
+          row: rowNumber,
+          field: 'email',
+          value: emailValue,
+          error: 'Invalid email format',
+        });
+      }
+    }
+
+    if (phoneValue) {
+      normalizedPhone = normalizePhone(phoneValue);
+      if (!normalizedPhone) {
+        errors.push({
+          row: rowNumber,
+          field: 'phone',
+          value: phoneValue,
+          error: 'Invalid phone format',
+        });
+      }
+    }
+
+    // Парсинг tags
+    const tags: string[] = [];
+    if (mapping.tags) {
+      const tagsValue = getValue(mapping.tags);
+      if (tagsValue) {
+        tags.push(...tagsValue.split(',').map((t) => t.trim()).filter(Boolean));
+      }
+    }
+
+    // Social links
+    let social: any = undefined;
+    if (mapping.social) {
+      const socialData: any = {};
+      if (mapping.social.instagram) {
+        const instagram = getValue(mapping.social.instagram);
+        if (instagram) socialData.instagram = instagram;
+      }
+      if (mapping.social.telegram) {
+        const telegram = getValue(mapping.social.telegram);
+        if (telegram) socialData.telegram = telegram;
+      }
+      if (mapping.social.whatsapp) {
+        const whatsapp = getValue(mapping.social.whatsapp);
+        if (whatsapp) socialData.whatsapp = whatsapp;
+      }
+      if (mapping.social.vk) {
+        const vk = getValue(mapping.social.vk);
+        if (vk) socialData.vk = vk;
+      }
+      if (mapping.social.linkedin) {
+        const linkedin = getValue(mapping.social.linkedin);
+        if (linkedin) socialData.linkedin = linkedin;
+      }
+
+      if (Object.keys(socialData).length > 0) {
+        social = normalizeSocialLinks(socialData);
+      }
+    }
+
+    // Парсинг directions (разделенные запятой)
+    const directions: string[] = [];
+    if (mapping.directions) {
+      const directionsValue = getValue(mapping.directions);
+      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Parsing directions:`, {
+        hasMapping: !!mapping.directions,
+        mappingColumn: mapping.directions,
+        rawValue: directionsValue,
+        csvRowHasColumn: mapping.directions ? csvRow.hasOwnProperty(mapping.directions) : false,
+        csvRowValue: mapping.directions ? csvRow[mapping.directions] : undefined,
+      });
+      if (directionsValue) {
+        const parsed = directionsValue.split(',').map((d) => d.trim()).filter(Boolean);
+        directions.push(...parsed);
+        console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Parsed directions:`, parsed);
+      } else {
+        console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No directions value found`);
+      }
+    } else {
+      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No directions mapping found`);
+    }
+
+    // Парсинг contactMethods (разделенные запятой)
+    const contactMethods: string[] = [];
+    if (mapping.contactMethods) {
+      const methodsValue = getValue(mapping.contactMethods);
+      if (methodsValue) {
+        contactMethods.push(...methodsValue.split(',').map((m) => m.trim()).filter(Boolean));
+      }
+    }
+
+    // Check if we have at least one field to create contact
+    const hasAnyContactField = normalizedEmail || normalizedPhone || getValue(mapping.fullName) ||
+                               contactMethods.length > 0 || directions.length > 0 ||
+                               getValue(mapping.link) || getValue(mapping.subscriberCount) ||
+                               getValue(mapping.websiteOrTgChannel) || getValue(mapping.contactInfo) ||
+                               getValue(mapping.position) || getValue(mapping.companyName) ||
+                               getValue(mapping.notes) || social;
+    
+    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Checking if contact should be created:`, {
+      hasAnyContactField,
+      hasEmail: !!normalizedEmail,
+      hasPhone: !!normalizedPhone,
+      hasFullName: !!getValue(mapping.fullName),
+      hasDirections: directions.length > 0,
+      directionsCount: directions.length,
+      directions: directions,
+      hasContactMethods: contactMethods.length > 0,
+      contactMethodsCount: contactMethods.length,
+    });
+    
+    if (!hasAnyContactField) {
+      // No contact fields - don't create contact
+      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No contact fields found, returning null`);
+      return null;
+    }
+
+    const result = {
+      fullName: sanitizeTextFields(getValue(mapping.fullName)) || null,
+      email: normalizedEmail || null,
+      phone: normalizedPhone || null,
+      position: sanitizeOptionalTextFields(getValue(mapping.position)) || null,
+      companyName: sanitizeOptionalTextFields(getValue(mapping.companyName)) || null,
+      companyId: getValue(mapping.companyId) || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      notes: sanitizeOptionalTextFields(getValue(mapping.notes)) || null,
+      social: social || undefined,
+      link: sanitizeOptionalTextFields(getValue(mapping.link)) || null,
+      subscriberCount: sanitizeOptionalTextFields(getValue(mapping.subscriberCount)) || null,
+      directions: directions.length > 0 ? directions : undefined,
+      contactMethods: contactMethods.length > 0 ? contactMethods : undefined,
+      websiteOrTgChannel: sanitizeOptionalTextFields(getValue(mapping.websiteOrTgChannel)) || null,
+      contactInfo: sanitizeOptionalTextFields(getValue(mapping.contactInfo)) || null,
+    };
+    
+    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Returning contact data:`, {
+      hasDirections: !!result.directions,
+      directions: result.directions,
+      directionsLength: result.directions?.length || 0,
+      hasContactMethods: !!result.contactMethods,
+      contactMethods: result.contactMethods,
+    });
+    
+    return result;
   }
 
   /**

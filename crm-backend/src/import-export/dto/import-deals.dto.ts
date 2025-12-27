@@ -25,6 +25,7 @@ export interface ImportDealsDto {
   pipelineId: string;
   workspaceId?: string;
   defaultAssignedToId?: string;
+  userValueMapping?: Record<string, string>; // Manual mapping: { "CSV value": "user-id" }
 }
 
 

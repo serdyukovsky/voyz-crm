@@ -9,6 +9,7 @@ import {
   sanitizeOptionalTextFields,
 } from '@/common/utils/normalization.utils';
 import { SystemFieldOptionsService } from '@/system-field-options/system-field-options.service';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 
 /**
  * Import Batch Service
@@ -25,6 +26,7 @@ export class ImportBatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly systemFieldOptionsService: SystemFieldOptionsService,
+    private readonly customFieldsService: CustomFieldsService,
   ) {}
 
   /**
@@ -219,15 +221,19 @@ export class ImportBatchService {
     // Add new directions to system options if they don't exist
     if (allDirections.size > 0) {
       try {
-        await this.systemFieldOptionsService.addOptionsIfMissing(
+        console.log('[BATCH CREATE CONTACTS] Updating directions options with values:', Array.from(allDirections));
+        const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
           'contact',
           'directions',
           Array.from(allDirections),
         );
+        console.log('[BATCH CREATE CONTACTS] directions options updated successfully. Total options:', updatedOptions.length);
       } catch (error) {
         console.error('[BATCH CREATE CONTACTS] Failed to update directions options:', error);
         // Don't fail the import if options update fails
       }
+    } else {
+      console.log('[BATCH CREATE CONTACTS] No directions values found in import data');
     }
 
     // Add new contactMethods to system options if they don't exist
@@ -406,6 +412,7 @@ export class ImportBatchService {
       tags?: string[];
       rejectionReasons?: string[];
       reason?: string | null;
+      customFields?: Record<string, any>;
     }>,
     userId: string,
   ): Promise<{
@@ -439,15 +446,76 @@ export class ImportBatchService {
     // Add new rejectionReasons to system options if they don't exist
     if (allRejectionReasons.size > 0) {
       try {
-        await this.systemFieldOptionsService.addOptionsIfMissing(
+        console.log('[BATCH CREATE DEALS] Updating rejectionReasons options with values:', Array.from(allRejectionReasons));
+        const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
           'deal',
           'rejectionReasons',
           Array.from(allRejectionReasons),
         );
+        console.log('[BATCH CREATE DEALS] rejectionReasons options updated successfully. Total options:', updatedOptions.length);
       } catch (error) {
         console.error('[BATCH CREATE DEALS] Failed to update rejectionReasons options:', error);
         // Don't fail the import if options update fails
       }
+    } else {
+      console.log('[BATCH CREATE DEALS] No rejectionReasons values found in import data');
+    }
+
+    // CRITICAL: Update custom field options for multi-select fields
+    // Get all custom fields of type MULTI_SELECT for deals
+    try {
+      const allCustomFields = await this.customFieldsService.findByEntity('deal');
+      const multiSelectFields = allCustomFields.filter((f) => f.type === 'MULTI_SELECT');
+      
+      // Collect values for each multi-select custom field
+      const customFieldValuesMap = new Map<string, Set<string>>();
+      
+      dealsData.forEach((row) => {
+        if (row.customFields) {
+          for (const [customFieldKey, value] of Object.entries(row.customFields)) {
+            // Find custom field by key
+            const customField = multiSelectFields.find((f) => f.key === customFieldKey);
+            if (customField) {
+              // Parse value (can be comma-separated string or array)
+              let values: string[] = [];
+              if (Array.isArray(value)) {
+                values = value;
+              } else if (typeof value === 'string') {
+                values = value.split(',').map((v) => v.trim()).filter(Boolean);
+              }
+              
+              // Add to map
+              if (!customFieldValuesMap.has(customField.id)) {
+                customFieldValuesMap.set(customField.id, new Set<string>());
+              }
+              values.forEach((v) => {
+                if (v && v.trim()) {
+                  customFieldValuesMap.get(customField.id)!.add(v.trim());
+                }
+              });
+            }
+          }
+        }
+      });
+      
+      // Update options for each multi-select field
+      for (const [customFieldId, values] of customFieldValuesMap.entries()) {
+        try {
+          await this.customFieldsService.addOptionsToMultiSelectField(
+            customFieldId,
+            Array.from(values),
+          );
+        } catch (error) {
+          console.error(
+            `[BATCH CREATE DEALS] Failed to update options for custom field ${customFieldId}:`,
+            error,
+          );
+          // Don't fail the import if options update fails
+        }
+      }
+    } catch (error) {
+      console.error('[BATCH CREATE DEALS] Failed to update custom field options:', error);
+      // Don't fail the import if options update fails
     }
 
     // Поиск существующих сделок по number
@@ -455,8 +523,11 @@ export class ImportBatchService {
     const existingDealsMap = await this.batchFindDealsByNumbers(numbers);
 
     // Разделяем на создание и обновление
-    const toCreate: Prisma.DealCreateManyInput[] = [];
+    // Store customFields separately as they're not part of Prisma schema
+    const toCreate: Array<Prisma.DealCreateManyInput & { customFields?: Record<string, any> }> = [];
     const toUpdate: Array<{ id: string; data: Prisma.DealUpdateInput }> = [];
+    // Map to store customFields by deal number for later processing
+    const customFieldsByDealNumber = new Map<string, Record<string, any>>();
 
     dealsData.forEach((row, index) => {
       try {
@@ -493,7 +564,7 @@ export class ImportBatchService {
         const amountValue = row.amount !== undefined && row.amount !== null ? Number(row.amount) : null;
         const budgetValue = row.budget !== undefined && row.budget !== null ? Number(row.budget) : null;
         
-        const baseDealData = {
+        const baseDealData: any = {
           title: row.title, // НИКОГДА не используем fallback
           budget: budgetValue,
           pipelineId: row.pipelineId, // НИКОГДА не используем fallback
@@ -510,6 +581,7 @@ export class ImportBatchService {
           tags: row.tags || [],
           rejectionReasons: row.rejectionReasons || [],
           reason: row.reason || null,
+          customFields: row.customFields,
         };
         
         console.log(`[BATCH CREATE DEAL DATA] Row ${index + 1}:`, {
@@ -610,8 +682,15 @@ export class ImportBatchService {
         } else {
           // Создание новой сделки
           // CRITICAL: amount must be 0 (not null) for new deals
-          // CRITICAL: Remove reason field - it doesn't exist in Prisma schema
-          const { reason, ...dealDataWithoutReason } = baseDealData;
+          // CRITICAL: Remove reason and customFields fields - they don't exist in Prisma schema
+          // customFields will be saved separately via CustomFieldValue
+          const { reason, customFields, ...dealDataWithoutReason } = baseDealData;
+          
+          // Store customFields separately
+          if (row.customFields) {
+            customFieldsByDealNumber.set(row.number, row.customFields);
+          }
+          
           toCreate.push({
             number: row.number,
             ...dealDataWithoutReason,
@@ -731,6 +810,53 @@ export class ImportBatchService {
               console.warn(`[BATCH CREATE DEALS] WARNING: ${skipped} deals were skipped (duplicates or errors)`);
             }
             
+            // Save custom field values for created deals
+            if (actuallyCreated > 0) {
+              try {
+                // Get all created deals by their numbers to get their IDs
+                const createdDeals = await tx.deal.findMany({
+                  where: { number: { in: batch.map((d) => d.number) } },
+                  select: { id: true, number: true },
+                });
+                
+                const dealsByNumber = new Map(createdDeals.map((d) => [d.number, d.id]));
+                
+                // Save custom field values for each deal
+                for (const dealData of batch) {
+                  const customFields = customFieldsByDealNumber.get(dealData.number);
+                  if (customFields && dealsByNumber.has(dealData.number)) {
+                    const dealId = dealsByNumber.get(dealData.number)!;
+                    
+                    // Get all custom fields to find their IDs by key
+                    const allCustomFields = await this.customFieldsService.findByEntity('deal');
+                    
+                    for (const [customFieldKey, value] of Object.entries(customFields)) {
+                      const customField = allCustomFields.find((f) => f.key === customFieldKey);
+                      if (customField) {
+                        // Parse value based on field type
+                        let parsedValue: any = value;
+                        if (customField.type === 'MULTI_SELECT' && typeof value === 'string') {
+                          // Parse comma-separated string to array
+                          parsedValue = value.split(',').map((v) => v.trim()).filter(Boolean);
+                        }
+                        
+                        await this.customFieldsService.setValue(
+                          customField.id,
+                          dealId,
+                          'deal',
+                          parsedValue,
+                          dealId,
+                        );
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('[BATCH CREATE DEALS] Failed to save custom field values:', error);
+                // Don't fail the import if custom fields save fails
+              }
+            }
+            
             return createResult;
           },
           {
@@ -820,6 +946,45 @@ export class ImportBatchService {
                 }),
               ),
             );
+            
+            // Save custom field values for updated deals
+            try {
+              // Get all custom fields to find their IDs by key
+              const allCustomFields = await this.customFieldsService.findByEntity('deal');
+              
+              // Find deals with custom fields in the original dealsData
+              for (const item of sanitizedBatch) {
+                const originalDealData = dealsData.find((d) => {
+                  const existing = existingDealsMap.get(d.number);
+                  return existing && existing.id === item.id;
+                });
+                
+                if (originalDealData && originalDealData.customFields) {
+                  for (const [customFieldKey, value] of Object.entries(originalDealData.customFields)) {
+                    const customField = allCustomFields.find((f) => f.key === customFieldKey);
+                    if (customField) {
+                      // Parse value based on field type
+                      let parsedValue: any = value;
+                      if (customField.type === 'MULTI_SELECT' && typeof value === 'string') {
+                        // Parse comma-separated string to array
+                        parsedValue = value.split(',').map((v) => v.trim()).filter(Boolean);
+                      }
+                      
+                      await this.customFieldsService.setValue(
+                        customField.id,
+                        item.id,
+                        'deal',
+                        parsedValue,
+                        item.id,
+                      );
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('[BATCH UPDATE DEALS] Failed to save custom field values:', error);
+              // Don't fail the import if custom fields save fails
+            }
           },
           {
             timeout: 30000,

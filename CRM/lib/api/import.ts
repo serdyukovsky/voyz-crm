@@ -273,6 +273,7 @@ export async function importDeals(
   pipelineId: string,
   dryRun: boolean = false,
   defaultAssignedToId?: string,
+  userValueMapping?: Record<string, string>, // Manual mapping: { "CSV value": "user-id" }
 ): Promise<ImportResult> {
   const token = localStorage.getItem('access_token')
   if (!token) {
@@ -317,6 +318,7 @@ export async function importDeals(
     mapping: invertedMapping,
     pipelineId: pipelineId,
     defaultAssignedToId: defaultAssignedToId,
+    userValueMapping: userValueMapping, // Manual mapping: { "CSV value": "user-id" }
   }
 
   // API_BASE_URL уже должен содержать /api

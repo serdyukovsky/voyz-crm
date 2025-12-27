@@ -7,9 +7,10 @@ import { ImportExportController } from './import-export.controller';
 import { CommonModule } from '@/common/common.module';
 import { PrismaService } from '@/common/services/prisma.service';
 import { SystemFieldOptionsModule } from '@/system-field-options/system-field-options.module';
+import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
 
 @Module({
-  imports: [CommonModule, SystemFieldOptionsModule],
+  imports: [CommonModule, SystemFieldOptionsModule, CustomFieldsModule],
   controllers: [ImportExportController],
   providers: [
     ImportExportService,

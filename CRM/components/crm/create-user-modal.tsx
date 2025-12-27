@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -161,6 +161,20 @@ export function CreateUserModal({
     }
     return null
   }
+
+  // Real-time form validation to enable/disable the button
+  const isFormValid = useMemo(() => {
+    // Check all required fields
+    if (!firstName.trim()) return false
+    if (!lastName.trim()) return false
+    if (!email.trim() || validateEmail(email) !== null) return false
+    if (!password || validatePassword(password).length > 0) return false
+    if (!confirmPassword.trim() || password !== confirmPassword) return false
+    // Phone validation - check if phone is valid
+    const phoneError = validatePhone(phone)
+    if (phoneError) return false
+    return true
+  }, [firstName, lastName, email, password, confirmPassword, phone, t])
 
   const handleSave = async () => {
     // Clear previous errors
@@ -464,7 +478,7 @@ export function CreateUserModal({
                 size="icon" 
                 className="h-10 w-10 rounded-full" 
                 onClick={handleSave}
-                disabled={loading || Object.keys(errors).length > 0}
+                disabled={loading || !isFormValid}
                 title={t('users.createUser') || 'Создать пользователя'}
               >
                 <Check className="h-5 w-5" strokeWidth={3} />

@@ -164,7 +164,7 @@ export abstract class BaseIntegration implements IntegrationServiceInterface {
         type: type as any, // Type assertion needed as we're using dynamic types
         dealId,
         userId,
-        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
+        payload: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
       },
     });
   }
