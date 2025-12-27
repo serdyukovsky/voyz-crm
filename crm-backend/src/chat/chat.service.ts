@@ -11,12 +11,10 @@ export class ChatService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => RealtimeGateway)) private readonly websocketGateway: RealtimeGateway,
   ) {
-    console.log('🔧 ChatService constructor called, prisma:', !!this.prisma, typeof this.prisma)
     if (!this.prisma) {
       console.error('❌ PrismaService is not injected in ChatService constructor!')
       throw new Error('PrismaService injection failed')
     }
-    console.log('✅ ChatService initialized with PrismaService')
   }
 
   /**
@@ -133,13 +131,10 @@ export class ChatService {
    */
   async getUserThreads(userId: string) {
     try {
-      console.log('USER:', userId);
-      console.log('WORKSPACE:', (userId as any)?.workspaceId);
       if (!this.prisma) {
         console.error('❌ PrismaService is undefined in getUserThreads!')
         throw new Error('Database service not available')
       }
-      console.log('🔍 Getting threads for user:', userId)
       const threads = await this.prisma.chatThread.findMany({
         where: {
           participants: {

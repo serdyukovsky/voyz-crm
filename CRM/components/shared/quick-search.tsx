@@ -87,8 +87,6 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
         const searchLower = search.toLowerCase().trim()
         const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0)
         
-        console.log('🔍 QuickSearch: Starting search for:', searchLower)
-        
         // Use server-side search first, then extend on client
         const [serverContacts, serverDeals, allTasks, serverCompanies, allUsers] = await Promise.all([
           getContacts({ search }).catch((e) => { console.error('Contacts error:', e); return [] }),
@@ -97,14 +95,6 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
           getCompanies({ search }).catch((e) => { console.error('Companies error:', e); return [] }),
           getUsers().catch((e) => { console.error('Users error:', e); return [] }),
         ])
-
-        console.log('📦 QuickSearch: Server results:', {
-          contacts: serverContacts.length,
-          deals: serverDeals.length,
-          tasks: allTasks.length,
-          companies: serverCompanies.length,
-          users: allUsers.length,
-        })
 
         // Extended client-side search for deals - search by all fields
         const filteredDeals = serverDeals.filter((deal) => {
@@ -217,42 +207,7 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
           return searchWords.length > 0 && searchWords.some(word => searchableText.includes(word))
         }).slice(0, 20)
 
-        console.log('✅ QuickSearch results:', {
-          search: searchLower,
-          serverResults: {
-            contacts: serverContacts.length,
-            deals: serverDeals.length,
-            companies: serverCompanies.length,
-          },
-          filtered: {
-            contacts: filteredContacts.length,
-            deals: filteredDeals.length,
-            tasks: filteredTasks.length,
-            companies: filteredCompanies.length,
-            users: filteredUsers.length,
-          },
-          sampleDeals: filteredDeals.slice(0, 3).map(d => ({ id: d.id, title: d.title })),
-          sampleTasks: filteredTasks.slice(0, 3).map(t => ({ id: t.id, title: t.title })),
-        })
-
-        console.log('💾 QuickSearch: Setting state with:', {
-          contacts: filteredContacts.length,
-          deals: filteredDeals.length,
-          tasks: filteredTasks.length,
-          companies: filteredCompanies.length,
-          users: filteredUsers.length,
-          firstDeal: filteredDeals[0]?.title,
-          firstTask: filteredTasks[0]?.title,
-        })
-
-        // Direct console logs for debugging
-        console.log('🔢 FILTERED COUNTS:', 'contacts:', filteredContacts.length, 'deals:', filteredDeals.length, 'tasks:', filteredTasks.length)
-        if (filteredDeals.length > 0) {
-          console.log('📋 FIRST DEAL:', filteredDeals[0])
-        }
-        if (filteredTasks.length > 0) {
-          console.log('📋 FIRST TASK:', filteredTasks[0])
-        }
+        // Debug logs removed for performance (Stage 6 optimization)
 
         setContacts(filteredContacts)
         setDeals(filteredDeals)
@@ -301,30 +256,9 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
 
   const hasResults = contacts.length > 0 || deals.length > 0 || tasks.length > 0 || companies.length > 0 || users.length > 0
 
-  console.log('🎨 QuickSearch render:', {
-    open,
-    search,
-    loading,
-    hasResults,
-    counts: {
-      contacts: contacts.length,
-      deals: deals.length,
-      tasks: tasks.length,
-      companies: companies.length,
-      users: users.length,
-    },
-    willShowContacts: !loading && contacts.length > 0,
-    willShowDeals: !loading && deals.length > 0,
-    willShowTasks: !loading && tasks.length > 0,
-    sampleDeals: deals.slice(0, 2).map(d => ({ id: d.id, title: d.title })),
-    sampleTasks: tasks.slice(0, 2).map(t => ({ id: t.id, title: t.title })),
-    sampleContacts: contacts.slice(0, 2).map(c => ({ id: c.id, fullName: c.fullName })),
-  })
-
-  // Direct console logs for debugging
+  // Debug logs removed for performance (Stage 6 optimization)
   if (open && search) {
-    console.log('🔍 RENDER STATE:', 'loading:', loading, 'deals:', deals.length, 'tasks:', tasks.length, 'contacts:', contacts.length)
-    console.log('👁️ WILL SHOW:', 'deals:', !loading && deals.length > 0, 'tasks:', !loading && tasks.length > 0, 'contacts:', !loading && contacts.length > 0)
+    // Debug logs removed for performance (Stage 6 optimization)
   }
 
   return (
