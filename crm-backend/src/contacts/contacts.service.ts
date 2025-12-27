@@ -167,12 +167,7 @@ export class ContactsService {
     }
 
     if (filters.hasActiveDeals !== undefined) {
-      const dealCount = await this.prisma.deal.count({
-        where: {
-          contactId: { not: null },
-          closedAt: null,
-        },
-      });
+      // Оптимизация: удален ненужный count() запрос, который не использовался
       if (filters.hasActiveDeals) {
         where.deals = {
           some: {

@@ -223,6 +223,7 @@ model Deal {
   @@index([createdAt])
   @@index([updatedAt])
   @@index([updatedAt, id]) // Composite index for cursor-based pagination
+  @@index([closedAt]) // Index for filtering active/closed deals
   @@map("deals")
 }
 

@@ -6,16 +6,16 @@ export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getGlobalStats() {
-    // Total deals
-    const totalDeals = await this.prisma.deal.count();
-
-    // Deals by stage
+    // Deals by stage (оптимизация: используем groupBy результат для totalDeals)
     const dealsByStageData = await this.prisma.deal.groupBy({
       by: ['stageId'],
       _count: {
         id: true,
       },
     });
+
+    // Total deals - вычисляем из groupBy чтобы избежать лишнего count() запроса
+    const totalDeals = dealsByStageData.reduce((sum, stage) => sum + stage._count.id, 0);
 
     const stageIds = dealsByStageData.map((d) => d.stageId);
     const stages = await this.prisma.stage.findMany({
@@ -36,22 +36,19 @@ export class StatsService {
       };
     });
 
-    // Total revenue (sum of closed deals)
-    const closedDeals = await this.prisma.deal.findMany({
+    // Total revenue (sum of closed deals) - оптимизация: используем aggregate вместо findMany
+    const totalRevenueResult = await this.prisma.deal.aggregate({
       where: {
         stage: {
           isClosed: true,
         },
       },
-      select: {
+      _sum: {
         amount: true,
       },
     });
 
-    const totalRevenue = closedDeals.reduce(
-      (sum, deal) => sum + Number(deal.amount),
-      0,
-    );
+    const totalRevenue = Number(totalRevenueResult._sum.amount || 0);
 
     // Tasks today
     const today = new Date();
@@ -166,35 +163,29 @@ export class StatsService {
       .sort((a, b) => b.totalRevenue - a.totalRevenue)
       .slice(0, 5);
 
-    // Revenue trend (last 7 days)
+    // Revenue trend (last 7 days) - оптимизация: используем raw SQL для GROUP BY на уровне БД
     const sevenDaysAgoForTrend = new Date();
     sevenDaysAgoForTrend.setDate(sevenDaysAgoForTrend.getDate() - 7);
     sevenDaysAgoForTrend.setHours(0, 0, 0, 0);
 
-    const closedDealsForTrend = await this.prisma.deal.findMany({
-      where: {
-        stage: {
-          isClosed: true,
-        },
-        OR: [
-          { closedAt: { gte: sevenDaysAgoForTrend } },
-          { closedAt: null, updatedAt: { gte: sevenDaysAgoForTrend } },
-        ],
-      },
-      select: {
-        amount: true,
-        closedAt: true,
-        updatedAt: true,
-      },
-    });
+    // Используем raw SQL для эффективной группировки по дате на уровне БД
+    // Примечание: используем Prisma.sql для безопасной интерполяции даты
+    const revenueTrendRaw = await this.prisma.$queryRaw<Array<{ date: Date; revenue: number }>>`
+      SELECT 
+        DATE(COALESCE("closedAt", "updatedAt")) as date,
+        SUM("amount")::numeric as revenue
+      FROM "deals"
+      WHERE "stageId" IN (SELECT id FROM "stages" WHERE "isClosed" = true)
+        AND (COALESCE("closedAt", "updatedAt") >= ${sevenDaysAgoForTrend}::timestamp)
+      GROUP BY DATE(COALESCE("closedAt", "updatedAt"))
+      ORDER BY date
+    `;
 
     // Group by date (use closedAt if available, otherwise updatedAt)
     const revenueByDate = new Map<string, number>();
-    closedDealsForTrend.forEach((deal) => {
-      const date = deal.closedAt || deal.updatedAt;
-      const dateKey = date.toISOString().split('T')[0];
-      const current = revenueByDate.get(dateKey) || 0;
-      revenueByDate.set(dateKey, current + Number(deal.amount));
+    revenueTrendRaw.forEach((row) => {
+      const dateKey = row.date.toISOString().split('T')[0];
+      revenueByDate.set(dateKey, Number(row.revenue));
     });
 
     // Fill in missing days with 0
