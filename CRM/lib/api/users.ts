@@ -46,7 +46,6 @@ export async function getUsers(): Promise<User[]> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found for getUsers - redirecting to login')
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
@@ -68,7 +67,6 @@ export async function getUsers(): Promise<User[]> {
   if (!response.ok) {
     // Handle authentication errors
     if (response.status === 401 || response.status === 403) {
-      console.warn('Unauthorized to fetch users - redirecting to login')
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
@@ -107,7 +105,6 @@ export async function getMyProfile(): Promise<User> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found for getMyProfile - redirecting to login')
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
@@ -121,7 +118,6 @@ export async function getMyProfile(): Promise<User> {
 
   const API_BASE_URL = getApiBaseUrl()
   const url = `${API_BASE_URL}/users/me`
-  console.log('getMyProfile: Fetching from:', url)
   
   const response = await fetch(url, {
     headers: {
@@ -129,12 +125,9 @@ export async function getMyProfile(): Promise<User> {
     },
   })
 
-  console.log('getMyProfile: Response status:', response.status, response.statusText)
-
   if (!response.ok) {
     // Handle authentication errors
     if (response.status === 401 || response.status === 403) {
-      console.warn('Unauthorized to fetch profile - redirecting to login')
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
@@ -147,12 +140,10 @@ export async function getMyProfile(): Promise<User> {
     }
     
     const error = await response.json().catch(() => ({ message: 'Failed to fetch profile' }))
-    console.error('getMyProfile: Error response:', error)
     throw new Error(error.message || 'Failed to fetch profile')
   }
 
   const data = await response.json()
-  console.log('getMyProfile: Received data:', data)
   return data
 }
 
@@ -201,7 +192,6 @@ export async function updateMyProfile(data: UpdateUserDto): Promise<User> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found for updateMyProfile - redirecting to login')
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')

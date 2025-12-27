@@ -80,7 +80,6 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       // Only handle unauthorized once per session to prevent multiple logouts
       if (!isHandlingUnauthorized) {
         isHandlingUnauthorized = true
-        console.warn('API: Unauthorized request (401) - token expired or invalid')
         
         // Clear invalid tokens immediately
         localStorage.removeItem('access_token')
@@ -106,8 +105,6 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
         setTimeout(() => {
           isHandlingUnauthorized = false
         }, 1000)
-      } else {
-        console.warn('API: Unauthorized request (401) - already handling, skipping duplicate logout')
       }
       
       throw new UnauthorizedError()
@@ -115,7 +112,6 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
 
     // Also handle 403, but don't clear tokens (might be permission issue)
     if (response.status === 403) {
-      console.warn('API: Forbidden request (403) - insufficient permissions')
       throw new Error('Insufficient permissions')
     }
 

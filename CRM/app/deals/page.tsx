@@ -43,7 +43,6 @@ const useRouter = () => {
   return {
     push: (url: string) => {
       if (typeof window !== 'undefined') {
-        console.log('useRouter.push: Updating URL to:', url)
         // Extract path and search params
         const [path, search] = url.split('?')
         const newSearch = search || ''
@@ -51,7 +50,6 @@ const useRouter = () => {
         // Update search params state immediately
         if (globalSetParams) {
           const newParams = new URLSearchParams(newSearch)
-          console.log('useRouter.push: Updating search params:', newParams.toString())
           globalSetParams(newParams)
         }
         
@@ -61,9 +59,6 @@ const useRouter = () => {
         
         // Force update by dispatching popstate event
         window.dispatchEvent(new PopStateEvent('popstate'))
-        
-        console.log('useRouter.push: URL after pushState:', window.location.href)
-        console.log('useRouter.push: window.location.search:', window.location.search)
       }
     }
   }
@@ -248,21 +243,15 @@ export default function DealsPage() {
   // Read deal ID from URL on mount and when URL changes
   useEffect(() => {
     const dealId = searchParams.get('deal')
-    console.log('DealsPage: Reading deal from URL:', dealId, 'Current selectedDealId:', selectedDealId)
     if (dealId && dealId !== selectedDealId) {
-      console.log('DealsPage: Setting selectedDealId from URL:', dealId)
       setSelectedDealId(dealId)
     } else if (!dealId && selectedDealId !== null) {
-      console.log('DealsPage: No deal in URL, clearing selectedDealId')
       setSelectedDealId(null)
     }
   }, [searchParams, selectedDealId])
 
   // Handle deal click - update URL
   const handleDealClick = useCallback((dealId: string | null) => {
-    console.log('DealsPage: handleDealClick called with dealId:', dealId)
-    console.log('DealsPage: Current URL before update:', window.location.href)
-    
     // Update state first
     setSelectedDealId(dealId)
     
@@ -276,12 +265,9 @@ export default function DealsPage() {
     }
     const queryString = params.toString()
     const newUrl = `/deals${queryString ? `?${queryString}` : ''}`
-    console.log('DealsPage: New URL to push:', newUrl)
     
     // Update URL using pushState
     window.history.pushState({ path: newUrl }, '', newUrl)
-    console.log('DealsPage: URL immediately after pushState:', window.location.href)
-    console.log('DealsPage: window.location.search:', window.location.search)
     
     // Update search params state
     if (globalSetParams) {
@@ -290,12 +276,6 @@ export default function DealsPage() {
     
     // Force update by dispatching popstate
     window.dispatchEvent(new PopStateEvent('popstate'))
-    
-    // Double check after a delay
-    setTimeout(() => {
-      console.log('DealsPage: URL after pushState (delayed):', window.location.href)
-      console.log('DealsPage: window.location.search (delayed):', window.location.search)
-    }, 100)
   }, [])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -365,14 +345,11 @@ export default function DealsPage() {
           if (defaultPipeline) {
             setCurrentFunnelId(defaultPipeline.id)
           }
-        } else {
-          console.log('No pipelines found, but user is authenticated')
         }
       } catch (error) {
         console.error('Failed to load pipelines:', error)
         // Check if it's an auth error
         if (error instanceof Error && (error.message === 'UNAUTHORIZED' || error.message.includes('401'))) {
-          console.warn('Authentication failed, redirecting to login')
           // Token already cleared in API function
           router.push('/login')
           return
@@ -396,15 +373,10 @@ export default function DealsPage() {
     }
 
     try {
-      console.log('Creating pipeline:', name.trim())
       const newPipeline = await createPipeline({
         name: name.trim(),
         isDefault: false, // Don't set as default automatically
       })
-
-      console.log('Pipeline created:', newPipeline)
-      console.log('Pipeline ID:', newPipeline.id)
-      console.log('Pipeline name:', newPipeline.name)
 
       // Create default stages for the new pipeline
       const defaultStagesToCreate = [
@@ -415,19 +387,16 @@ export default function DealsPage() {
         { name: 'Closed Lost', color: '#EF4444', order: 4, isDefault: false, isClosed: true },
       ]
 
-      console.log('Creating default stages for pipeline:', newPipeline.id)
       let stagesCreated = 0
       for (const stageData of defaultStagesToCreate) {
         try {
-          const createdStage = await createStage(newPipeline.id, stageData)
-          console.log('Stage created:', stageData.name, createdStage.id)
+          await createStage(newPipeline.id, stageData)
           stagesCreated++
         } catch (stageError) {
           console.error(`Failed to create stage ${stageData.name}:`, stageError)
           // Continue creating other stages even if one fails
         }
       }
-      console.log(`Created ${stagesCreated} out of ${defaultStagesToCreate.length} stages`)
 
       showSuccess(`Pipeline "${newPipeline.name}" created successfully with ${stagesCreated} stages`)
       
@@ -435,23 +404,15 @@ export default function DealsPage() {
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // Refresh pipelines list from API to get the pipeline with stages
-      console.log('Refreshing pipelines list to get created pipeline with stages...')
       const pipelines = await getPipelines()
-      console.log('Refreshed pipelines:', pipelines.length)
       
       // Find the newly created pipeline
       const createdPipeline = pipelines.find(p => p.id === newPipeline.id)
-      if (createdPipeline) {
-        console.log('Found created pipeline with stages:', createdPipeline.stages?.length || 0)
-      } else {
-        console.warn('Created pipeline not found in refreshed list, retrying...')
+      if (!createdPipeline) {
         // Retry once more
         await new Promise(resolve => setTimeout(resolve, 1000))
         const retryPipelines = await getPipelines()
-        const retryPipeline = retryPipelines.find(p => p.id === newPipeline.id)
-        if (retryPipeline) {
-          console.log('Found pipeline on retry:', retryPipeline.stages?.length || 0, 'stages')
-        }
+        retryPipelines.find(p => p.id === newPipeline.id)
       }
       
       // Update funnels list with all pipelines from API
@@ -460,35 +421,20 @@ export default function DealsPage() {
         name: p.name,
       }))
       
-      console.log('Updating funnels list:', funnelsList.length, funnelsList)
       setFunnels(funnelsList)
       
       // Select the newly created pipeline
-      console.log('Setting currentFunnelId to:', newPipeline.id)
       setCurrentFunnelId(newPipeline.id)
       
       // Force Kanban board to refresh by changing key - this will make it reload pipelines
-      setKanbanRefreshKey(prev => {
-        const newKey = prev + 1
-        console.log('Kanban refresh key updated to:', newKey)
-        return newKey
-      })
-      
+      setKanbanRefreshKey(prev => prev + 1)
+
       // Close settings modal if open
       setIsSettingsOpen(false)
-      console.log('Settings modal closed')
-      
-      console.log('Pipeline creation completed successfully')
     } catch (error) {
       console.error('Failed to create pipeline:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', {
-        message: errorMessage,
-        error: error,
-        stack: error instanceof Error ? error.stack : undefined
-      })
       showError('Failed to create pipeline', errorMessage)
-      // Don't close modal on error so user can try again
     }
   }
 
