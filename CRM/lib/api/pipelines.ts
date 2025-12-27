@@ -61,13 +61,11 @@ export async function getPipelines(): Promise<Pipeline[]> {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, returning empty pipelines list')
     return []
   }
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('Fetching pipelines from:', `${API_BASE_URL}/pipelines`)
     const response = await fetch(`${API_BASE_URL}/pipelines`, {
       headers: {
         'Content-Type': 'application/json',
@@ -75,14 +73,10 @@ export async function getPipelines(): Promise<Pipeline[]> {
       },
     })
 
-    console.log('Pipelines response status:', response.status, response.statusText)
-
     if (!response.ok) {
       // If unauthorized, clear token and redirect to login
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch pipelines - token may be invalid or expired')
         const errorText = await response.text().catch(() => 'Unauthorized')
-        console.warn('Error details:', errorText)
         
         // Clear invalid token
         localStorage.removeItem('access_token')
@@ -103,33 +97,14 @@ export async function getPipelines(): Promise<Pipeline[]> {
     }
 
     const data = await response.json()
-    console.log('Pipelines fetched successfully:', data.length, 'pipelines')
     // Ensure stages array exists for each pipeline
     const pipelinesWithStages = data.map((pipeline: any) => ({
       ...pipeline,
       stages: pipeline.stages || []
     }))
-    // Log stages for debugging
-    pipelinesWithStages.forEach((pipeline: any, index: number) => {
-      console.log(`Pipeline ${index + 1}:`, {
-        id: pipeline.id,
-        name: pipeline.name,
-        stagesCount: pipeline.stages?.length || 0,
-        hasStages: !!pipeline.stages,
-        stages: pipeline.stages || [],
-        rawStages: pipeline.stages
-      })
-      // Log full pipeline object for debugging
-      if (pipeline.stages && pipeline.stages.length > 0) {
-        console.log(`Pipeline ${index + 1} stages details:`, JSON.stringify(pipeline.stages, null, 2))
-      } else {
-        console.warn(`Pipeline ${index + 1} has NO stages!`, pipeline)
-      }
-    })
     return pipelinesWithStages
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      console.warn('Network error: Unable to reach the API server')
       return [] // Return empty array instead of throwing
     }
     // For other errors, still return empty array to prevent app crash
@@ -166,9 +141,7 @@ export async function createPipeline(data: CreatePipelineDto): Promise<Pipeline>
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('API: Creating pipeline with data:', data)
     const url = `${API_BASE_URL}/pipelines`
-    console.log('API: POST URL:', url)
     
     const response = await fetch(url, {
       method: 'POST',
@@ -178,8 +151,6 @@ export async function createPipeline(data: CreatePipelineDto): Promise<Pipeline>
       },
       body: JSON.stringify(data),
     })
-
-    console.log('API: Response status:', response.status, response.statusText)
 
     if (!response.ok) {
       let errorMessage = 'Unknown error'
@@ -205,20 +176,14 @@ export async function createPipeline(data: CreatePipelineDto): Promise<Pipeline>
     }
 
     const result = await response.json()
-    console.log('API: Pipeline created successfully:', result)
     // Ensure stages array exists
     const pipelineWithStages = {
       ...result,
       stages: result.stages || []
     }
-    console.log('API: Pipeline with stages:', pipelineWithStages)
     return pipelineWithStages
   } catch (error) {
     console.error('API: Error creating pipeline:', error)
-    if (error instanceof Error) {
-      console.error('API: Error message:', error.message)
-      console.error('API: Error stack:', error.stack)
-    }
     throw error
   }
 }
@@ -254,7 +219,6 @@ export async function createStage(pipelineId: string, data: CreateStageDto): Pro
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('API: Creating stage with data:', { pipelineId, data })
     const response = await fetch(`${API_BASE_URL}/pipelines/${pipelineId}/stages`, {
       method: 'POST',
       headers: {
@@ -264,14 +228,10 @@ export async function createStage(pipelineId: string, data: CreateStageDto): Pro
       body: JSON.stringify(data),
     })
 
-    console.log('API: Stage creation response status:', response.status, response.statusText)
-
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to create stage - token may be invalid or expired')
         const errorText = await response.text().catch(() => 'Unauthorized')
-        console.warn('Error details:', errorText)
         
         // Clear invalid token
         localStorage.removeItem('access_token')
@@ -310,14 +270,9 @@ export async function createStage(pipelineId: string, data: CreateStageDto): Pro
     }
 
     const result = await response.json()
-    console.log('API: Stage created successfully:', result)
     return result
   } catch (error) {
     console.error('API: Error creating stage:', error)
-    if (error instanceof Error) {
-      console.error('API: Error message:', error.message)
-      console.error('API: Error stack:', error.stack)
-    }
     throw error
   }
 }
@@ -347,9 +302,7 @@ export async function updateStage(id: string, data: UpdateStageDto): Promise<Sta
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to update stage - token may be invalid or expired')
         const errorText = await response.text().catch(() => 'Unauthorized')
-        console.warn('Error details:', errorText)
         
         // Clear invalid token
         localStorage.removeItem('access_token')
@@ -390,10 +343,6 @@ export async function updateStage(id: string, data: UpdateStageDto): Promise<Sta
     return response.json()
   } catch (error) {
     console.error('API: Error updating stage:', error)
-    if (error instanceof Error) {
-      console.error('API: Error message:', error.message)
-      console.error('API: Error stack:', error.stack)
-    }
     throw error
   }
 }

@@ -47,7 +47,6 @@ export async function getDeals(params?: {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found - redirecting to login')
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
@@ -70,19 +69,15 @@ export async function getDeals(params?: {
   try {
     const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
-    console.log('Fetching deals from:', url)
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     })
 
-    console.log('Deals API response status:', response.status, response.statusText)
-
     if (!response.ok) {
       // If unauthorized, redirect to login
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch deals - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
@@ -99,11 +94,9 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
-    console.log('Deals API response data:', data.length, 'deals')
     return data
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      console.warn('Network error: Unable to reach the API server')
       return [] // Return empty array instead of throwing
     }
     // For other errors, still return empty array to prevent app crash
@@ -160,7 +153,6 @@ export async function createDeal(data: {
       description: data.description ? String(data.description) : undefined,
     }
     
-    console.log('API: Creating deal with clean data:', cleanData)
     const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/deals`, {
       method: 'POST',
@@ -170,8 +162,6 @@ export async function createDeal(data: {
       },
       body: JSON.stringify(cleanData),
     })
-
-    console.log('API: Deal creation response status:', response.status, response.statusText)
 
     if (!response.ok) {
       let errorMessage = 'Unknown error'
@@ -197,16 +187,9 @@ export async function createDeal(data: {
     }
 
     const result = await response.json()
-    console.log('API: Deal created successfully:', result?.id, result?.title, result?.amount)
     return result
   } catch (error) {
-    // Log error without circular references
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorStack = error instanceof Error ? error.stack : undefined
-    console.error('API: Error creating deal:', errorMessage)
-    if (errorStack) {
-      console.error('API: Error stack:', errorStack)
-    }
+    console.error('API: Error creating deal:', error)
     throw error
   }
 }

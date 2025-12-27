@@ -35,6 +35,7 @@ import { updateDeal as updateDealApi } from '@/lib/api/deals'
 import { getUsers, type User } from '@/lib/api/users'
 import { createComment, getDealComments, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { getSystemFieldOptions } from '@/lib/api/system-field-options'
 
 interface DealDetailProps {
   dealId: string
@@ -50,7 +51,18 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   
   // Helper functions for translations
   const getDirectionLabel = (value: string) => {
-    return t(`contacts.direction.${value}`) || value
+    if (!value) return value
+    
+    // Try to get translation
+    const translation = t(`contacts.direction.${value}`)
+    
+    // If translation was found (not the key itself), return it
+    if (translation && !translation.startsWith('contacts.direction.')) {
+      return translation
+    }
+    
+    // For custom directions from CSV (like "Китай", "Алтай", "Байкал"), return as-is
+    return value
   }
   
   const getContactMethodLabel = (value: string) => {
@@ -58,7 +70,22 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   }
   
   const getRejectionReasonLabel = (value: string) => {
-    return t(`deals.rejectionReason.${value}`) || value
+    if (!value) return value
+    
+    // Standard rejection reason keys (English)
+    const standardReasons = ['price', 'competitor', 'timing', 'budget', 'requirements', 'other']
+    
+    // If it's a standard reason, try to get translation
+    if (standardReasons.includes(value.toLowerCase())) {
+      const translation = t(`deals.rejectionReason.${value.toLowerCase()}`)
+      // Check if translation was found (not the key itself)
+      if (translation && !translation.startsWith('deals.rejectionReason.')) {
+        return translation
+      }
+    }
+    
+    // For custom reasons from CSV (like "Игнор", "Туроператор"), return as-is
+    return value
   }
 
   // Helper function to ensure contact exists
@@ -91,6 +118,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [rejectionReasonsOptions, setRejectionReasonsOptions] = useState<string[]>([])
+  const [directionsOptions, setDirectionsOptions] = useState<string[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -186,25 +215,46 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     loadComments()
   }, [dealId])
 
+  // Load rejection reasons options from API
+  useEffect(() => {
+    const loadRejectionReasonsOptions = async () => {
+      try {
+        const options = await getSystemFieldOptions('deal', 'rejectionReasons')
+        setRejectionReasonsOptions(options)
+      } catch (error) {
+        console.error('[DEAL DETAIL] Failed to load rejection reasons options:', error)
+        // Fallback to default options if API fails
+        setRejectionReasonsOptions(['Price', 'Competitor', 'Timing', 'Budget', 'Requirements', 'Other'])
+      }
+    }
+    loadRejectionReasonsOptions()
+  }, [])
+
+  // Load directions options from API
+  useEffect(() => {
+    const loadDirectionsOptions = async () => {
+      try {
+        const options = await getSystemFieldOptions('contact', 'directions')
+        setDirectionsOptions(options)
+      } catch (error) {
+        console.error('[DEAL DETAIL] Failed to load directions options:', error)
+        // Fallback to empty array if API fails - will show no options
+        setDirectionsOptions([])
+      }
+    }
+    loadDirectionsOptions()
+  }, [])
+
   // Load pipeline with stages when deal is loaded
   useEffect(() => {
     const loadPipeline = async () => {
       if (!deal?.pipelineId) {
-        console.log('DealDetail: No pipelineId in deal', deal)
         setPipeline(null)
         return
       }
 
-      console.log('DealDetail: Loading pipeline for deal', {
-        pipelineId: deal.pipelineId,
-        hasPipeline: !!deal.pipeline,
-        hasStages: !!(deal.pipeline?.stages && deal.pipeline.stages.length > 0),
-        stagesCount: deal.pipeline?.stages?.length || 0,
-      })
-
       // If pipeline data is already in deal, use it
       if (deal.pipeline?.stages && deal.pipeline.stages.length > 0) {
-        console.log('DealDetail: Using pipeline from deal data', deal.pipeline)
         setPipeline({
           id: deal.pipeline.id,
           name: deal.pipeline.name,
@@ -230,10 +280,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
       // Otherwise, fetch pipeline from API
       try {
-        console.log('DealDetail: Fetching pipeline from API', deal.pipelineId)
         setPipelineLoading(true)
         const pipelineData = await getPipeline(deal.pipelineId)
-        console.log('DealDetail: Pipeline loaded from API', pipelineData)
         setPipeline(pipelineData)
       } catch (error) {
         console.error('DealDetail: Failed to load pipeline:', error)
@@ -338,9 +386,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
   const handleTaskCreate = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
     try {
-      console.log('handleTaskCreate called with:', taskData)
       const newTask = await createTask(taskData)
-      console.log('Task created:', newTask)
       
       // Reload activities to show the task creation activity (created by backend)
       await refetchActivities()
@@ -364,8 +410,6 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     assignedToId: string
   }) => {
     try {
-      console.log('handleCreateTaskFromModal called with:', taskData)
-      
       // Get current user ID if not provided
       let assignedToId = taskData.assignedToId
       if (!assignedToId) {
@@ -386,7 +430,6 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         if (users.length > 0) {
           assignedToId = users[0].id
         } else {
-          console.warn('No assignedToId available, using empty string')
           assignedToId = ''
         }
       }
@@ -403,11 +446,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         completed: false
       }
       
-      console.log('Creating task with payload:', taskPayload)
-      
       await handleTaskCreate(taskPayload)
-      
-      console.log('Task created successfully')
       setIsCreateTaskModalOpen(false)
     } catch (error) {
       console.error('Failed to create task from modal:', error)
@@ -479,9 +518,6 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       showSuccess('Comment added successfully')
 
       // TODO: Handle file uploads if files are provided
-      if (files && files.length > 0) {
-        console.warn('File uploads in comments are not yet implemented')
-      }
     } catch (error) {
       console.error('Failed to create comment:', error)
       showError('Failed to add comment', error instanceof Error ? error.message : 'Unknown error')
@@ -600,15 +636,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             sessionStorage.getItem(`deal-${dealId}-isNew`) === 'true'}
           onDuplicate={() => {
             // TODO: Implement duplicate
-            console.log('Duplicate deal')
           }}
           onArchive={() => {
             // TODO: Implement archive
-            console.log('Archive deal')
           }}
           onDelete={() => {
             // TODO: Implement delete
-            console.log('Delete deal')
           }}
         />
 
@@ -854,21 +887,32 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       e.preventDefault()
                     }}
                   >
-                    <SelectItem value="marketing">
-                      {t('contacts.direction.marketing') || 'Маркетинг'}
-                    </SelectItem>
-                    <SelectItem value="sales">
-                      {t('contacts.direction.sales') || 'Продажи'}
-                    </SelectItem>
-                    <SelectItem value="support">
-                      {t('contacts.direction.support') || 'Поддержка'}
-                    </SelectItem>
-                    <SelectItem value="development">
-                      {t('contacts.direction.development') || 'Разработка'}
-                    </SelectItem>
-                    <SelectItem value="other">
-                      {t('contacts.direction.other') || 'Другое'}
-                    </SelectItem>
+                    {directionsOptions.length > 0 ? (
+                      directionsOptions.map((direction) => (
+                        <SelectItem key={direction} value={direction}>
+                          {getDirectionLabel(direction)}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      // Fallback to default options if API hasn't loaded yet
+                      <>
+                        <SelectItem value="marketing">
+                          {t('contacts.direction.marketing') || 'Маркетинг'}
+                        </SelectItem>
+                        <SelectItem value="sales">
+                          {t('contacts.direction.sales') || 'Продажи'}
+                        </SelectItem>
+                        <SelectItem value="support">
+                          {t('contacts.direction.support') || 'Поддержка'}
+                        </SelectItem>
+                        <SelectItem value="development">
+                          {t('contacts.direction.development') || 'Разработка'}
+                        </SelectItem>
+                        <SelectItem value="other">
+                          {t('contacts.direction.other') || 'Другое'}
+                        </SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 {deal?.contact?.directions && deal.contact.directions.length > 0 && (
@@ -1081,24 +1125,35 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     e.preventDefault()
                   }}
                 >
-                  <SelectItem value="price">
-                    {t('deals.rejectionReason.price') || 'Цена'}
-                  </SelectItem>
-                  <SelectItem value="competitor">
-                    {t('deals.rejectionReason.competitor') || 'Конкурент'}
-                  </SelectItem>
-                  <SelectItem value="timing">
-                    {t('deals.rejectionReason.timing') || 'Сроки'}
-                  </SelectItem>
-                  <SelectItem value="budget">
-                    {t('deals.rejectionReason.budget') || 'Бюджет'}
-                  </SelectItem>
-                  <SelectItem value="requirements">
-                    {t('deals.rejectionReason.requirements') || 'Требования'}
-                  </SelectItem>
-                  <SelectItem value="other">
-                    {t('deals.rejectionReason.other') || 'Другое'}
-                  </SelectItem>
+                  {rejectionReasonsOptions.length > 0 ? (
+                    rejectionReasonsOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {getRejectionReasonLabel(option)}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    // Fallback to default options while loading
+                    <>
+                      <SelectItem value="price">
+                        {t('deals.rejectionReason.price') || 'Цена'}
+                      </SelectItem>
+                      <SelectItem value="competitor">
+                        {t('deals.rejectionReason.competitor') || 'Конкурент'}
+                      </SelectItem>
+                      <SelectItem value="timing">
+                        {t('deals.rejectionReason.timing') || 'Сроки'}
+                      </SelectItem>
+                      <SelectItem value="budget">
+                        {t('deals.rejectionReason.budget') || 'Бюджет'}
+                      </SelectItem>
+                      <SelectItem value="requirements">
+                        {t('deals.rejectionReason.requirements') || 'Требования'}
+                      </SelectItem>
+                      <SelectItem value="other">
+                        {t('deals.rejectionReason.other') || 'Другое'}
+                      </SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
               {deal.rejectionReasons && deal.rejectionReasons.length > 0 && (

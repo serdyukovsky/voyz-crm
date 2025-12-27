@@ -36,7 +36,6 @@ export async function getTasks(params?: {
 
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, redirecting to login')
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     }
@@ -60,7 +59,6 @@ export async function getTasks(params?: {
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch tasks - token may be invalid or expired')
         // Clear invalid token
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
@@ -123,7 +121,6 @@ export async function createTask(data: CreateTaskDto): Promise<Task> {
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('API: Creating task with data:', data)
     const response = await fetch(`${API_BASE_URL}/tasks`, {
       method: 'POST',
       headers: {
@@ -133,14 +130,10 @@ export async function createTask(data: CreateTaskDto): Promise<Task> {
       body: JSON.stringify(data),
     })
 
-    console.log('API: Task creation response status:', response.status, response.statusText)
-
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to create task - token may be invalid or expired')
         const errorText = await response.text().catch(() => 'Unauthorized')
-        console.warn('Error details:', errorText)
         
         // Clear invalid token
         localStorage.removeItem('access_token')
@@ -179,14 +172,9 @@ export async function createTask(data: CreateTaskDto): Promise<Task> {
     }
 
     const result = await response.json()
-    console.log('API: Task created successfully:', result)
     return result
   } catch (error) {
     console.error('API: Error creating task:', error)
-    if (error instanceof Error) {
-      console.error('API: Error message:', error.message)
-      console.error('API: Error stack:', error.stack)
-    }
     throw error
   }
 }
@@ -224,7 +212,6 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('API: Updating task with data:', { id, data })
     const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
       method: 'PATCH',
       headers: {
@@ -236,7 +223,6 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        console.warn('API: Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
@@ -293,7 +279,6 @@ export async function deleteTask(id: string): Promise<void> {
 
   try {
     const API_BASE_URL = getApiBaseUrl()
-    console.log('API: Deleting task:', id)
     const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
       method: 'DELETE',
       headers: {
@@ -304,7 +289,6 @@ export async function deleteTask(id: string): Promise<void> {
     if (!response.ok) {
       // 401 = Unauthorized (token invalid/expired) - redirect to login
       if (response.status === 401) {
-        console.warn('API: Unauthorized - redirecting to login')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')

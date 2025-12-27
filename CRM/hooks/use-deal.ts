@@ -114,7 +114,6 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
       }
 
       const API_BASE_URL = getApiBaseUrl()
-      console.log('Loading deal from API:', dealId)
       const response = await fetch(`${API_BASE_URL}/deals/${dealId}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -126,7 +125,6 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
         if (response.status === 404) {
           // If we have quick data, keep it even if API returns 404 (deal might be very new)
           if (quickDealData) {
-            console.warn('Deal not found in API but has sessionStorage data, keeping sessionStorage data')
             return
           }
           throw new Error('Deal not found')
@@ -172,10 +170,18 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
           companyName: data.contact.companyName,
           social: data.contact.social,
           stats: data.contact.stats,
+          // Contact fields
+          link: data.contact.link,
+          subscriberCount: data.contact.subscriberCount,
+          directions: data.contact.directions,
+          contactMethods: data.contact.contactMethods,
+          websiteOrTgChannel: data.contact.websiteOrTgChannel,
+          contactInfo: data.contact.contactInfo,
         } : undefined,
         createdAt: data.createdAt || new Date().toISOString(),
         expectedClose: data.expectedCloseAt,
         tags: data.tags || [],
+        rejectionReasons: data.rejectionReasons || [],
         customFields: data.customFields || [],
       }
       
@@ -201,10 +207,17 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
               phone: dealData.contact.phone,
               position: dealData.contact.position,
               companyName: dealData.contact.companyName,
+              link: dealData.contact.link,
+              subscriberCount: dealData.contact.subscriberCount,
+              directions: dealData.contact.directions,
+              contactMethods: dealData.contact.contactMethods,
+              websiteOrTgChannel: dealData.contact.websiteOrTgChannel,
+              contactInfo: dealData.contact.contactInfo,
             } : undefined,
             createdAt: dealData.createdAt,
             expectedClose: dealData.expectedClose,
             tags: dealData.tags,
+            rejectionReasons: dealData.rejectionReasons,
             customFields: dealData.customFields,
           }
           sessionStorage.setItem(`deal-${dealId}`, JSON.stringify(cleanDeal))

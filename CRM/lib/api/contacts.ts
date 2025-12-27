@@ -180,7 +180,6 @@ export async function getContacts(params?: {
   // Real API call
   const token = localStorage.getItem('access_token')
   if (!token) {
-    console.warn('No access token found, redirecting to login')
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     }
@@ -207,7 +206,6 @@ export async function getContacts(params?: {
     if (!response.ok) {
       // If unauthorized, redirect to login
       if (response.status === 401 || response.status === 403) {
-        console.warn('Unauthorized to fetch contacts, redirecting to login')
         // Clear invalid token
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
@@ -226,7 +224,6 @@ export async function getContacts(params?: {
     return response.json()
   } catch (error) {
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      console.warn('Network error: Unable to reach the API server, returning mock contacts')
       return mockContacts // Return mock data instead of throwing
     }
     // For other errors, return mock data to prevent app crash

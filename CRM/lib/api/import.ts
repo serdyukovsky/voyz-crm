@@ -76,7 +76,6 @@ export function getAllFields(meta: ImportMeta | any): ImportField[] {
   }
   
   // Fallback to empty array
-  console.warn('getAllFields: Unexpected meta structure', meta)
   return []
 }
 
@@ -130,8 +129,6 @@ export async function getImportMeta(entityType: 'contact' | 'deal'): Promise<Imp
     url = `${API_BASE_URL}/api/import/meta?entityType=${entityType}`
   }
   
-  console.log('Fetching import meta from:', url, 'API_BASE_URL:', API_BASE_URL)
-  
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -146,11 +143,6 @@ export async function getImportMeta(entityType: 'contact' | 'deal'): Promise<Imp
   }
 
   const data = await response.json()
-  console.log('Import meta API response:', JSON.stringify(data, null, 2))
-  console.log('systemFields:', data.systemFields)
-  console.log('customFields:', data.customFields)
-  console.log('systemFields is array?', Array.isArray(data.systemFields))
-  console.log('customFields is array?', Array.isArray(data.customFields))
   return data
 }
 
@@ -171,8 +163,6 @@ export async function autoMapColumns(
   if (!API_BASE_URL.includes('/api')) {
     url = `${API_BASE_URL}/api/import/auto-map?entityType=${entityType}`
   }
-  
-  console.log('Auto-mapping columns:', url)
   
   const response = await fetch(url, {
     method: 'POST',
@@ -217,7 +207,6 @@ export async function importContacts(
   // pipelineId is a top-level parameter, NOT a CSV column mapping
   // If it's in mapping, backend will try to find CSV column named "pipelineId" and fail
   if ('pipelineId' in cleanMapping) {
-    console.warn('[IMPORT MAPPING] WARNING: pipelineId found in mapping - removing it. pipelineId should be passed as separate parameter, not in mapping.');
     delete cleanMapping.pipelineId;
   }
 
@@ -228,22 +217,9 @@ export async function importContacts(
     // CRITICAL: Double-check - never include pipelineId in inverted mapping
     if (crmField && typeof crmField === 'string' && crmField !== 'pipelineId') {
       acc[crmField] = csvColumn
-    } else if (crmField === 'pipelineId') {
-      console.warn('[IMPORT MAPPING] WARNING: Attempted to map pipelineId - skipping. pipelineId must be passed separately.');
     }
     return acc
   }, {})
-  
-  // Log mapping for debugging - ensure keys match backend expectations
-  // Backend expects: mapping.title = "CSV Column Name"
-  console.log('[IMPORT MAPPING]', {
-    original: cleanMapping, // { "CSV Column": "crmField" }
-    inverted: invertedMapping, // { "crmField": "CSV Column" }
-    hasTitle: 'title' in invertedMapping,
-    titleColumn: invertedMapping.title,
-    allMappedFields: Object.keys(invertedMapping),
-    pipelineIdInMapping: 'pipelineId' in cleanMapping || 'pipelineId' in invertedMapping
-  })
 
   const formData = new FormData()
   formData.append('file', file)
@@ -267,7 +243,6 @@ export async function importContacts(
   if (!response.ok) {
     // Handle 401 unauthorized - token expired or invalid
     if (response.status === 401) {
-      console.warn('Import contacts: Unauthorized (401) - token expired or invalid')
       // Clear invalid tokens
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
@@ -320,7 +295,6 @@ export async function importDeals(
   // pipelineId is a top-level parameter, NOT a CSV column mapping
   // If it's in mapping, backend will try to find CSV column named "pipelineId" and fail
   if ('pipelineId' in cleanMapping) {
-    console.warn('[IMPORT MAPPING] WARNING: pipelineId found in mapping - removing it. pipelineId should be passed as separate parameter, not in mapping.');
     delete cleanMapping.pipelineId;
   }
 
@@ -331,23 +305,9 @@ export async function importDeals(
     // CRITICAL: Double-check - never include pipelineId in inverted mapping
     if (crmField && typeof crmField === 'string' && crmField !== 'pipelineId') {
       acc[crmField] = csvColumn
-    } else if (crmField === 'pipelineId') {
-      console.warn('[IMPORT MAPPING] WARNING: Attempted to map pipelineId - skipping. pipelineId must be passed separately.');
     }
     return acc
   }, {})
-  
-  // Log mapping and rows for debugging
-  console.log('[IMPORT MAPPING]', {
-    original: cleanMapping, // { "CSV Column": "crmField" }
-    inverted: invertedMapping, // { "crmField": "CSV Column" }
-    hasTitle: 'title' in invertedMapping,
-    titleColumn: invertedMapping.title,
-    allMappedFields: Object.keys(invertedMapping),
-    pipelineIdInMapping: 'pipelineId' in cleanMapping || 'pipelineId' in invertedMapping,
-    rowsCount: rows.length,
-    firstRowSample: rows[0] ? Object.keys(rows[0]).slice(0, 5) : []
-  })
 
   // CRITICAL: Send rows as JSON, not FormData
   // CSV parsing is done on frontend, backend receives parsed rows
@@ -365,19 +325,6 @@ export async function importDeals(
     url = `${API_BASE_URL}/api/import/deals?dryRun=${dryRun ? 'true' : 'false'}`
   }
   
-  // 🔥 DIAGNOSTIC: Log request details
-  console.log('🔥 IMPORT REQUEST:', {
-    url,
-    method: 'POST',
-    contentType: 'application/json',
-    bodyKeys: Object.keys(requestBody),
-    rowsCount: requestBody.rows.length,
-    hasMapping: !!requestBody.mapping,
-    mappingKeys: Object.keys(requestBody.mapping || {}),
-    pipelineId: requestBody.pipelineId,
-    dryRun,
-  })
-  
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -390,7 +337,6 @@ export async function importDeals(
   if (!response.ok) {
     // Handle 401 unauthorized - token expired or invalid
     if (response.status === 401) {
-      console.warn('Import deals: Unauthorized (401) - token expired or invalid')
       // Clear invalid tokens
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
@@ -404,33 +350,14 @@ export async function importDeals(
       throw new UnauthorizedError()
     }
     
-    // 🔥 DIAGNOSTIC: Log error response details
     const errorText = await response.text()
-    console.error('🔥 IMPORT ERROR RESPONSE:', {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.url,
-      headers: Object.fromEntries(response.headers.entries()),
-      errorText,
-    })
     
     // Try to parse as JSON for better error message
     let errorMessage = errorText
-    let errorJson: any = null
     try {
-      errorJson = JSON.parse(errorText)
+      const errorJson = JSON.parse(errorText)
       errorMessage = errorJson.message || errorJson.error || errorJson[0]?.message || errorText
-      console.error('🔥 PARSED ERROR:', JSON.stringify(errorJson, null, 2))
-      console.error('🔥 ERROR MESSAGE:', errorMessage)
-      console.error('🔥 ERROR TYPE:', typeof errorJson)
-      if (Array.isArray(errorJson)) {
-        console.error('🔥 ERROR IS ARRAY:', errorJson.length, 'items')
-        errorJson.forEach((err, idx) => {
-          console.error(`🔥 ERROR[${idx}]:`, err)
-        })
-      }
     } catch (e) {
-      console.error('🔥 ERROR PARSE FAILED:', e)
       // Not JSON, use as-is
     }
     
