@@ -19,6 +19,11 @@ export interface Deal {
     avatar: string
   }
   updatedAt: string
+  contact?: {
+    link?: string
+    subscriberCount?: string
+    directions?: string[]
+  }
 }
 
 export interface Stage {

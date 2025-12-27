@@ -204,7 +204,22 @@ function DealsPageContent() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isFunnelDropdownOpen, setIsFunnelDropdownOpen] = useState(false)
-  const [currentFunnelId, setCurrentFunnelId] = useState<string>("")
+  
+  // Load saved funnel ID from localStorage
+  const [currentFunnelId, setCurrentFunnelId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lastSelectedFunnelId')
+      return saved || ""
+    }
+    return ""
+  })
+  
+  // Save funnel ID to localStorage when it changes
+  useEffect(() => {
+    if (currentFunnelId && typeof window !== 'undefined') {
+      localStorage.setItem('lastSelectedFunnelId', currentFunnelId)
+    }
+  }, [currentFunnelId])
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [deals, setDeals] = useState<Deal[]>(demoDeals)
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
@@ -273,12 +288,30 @@ function DealsPageContent() {
     name: p.name,
   }))
 
-  // Устанавливаем дефолтный пайплайн при загрузке
+  // Устанавливаем дефолтный пайплайн при загрузке или проверяем сохраненный
   useEffect(() => {
-    if (funnelsList.length > 0 && !currentFunnelId) {
-      const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
-      if (defaultPipeline) {
-        setCurrentFunnelId(defaultPipeline.id)
+    if (funnelsList.length > 0) {
+      // Check if saved funnel ID exists in current pipelines
+      if (currentFunnelId) {
+        const savedPipeline = pipelines.find(p => p.id === currentFunnelId)
+        if (savedPipeline) {
+          // Saved pipeline exists, use it
+          return
+        } else {
+          // Saved pipeline doesn't exist, clear it
+          setCurrentFunnelId("")
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('lastSelectedFunnelId')
+          }
+        }
+      }
+      
+      // If no current funnel, set default or first one
+      if (!currentFunnelId) {
+        const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
+        if (defaultPipeline) {
+          setCurrentFunnelId(defaultPipeline.id)
+        }
       }
     }
   }, [pipelines, funnelsList.length, currentFunnelId])
@@ -1109,6 +1142,11 @@ function DealsPageContent() {
                         : deal.assignedTo.name?.substring(0, 2).toUpperCase() || deal.assignedTo.email?.substring(0, 2).toUpperCase() || 'U')
                     } : { name: 'Unassigned', avatar: 'U' },
                     updatedAt: deal.updatedAt || deal.createdAt || new Date().toISOString(),
+                    contact: deal.contact ? {
+                      link: deal.contact.link,
+                      subscriberCount: deal.contact.subscriberCount,
+                      directions: deal.contact.directions,
+                    } : undefined,
                   }
                 })}
               selectedDeals={selectedDeals}

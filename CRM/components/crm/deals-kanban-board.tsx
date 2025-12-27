@@ -40,11 +40,12 @@ import {
   X,
   Calendar,
   Building2,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
-import { getPipelines, createStage, type Pipeline, type Stage, type CreateStageDto } from "@/lib/api/pipelines"
+import { getPipelines, createStage, updateStage, deleteStage, reorderStages, type Pipeline, type Stage, type CreateStageDto } from "@/lib/api/pipelines"
 import { getCompanies, type Company } from "@/lib/api/companies"
 import { getContacts, type Contact } from "@/lib/api/contacts"
 import { CompanyBadge } from "@/components/shared/company-badge"
@@ -145,6 +146,7 @@ interface DealCardProps {
   onMarkAsLost: (dealId: string) => void
   onReassignContact: (dealId: string) => void
   onOpenInSidebar: (dealId: string) => void
+  onDeleteDeal?: (dealId: string) => void
   availableContacts: Contact[]
 }
 
@@ -157,12 +159,14 @@ function DealCard({
   onMarkAsLost,
   onReassignContact,
   onOpenInSidebar,
+  onDeleteDeal,
   availableContacts,
   searchQuery
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { showSuccess, showError } = useToastNotification()
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation()
@@ -269,6 +273,27 @@ function DealCard({
                 <XCircle className="mr-2 h-4 w-4" />
                 {t('dealCard.markAsLost')}
               </DropdownMenuItem>
+              {onDeleteDeal && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      if (confirm(`Are you sure you want to delete deal "${deal.title}"?`)) {
+                        try {
+                          await onDeleteDeal(deal.id)
+                          showSuccess('Deal deleted successfully')
+                        } catch (error) {
+                          showError('Failed to delete deal', error instanceof Error ? error.message : 'Unknown error')
+                        }
+                      }
+                    }}
+                    className="text-red-600 dark:text-red-400"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t('deals.delete') || 'Delete Deal'}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -363,8 +388,17 @@ interface KanbanColumnProps {
   onMarkAsLost: (dealId: string) => void
   onReassignContact: (dealId: string) => void
   onOpenInSidebar: (dealId: string) => void
+  onDeleteDeal?: (dealId: string) => Promise<void>
   onAddDeal?: (stageId: string) => void
   onAddStage?: (afterStageId: string) => void
+  onUpdateStage?: (stageId: string, name: string, color?: string) => Promise<void>
+  onUpdateStageColor?: (stageId: string, color: string) => Promise<void>
+  onDeleteStage?: (stageId: string) => Promise<void>
+  onStageDragStart?: (stageId: string) => void
+  onStageDragOver?: (e: React.DragEvent, stageId: string) => void
+  onStageDragEnd?: () => void
+  onStageDropAndSave?: (targetStageId: string) => void
+  isStageDragged?: boolean
   availableContacts: Contact[]
   pipelineId: string
   searchQuery?: string
@@ -390,14 +424,147 @@ function KanbanColumn({
   onMarkAsLost,
   onReassignContact,
   onOpenInSidebar,
+  onDeleteDeal,
   onAddDeal,
   onAddStage,
+  onUpdateStage,
+  onUpdateStageColor,
+  onDeleteStage,
+  onStageDragStart,
+  onStageDragOver,
+  onStageDragEnd,
+  onStageDropAndSave,
+  isStageDragged = false,
   availableContacts,
   pipelineId,
   searchQuery
 }: KanbanColumnProps) {
   const { t } = useTranslation()
+  const { showSuccess, showError } = useToastNotification()
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedName, setEditedName] = useState(stage.name)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false)
+  const dragStartedRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
+  const isDeletingRef = useRef(false)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
+
+  // Reset editing state when stage changes
+  useEffect(() => {
+    setIsEditing(false)
+    setEditedName(stage.name)
+  }, [stage.id, stage.name])
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setIsColorPickerOpen(false)
+      }
+    }
+
+    if (isColorPickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isColorPickerOpen])
+
+  // Generate color gradients - creates lighter to darker variations
+  const generateColorGradients = (baseColor: string, steps: number = 9): string[] => {
+    // Convert hex to RGB
+    const hex = baseColor.replace('#', '')
+    const r = parseInt(hex.substring(0, 2), 16)
+    const g = parseInt(hex.substring(2, 4), 16)
+    const b = parseInt(hex.substring(4, 6), 16)
+
+    const gradients: string[] = []
+    for (let i = 0; i < steps; i++) {
+      // Create variations from lighter to darker
+      // Factor ranges from 0.3 (darker) to 1.0 (original) to 1.5 (lighter)
+      const factor = 0.3 + (i * (1.2 / (steps - 1)))
+      
+      // For lighter colors, blend with white; for darker, blend with black
+      let newR: number, newG: number, newB: number
+      if (factor > 1.0) {
+        // Lighter: blend with white
+        const blendFactor = factor - 1.0
+        newR = Math.round(r + (255 - r) * blendFactor)
+        newG = Math.round(g + (255 - g) * blendFactor)
+        newB = Math.round(b + (255 - b) * blendFactor)
+      } else {
+        // Darker: multiply
+        newR = Math.round(r * factor)
+        newG = Math.round(g * factor)
+        newB = Math.round(b * factor)
+      }
+      
+      // Clamp values
+      newR = Math.min(255, Math.max(0, newR))
+      newG = Math.min(255, Math.max(0, newG))
+      newB = Math.min(255, Math.max(0, newB))
+      
+      gradients.push(`#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`)
+    }
+    return gradients
+  }
+
+  // Basic colors (first row)
+  const basicColors = [
+    '#6B7280', // Gray
+    '#3B82F6', // Blue
+    '#8B5CF6', // Purple
+    '#EC4899', // Pink
+    '#F59E0B', // Amber
+    '#10B981', // Green
+    '#14B8A6', // Teal
+    '#EF4444', // Red
+    '#F97316', // Orange
+  ]
+
+  // Gradient base colors (for generating gradient rows)
+  const gradientBaseColors = [
+    '#3B82F6', // Blue
+    '#8B5CF6', // Purple
+    '#10B981', // Green
+    '#F59E0B', // Amber
+    '#EC4899', // Pink
+  ]
+
+  const handleColorChange = async (color: string) => {
+    if (onUpdateStageColor) {
+      try {
+        await onUpdateStageColor(stage.id, color)
+        showSuccess('Stage color updated')
+        setIsColorPickerOpen(false)
+      } catch (error) {
+        console.error('Failed to update stage color:', error)
+        showError('Failed to update stage color', error instanceof Error ? error.message : 'Unknown error')
+      }
+    }
+  }
+
   const handleDragOver = (e: React.DragEvent) => {
+    // Check if this is a stage drag by checking dataTransfer types
+    const types = Array.from(e.dataTransfer.types)
+    if (types.includes('application/json')) {
+      // Might be a stage drag, but we can't read it here
+      // Let the parent handle stage drags, we only handle deal drags
+      // Stage drags are handled at the column level
+      return
+    }
+    
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -406,6 +573,27 @@ function KanbanColumn({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    
+    // Try to get JSON data first (for stage drags)
+    let isStageDrag = false
+    try {
+      const jsonData = e.dataTransfer.getData('application/json')
+      if (jsonData) {
+        const parsed = JSON.parse(jsonData)
+        if (parsed.type === 'stage') {
+          isStageDrag = true
+        }
+      }
+    } catch {
+      // Not JSON or not a stage drag
+    }
+    
+    // If it's a stage drag, don't handle it here (parent handles it)
+    if (isStageDrag) {
+      return
+    }
+    
+    // Handle deal drop
     const dealId = e.dataTransfer.getData('text/plain')
     if (dealId) {
       onDrop(stage.id)
@@ -429,35 +617,458 @@ function KanbanColumn({
     }
   }
 
+  const handleDoubleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true)
+      setEditedName(stage.name)
+    }
+  }
+
+  const handleSave = async () => {
+    // Don't save if we're deleting
+    if (isDeletingRef.current) {
+      return
+    }
+    
+    if (!editedName.trim() || editedName.trim() === stage.name) {
+      setIsEditing(false)
+      setEditedName(stage.name)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (onUpdateStage) {
+        await onUpdateStage(stage.id, editedName.trim())
+        showSuccess('Stage name updated')
+      }
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Failed to update stage:', error)
+      showError('Failed to update stage', error instanceof Error ? error.message : 'Unknown error')
+      setEditedName(stage.name) // Revert on error
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Check if the blur is because we clicked on the delete button
+    const relatedTarget = e.relatedTarget as HTMLElement
+    if (relatedTarget && deleteButtonRef.current && deleteButtonRef.current.contains(relatedTarget)) {
+      // User clicked on delete button, don't save
+      return
+    }
+    // Small delay to allow click events to process first
+    setTimeout(() => {
+      if (!isDeletingRef.current) {
+        handleSave()
+      }
+    }, 200)
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditedName(stage.name)
+  }
+
+  const handleDelete = async (e?: React.MouseEvent) => {
+    console.log('🗑️ handleDelete called', { 
+      stageId: stage.id, 
+      stageName: stage.name,
+      hasOnDeleteStage: !!onDeleteStage,
+      dealsCount: deals.length,
+      isEditing
+    })
+    
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // Set flag to prevent save on blur
+    isDeletingRef.current = true
+    
+    if (!onDeleteStage) {
+      console.error('🗑️ handleDelete: onDeleteStage is not provided!')
+      isDeletingRef.current = false
+      return
+    }
+    
+    if (deals.length > 0) {
+      showError('Cannot delete stage', `This stage contains ${deals.length} deal(s). Move deals to another stage first.`)
+      isDeletingRef.current = false
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete stage "${stage.name}"?`)) {
+      isDeletingRef.current = false
+      return
+    }
+
+    try {
+      console.log('🗑️ handleDelete: Calling onDeleteStage with stageId:', stage.id)
+      await onDeleteStage(stage.id)
+      console.log('🗑️ handleDelete: Stage deleted successfully')
+      showSuccess('Stage deleted')
+      // Don't reset flag here - component will be unmounted
+    } catch (error) {
+      console.error('🗑️ handleDelete: Failed to delete stage:', error)
+      isDeletingRef.current = false
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('deal(s)')) {
+        showError('Cannot delete stage', errorMessage)
+      } else {
+        showError('Failed to delete stage', errorMessage)
+      }
+    }
+  }
+
+  const handleStageDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', stage.id)
+    e.dataTransfer.setData('application/json', JSON.stringify({ stageId: stage.id, type: 'stage' }))
+    onStageDragStart?.(stage.id)
+  }
+
+  const handleStageDragOver = (e: React.DragEvent) => {
+    // Check if this is a stage drag by checking dataTransfer types
+    // We can't read data in dragOver, but we can check types
+    const types = Array.from(e.dataTransfer.types)
+    const hasStageData = types.includes('application/json') && types.includes('text/plain')
+    
+    if (hasStageData) {
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      onStageDragOver?.(e, stage.id)
+    }
+  }
+  
+  const handleStageDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Check if this is a stage drag by checking types
+    const types = Array.from(e.dataTransfer.types)
+    const isStageDrag = types.includes('application/json')
+    
+    if (isStageDrag) {
+      // For stage drags, we just mark the drop target
+      // The actual save will happen in handleStageDragEnd
+      console.log('handleStageDrop: Stage drag dropped on:', stage.id)
+      // Don't call onStageDropAndSave here - let dragEnd handle it
+      return
+    }
+    
+    // This is a deal drop, handle it normally
+    const dealId = e.dataTransfer.getData('text/plain')
+    if (dealId) {
+      onDrop(stage.id)
+    }
+  }
+
+  const handleStageDragEnd = (e: React.DragEvent) => {
+    console.log('🔥🔥🔥 KanbanColumn handleStageDragEnd CALLED', { 
+      stageId: stage.id,
+      hasOnStageDragEnd: !!onStageDragEnd,
+      hasOnStageDropAndSave: !!onStageDropAndSave
+    })
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Reset drag flag
+    dragStartedRef.current = false
+    
+    // Call parent handler
+    if (onStageDragEnd) {
+      console.log('🔥 Calling onStageDragEnd from parent')
+      onStageDragEnd()
+    } else {
+      console.error('🔥 ERROR: onStageDragEnd is not provided!')
+    }
+  }
+
   // Calculate deals count and total amount for this stage
   const stageDealsCount = deals.length
   const stageTotalAmount = deals.reduce((sum, deal) => sum + deal.amount, 0)
 
   return (
-    <div className="flex-shrink-0 w-72">
+    <div 
+      className={cn(
+        "flex-shrink-0 w-72"
+      )}
+      onDragOver={handleStageDragOver}
+      onDrop={handleStageDrop}
+    >
       <div className="mb-3 flex items-center gap-2">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: stage.color }}
-        />
-        <CardTitle className="text-sm font-semibold flex-1">{stage.name}</CardTitle>
-        <Badge variant="secondary" className="text-xs">
-          {deals.length}
-        </Badge>
-        {onAddStage && !isWonOrLostStage(stage.name) && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 hover:bg-muted transition-colors"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onAddStage(stage.id)
-            }}
-            title="Добавить стадию после этой"
+        {isEditing ? (
+          <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
+            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="relative">
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
+                style={{ backgroundColor: stage.color }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsColorPickerOpen(!isColorPickerOpen)
+                }}
+                title="Click to change color"
+              />
+              {isColorPickerOpen && (
+                <div
+                  ref={colorPickerRef}
+                  className="absolute z-50 mt-2 p-3 bg-card border border-border rounded-lg shadow-lg w-[280px]"
+                  style={{ left: '0', top: '100%' }}
+                >
+                  {/* Basic colors row */}
+                  <div className="mb-3">
+                    <div className="text-xs text-foreground mb-2">Basic Colors</div>
+                    <div className="grid grid-cols-9 gap-1.5">
+                      {basicColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleColorChange(color)
+                          }}
+                          className={`h-7 w-7 rounded border-2 transition-all hover:scale-110 ${
+                            stage.color === color
+                              ? 'border-foreground scale-110'
+                              : 'border-transparent hover:border-foreground/30'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Gradient rows */}
+                  {gradientBaseColors.map((baseColor, rowIndex) => {
+                    const gradients = generateColorGradients(baseColor, 9)
+                    return (
+                      <div key={baseColor} className={rowIndex > 0 ? 'mt-3' : ''}>
+                        <div className="text-xs text-foreground mb-2">
+                          {baseColor === '#3B82F6' ? 'Blue' :
+                           baseColor === '#8B5CF6' ? 'Purple' :
+                           baseColor === '#10B981' ? 'Green' :
+                           baseColor === '#F59E0B' ? 'Amber' :
+                           'Pink'}
+                        </div>
+                        <div className="grid grid-cols-9 gap-1.5">
+                          {gradients.map((color, index) => (
+                            <button
+                              key={`${baseColor}-${index}`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleColorChange(color)
+                              }}
+                              className={`h-7 w-7 rounded border-2 transition-all hover:scale-110 ${
+                                stage.color === color
+                                  ? 'border-foreground scale-110'
+                                  : 'border-transparent hover:border-foreground/30'
+                              }`}
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <Input
+              ref={inputRef}
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleSave()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  handleCancel()
+                }
+              }}
+              onBlur={handleInputBlur}
+              disabled={isSaving}
+              className="h-7 text-sm flex-1"
+            />
+            {onDeleteStage && (
+              <Button
+                ref={deleteButtonRef}
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground flex-shrink-0"
+                onClick={(e) => {
+                  console.log('🗑️ Delete button clicked!', { stageId: stage.id, isEditing })
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleDelete(e)
+                }}
+                onMouseDown={(e) => {
+                  // Prevent input blur from firing before click
+                  e.preventDefault()
+                }}
+                title="Delete stage"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div 
+            className={cn(
+              "flex items-center gap-2 flex-1 min-w-0",
+              isStageDragged && "opacity-50"
+            )}
           >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
+            <GripVertical 
+              className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0 hover:text-foreground transition-colors"
+              draggable={true}
+              onDragStart={(e) => {
+                console.log('🔥🔥🔥 GRIP onDragStart FIRED!', { 
+                  stageId: stage.id, 
+                  isEditing,
+                  draggable: true
+                })
+                dragStartedRef.current = true
+                handleStageDragStart(e)
+              }}
+              onDragEnd={(e) => {
+                console.log('🔥🔥🔥 GRIP onDragEnd FIRED!', { 
+                  stageId: stage.id,
+                  hasOnStageDragEnd: !!onStageDragEnd
+                })
+                e.preventDefault()
+                e.stopPropagation()
+                // Reset drag flag after a delay to allow double click to work
+                setTimeout(() => {
+                  dragStartedRef.current = false
+                }, 200)
+                handleStageDragEnd(e)
+              }}
+              style={{ userSelect: 'none' }}
+              title="Drag to reorder"
+            />
+            <div className="relative">
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
+                style={{ backgroundColor: stage.color }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setIsColorPickerOpen(!isColorPickerOpen)
+                }}
+                title="Click to change color"
+              />
+              {isColorPickerOpen && (
+                <div
+                  ref={colorPickerRef}
+                  className="absolute z-50 mt-2 p-3 bg-card border border-border rounded-lg shadow-lg w-[280px]"
+                  style={{ left: '0', top: '100%' }}
+                >
+                  {/* Basic colors row */}
+                  <div className="mb-3">
+                    <div className="text-xs text-foreground mb-2">Basic Colors</div>
+                    <div className="grid grid-cols-9 gap-1.5">
+                      {basicColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleColorChange(color)
+                          }}
+                          className={`h-7 w-7 rounded border-2 transition-all hover:scale-110 ${
+                            stage.color === color
+                              ? 'border-foreground scale-110'
+                              : 'border-transparent hover:border-foreground/30'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Gradient rows */}
+                  {gradientBaseColors.map((baseColor, rowIndex) => {
+                    const gradients = generateColorGradients(baseColor, 9)
+                    return (
+                      <div key={baseColor} className={rowIndex > 0 ? 'mt-3' : ''}>
+                        <div className="text-xs text-foreground mb-2">
+                          {baseColor === '#3B82F6' ? 'Blue' :
+                           baseColor === '#8B5CF6' ? 'Purple' :
+                           baseColor === '#10B981' ? 'Green' :
+                           baseColor === '#F59E0B' ? 'Amber' :
+                           'Pink'}
+                        </div>
+                        <div className="grid grid-cols-9 gap-1.5">
+                          {gradients.map((color, index) => (
+                            <button
+                              key={`${baseColor}-${index}`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleColorChange(color)
+                              }}
+                              className={`h-7 w-7 rounded border-2 transition-all hover:scale-110 ${
+                                stage.color === color
+                                  ? 'border-foreground scale-110'
+                                  : 'border-transparent hover:border-foreground/30'
+                              }`}
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <CardTitle 
+                className="text-sm font-semibold cursor-pointer hover:text-primary transition-colors truncate"
+                onDoubleClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (!isEditing && !dragStartedRef.current) {
+                    handleDoubleClick()
+                  }
+                }}
+                title={stage.name}
+              >
+                {stage.name}
+              </CardTitle>
+            </div>
+            <Badge variant="secondary" className="text-xs flex-shrink-0">
+              {deals.length}
+            </Badge>
+            {onAddStage && !isWonOrLostStage(stage.name) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 flex-shrink-0 hover:bg-muted transition-colors"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onAddStage(stage.id)
+                }}
+                title="Добавить стадию после этой"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -466,8 +1077,34 @@ function KanbanColumn({
           "flex flex-col shadow-none",
           isDraggedOver && "border-primary border-2"
         )}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
+        onDragOver={(e) => {
+          // Check if this is a stage drag
+          const types = Array.from(e.dataTransfer.types)
+          const isStageDrag = types.includes('application/json')
+          
+          if (isStageDrag) {
+            // Let stage drags pass through to parent (the stage column div)
+            e.stopPropagation()
+            return
+          }
+          
+          // Handle deal drags
+          handleDragOver(e)
+        }}
+        onDrop={(e) => {
+          // Check if this is a stage drag
+          const types = Array.from(e.dataTransfer.types)
+          const isStageDrag = types.includes('application/json')
+          
+          if (isStageDrag) {
+            // Let stage drags pass through to parent (the stage column div)
+            e.stopPropagation()
+            return
+          }
+          
+          // Handle deal drops
+          handleDrop(e)
+        }}
       >
         <CardContent className="p-3">
           {!stage.isClosed && (
@@ -500,6 +1137,7 @@ function KanbanColumn({
                 onMarkAsLost={onMarkAsLost}
                 onReassignContact={onReassignContact}
                 onOpenInSidebar={onOpenInSidebar}
+                onDeleteDeal={onDeleteDeal}
                 availableContacts={availableContacts}
                 searchQuery={searchQuery}
               />
@@ -532,6 +1170,7 @@ export function DealsKanbanBoard({
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [draggedDeal, setDraggedDeal] = useState<DealCardData | null>(null)
+  const [draggedStageId, setDraggedStageId] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [isAddStageModalOpen, setIsAddStageModalOpen] = useState(false)
@@ -604,18 +1243,23 @@ export function DealsKanbanBoard({
         return
       }
       
+      // Preserve currently selected pipeline if it exists
+      const currentPipelineId = selectedPipeline?.id || pipelineId
+      
+      if (currentPipelineId) {
+        const pipeline = data.find(p => p.id === currentPipelineId)
+        if (pipeline) {
+          console.log('Updating selected pipeline:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
+          setSelectedPipeline(pipeline)
+          return
+        }
+      }
+      
+      // Fallback to default or first pipeline
       const defaultPipeline = data.find(p => p.isDefault) || data[0]
       if (defaultPipeline) {
         console.log('Setting default pipeline:', defaultPipeline.id, defaultPipeline.name)
         setSelectedPipeline(defaultPipeline)
-      }
-      
-      if (pipelineId) {
-        const pipeline = data.find(p => p.id === pipelineId)
-        if (pipeline) {
-          console.log('Setting pipeline from URL:', pipeline.id, pipeline.name)
-          setSelectedPipeline(pipeline)
-        }
       }
     } catch (error) {
       // Handle unauthorized error - redirect to login
@@ -993,6 +1637,21 @@ export function DealsKanbanBoard({
     showError('Not implemented', 'Contact reassignment will be available soon')
   }
 
+  const handleDeleteDeal = async (dealId: string) => {
+    try {
+      const { deleteDeal } = await import('@/lib/api/deals')
+      await deleteDeal(dealId)
+      // Remove deal from local state
+      setDeals(prevDeals => prevDeals.filter(d => d.id !== dealId))
+      showSuccess('Deal deleted successfully')
+    } catch (error) {
+      console.error('Failed to delete deal:', error)
+      // Reload deals on error
+      await loadDeals()
+      throw error
+    }
+  }
+
   const handleOpenInSidebar = useCallback((dealId: string) => {
     console.log('DealsKanbanBoard: handleOpenInSidebar called with dealId:', dealId)
     console.log('DealsKanbanBoard: onDealClick prop:', onDealClick)
@@ -1092,7 +1751,6 @@ export function DealsKanbanBoard({
       })
 
       // Update stages in reverse order (from highest to lowest) to avoid conflicts
-      const { updateStage } = await import('@/lib/api/pipelines')
       for (const stage of stagesToUpdate) {
         try {
           await updateStage(stage.id, { order: stage.order + 1 })
@@ -1132,6 +1790,350 @@ export function DealsKanbanBoard({
       }
       
       showError('Failed to create stage', errorMessage)
+    }
+  }
+
+  const handleUpdateStageColor = async (stageId: string, color: string) => {
+    if (!selectedPipeline) return
+
+    try {
+      await updateStage(stageId, { color })
+      showSuccess('Stage color updated successfully')
+      await loadPipelines()
+    } catch (error) {
+      console.error('Failed to update stage color:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(errorMessage)
+    }
+  }
+
+  const handleUpdateStage = async (stageId: string, name: string) => {
+    if (!selectedPipeline) return
+
+    try {
+      await updateStage(stageId, { name })
+      // Optimistically update local state
+      setPipelines(prevPipelines => 
+        prevPipelines.map(p => 
+          p.id === selectedPipeline.id
+            ? {
+                ...p,
+                stages: p.stages.map(s => 
+                  s.id === stageId ? { ...s, name } : s
+                )
+              }
+            : p
+        )
+      )
+      // Update selectedPipeline
+      setSelectedPipeline(prev => 
+        prev ? {
+          ...prev,
+          stages: prev.stages.map(s => 
+            s.id === stageId ? { ...s, name } : s
+          )
+        } : null
+      )
+    } catch (error) {
+      console.error('Failed to update stage:', error)
+      // Reload pipelines on error
+      await loadPipelines()
+      throw error
+    }
+  }
+
+  const handleDeleteStage = async (stageId: string) => {
+    if (!selectedPipeline) return
+
+    try {
+      await deleteStage(stageId)
+      showSuccess('Stage deleted successfully')
+      await loadPipelines()
+    } catch (error) {
+      console.error('Failed to delete stage:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(errorMessage)
+    }
+  }
+
+  const [stageDropTargetId, setStageDropTargetId] = useState<string | null>(null)
+
+  const handleStageDragStart = (stageId: string) => {
+    console.log('🔥 handleStageDragStart: Starting drag for stage:', stageId)
+    setDraggedStageId(stageId)
+    setStageDropTargetId(null)
+  }
+
+  const handleStageDragOver = (e: React.DragEvent, targetStageId: string) => {
+    if (!draggedStageId || draggedStageId === targetStageId || !selectedPipeline) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+
+    // Track the drop target
+    console.log('🔥 handleStageDragOver: Dragging over stage:', targetStageId, 'dragged:', draggedStageId)
+    setStageDropTargetId(targetStageId)
+
+    const stages = [...selectedPipeline.stages].sort((a, b) => a.order - b.order)
+    const draggedIndex = stages.findIndex(s => s.id === draggedStageId)
+    const targetIndex = stages.findIndex(s => s.id === targetStageId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    // Only update if the position actually changed
+    if (draggedIndex === targetIndex) return
+
+    // Reorder stages locally for visual feedback
+    const newStages = [...stages]
+    const [removed] = newStages.splice(draggedIndex, 1)
+    newStages.splice(targetIndex, 0, removed)
+
+    // Update order values
+    const reorderedStages = newStages.map((stage, index) => ({
+      ...stage,
+      order: index
+    }))
+
+    // Optimistically update UI
+    setSelectedPipeline({
+      ...selectedPipeline,
+      stages: reorderedStages
+    })
+  }
+
+  const handleStageDragEnd = async () => {
+    console.log('🔥🔥🔥 handleStageDragEnd CALLED', { 
+      draggedStageId, 
+      stageDropTargetId,
+      hasPipeline: !!selectedPipeline,
+      pipelineStages: selectedPipeline?.stages?.length,
+      stagesOrder: selectedPipeline?.stages?.map(s => ({ id: s.id, name: s.name, order: s.order }))
+    })
+    
+    // Save the current values to avoid stale closures
+    const currentDraggedId = draggedStageId
+    const currentTargetId = stageDropTargetId
+    const currentPipeline = selectedPipeline
+    
+    // Clear state immediately to prevent double calls
+    setDraggedStageId(null)
+    setStageDropTargetId(null)
+    
+    // If we have dragged stage and target, save the changes
+    if (currentDraggedId && currentTargetId && currentDraggedId !== currentTargetId && currentPipeline) {
+      console.log('handleStageDragEnd: Saving stage reorder', {
+        dragged: currentDraggedId,
+        target: currentTargetId
+      })
+      try {
+        await handleStageDropAndSave(currentTargetId, currentDraggedId)
+      } catch (error) {
+        console.error('handleStageDragEnd: Error saving:', error)
+        await loadPipelines()
+      }
+    } else if (currentDraggedId && currentPipeline) {
+      // No explicit target, but check if order changed
+      // Use the current order from optimistically updated pipeline
+      const currentStages = [...currentPipeline.stages].sort((a, b) => a.order - b.order)
+      
+      // Always save current order - if user dragged, order should be updated by dragOver
+      console.log('handleStageDragEnd: Saving current order (no explicit target)', {
+        dragged: currentDraggedId,
+        stagesCount: currentStages.length,
+        currentOrder: currentStages.map(s => ({ id: s.id, name: s.name, order: s.order }))
+      })
+      
+      try {
+        const stageOrders = currentStages.map((stage, index) => ({
+          id: stage.id,
+          order: index
+        }))
+        
+        console.log('handleStageDragEnd: Sending reorder request to API:', {
+          pipelineId: currentPipeline.id,
+          stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
+        })
+        
+        const result = await reorderStages(currentPipeline.id, stageOrders)
+        console.log('handleStageDragEnd: API returned:', {
+          pipelineId: result.id,
+          stagesCount: result.stages?.length,
+          stagesOrder: result.stages?.map(s => ({ id: s.id, name: s.name, order: s.order }))
+        })
+        
+        showSuccess('Stages reordered successfully')
+        
+        // Update state with result
+        setSelectedPipeline(result)
+        setPipelines(prev => prev.map(p => p.id === currentPipeline.id ? result : p))
+        
+        // Reload to ensure sync with server
+        await loadPipelines()
+        
+        console.log('handleStageDragEnd: Save complete and pipelines reloaded')
+      } catch (error) {
+        console.error('handleStageDragEnd: Error saving:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        showError('Failed to reorder stages', errorMessage)
+        // Reload to revert optimistic update
+        await loadPipelines()
+      }
+    }
+  }
+
+  const handleStageDropAndSave = async (targetStageId: string, draggedStageIdParam?: string) => {
+    // Use parameter if provided, otherwise use state (for backward compatibility)
+    const currentDraggedStageId = draggedStageIdParam || draggedStageId
+    const currentPipeline = selectedPipeline
+    
+    console.log('handleStageDropAndSave called', {
+      targetStageId,
+      currentDraggedStageId,
+      draggedStageIdParam,
+      stateDraggedStageId: draggedStageId,
+      hasPipeline: !!currentPipeline
+    })
+    
+    if (!currentDraggedStageId || !currentPipeline) {
+      console.error('handleStageDropAndSave: Missing required data', { 
+        currentDraggedStageId, 
+        hasPipeline: !!currentPipeline 
+      })
+      return
+    }
+
+    if (currentDraggedStageId === targetStageId) {
+      console.log('handleStageDropAndSave: Dropped on same stage, no change needed')
+      return
+    }
+
+    try {
+      // Get current order from the optimistically updated pipeline
+      // handleStageDragOver already updated the order values, so we can use them directly
+      // BUT we need to sort by the updated order values to get the correct sequence
+      const stages = [...currentPipeline.stages].sort((a, b) => a.order - b.order)
+      console.log('handleStageDropAndSave: Current stages order (after optimistic update):', stages.map((s, i) => ({ 
+        id: s.id, 
+        name: s.name, 
+        order: s.order,
+        index: i 
+      })))
+      
+      // Verify both stages exist
+      const draggedIndex = stages.findIndex(s => s.id === currentDraggedStageId)
+      const targetIndex = stages.findIndex(s => s.id === targetStageId)
+      
+      if (draggedIndex === -1 || targetIndex === -1) {
+        console.error('handleStageDropAndSave: Could not find dragged or target stage', {
+          draggedIndex,
+          targetIndex,
+          draggedStageId: currentDraggedStageId,
+          targetStageId,
+          stageIds: stages.map(s => s.id)
+        })
+        return
+      }
+
+      // The stages are already in the correct order from optimistic update
+      // Just create stage orders with sequential indices (0, 1, 2, ...)
+      const stageOrders = stages.map((stage, index) => ({
+        id: stage.id,
+        order: index
+      }))
+      
+      console.log('handleStageDropAndSave: Final stage orders to save', {
+        stageOrders: stageOrders.map((so, i) => ({ 
+          id: so.id, 
+          order: so.order,
+          stageName: stages.find(s => s.id === so.id)?.name,
+          index: i
+        }))
+      })
+
+      console.log('handleStageDropAndSave: Sending reorder request:', {
+        pipelineId: currentPipeline.id,
+        draggedStageId: currentDraggedStageId,
+        targetStageId,
+        draggedIndex,
+        targetIndex,
+        stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
+      })
+
+      const result = await reorderStages(currentPipeline.id, stageOrders)
+      console.log('✅ handleStageDropAndSave: Reorder successful, result:', result)
+      console.log('✅ handleStageDropAndSave: Result stages order:', result.stages?.map((s, i) => ({ 
+        id: s.id, 
+        name: s.name, 
+        order: s.order,
+        index: i 
+      })))
+      
+      // Verify the order was saved correctly
+      const savedOrder = result.stages?.map(s => s.order) || []
+      const expectedOrder = stageOrders.map(so => so.order)
+      const ordersMatch = JSON.stringify(savedOrder.sort()) === JSON.stringify(expectedOrder.sort())
+      console.log('✅ handleStageDropAndSave: Order verification', {
+        savedOrder,
+        expectedOrder,
+        ordersMatch,
+        savedStages: result.stages?.map((s, i) => ({ name: s.name, order: s.order, index: i }))
+      })
+      
+      if (!ordersMatch) {
+        console.error('❌ handleStageDropAndSave: Order mismatch! Saved order does not match expected order')
+      }
+      
+      showSuccess('Stages reordered successfully')
+      
+      // Update pipelines list with the result
+      setPipelines(prevPipelines => 
+        prevPipelines.map(p => 
+          p.id === currentPipeline.id ? result : p
+        )
+      )
+      
+      // Update selected pipeline with the result
+      setSelectedPipeline(result)
+      
+      // Also reload to ensure we have the latest data from server
+      console.log('🔄 handleStageDropAndSave: Reloading pipelines to verify persistence...')
+      const reloadedData = await getPipelines()
+      
+      // After reload, check if order persisted
+      const reloadedPipeline = reloadedData.find(p => p.id === currentPipeline.id)
+      if (reloadedPipeline) {
+        const reloadedOrder = reloadedPipeline.stages?.map(s => s.order) || []
+        const persisted = JSON.stringify(reloadedOrder.sort()) === JSON.stringify(expectedOrder.sort())
+        console.log('🔄 handleStageDropAndSave: After reload verification', {
+          persisted,
+          reloadedOrder,
+          expectedOrder,
+          reloadedStages: reloadedPipeline.stages?.map((s, i) => ({ name: s.name, order: s.order, index: i }))
+        })
+        if (!persisted) {
+          console.error('❌ handleStageDropAndSave: Order did NOT persist after reload!')
+          console.error('❌ This indicates a backend/database issue - the order was not saved correctly')
+        } else {
+          console.log('✅ handleStageDropAndSave: Order persisted correctly after reload!')
+        }
+        
+        // Update state with reloaded data
+        setPipelines(reloadedData)
+        setSelectedPipeline(reloadedPipeline)
+      }
+    } catch (error) {
+      console.error('handleStageDropAndSave: Failed to reorder stages:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('handleStageDropAndSave: Error details:', {
+        errorMessage,
+        errorStack: error instanceof Error ? error.stack : undefined
+      })
+      showError('Failed to reorder stages', errorMessage)
+      // Reload to revert optimistic update
+      await loadPipelines()
+    } finally {
+      setDraggedStageId(null)
     }
   }
 
@@ -1386,6 +2388,7 @@ export function DealsKanbanBoard({
           {stages.map((stage) => {
           const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
           const isDraggedOver = draggedDeal !== null && draggedDeal.stageId !== stage.id
+          const isStageDragged = draggedStageId === stage.id
 
           return (
             <KanbanColumn
@@ -1400,8 +2403,17 @@ export function DealsKanbanBoard({
               onMarkAsLost={handleMarkAsLost}
               onReassignContact={handleReassignContact}
               onOpenInSidebar={handleOpenInSidebar}
+              onDeleteDeal={handleDeleteDeal}
               onAddDeal={handleAddDealClick}
               onAddStage={handleAddStage}
+              onUpdateStage={handleUpdateStage}
+              onUpdateStageColor={handleUpdateStageColor}
+              onDeleteStage={handleDeleteStage}
+              onStageDragStart={handleStageDragStart}
+              onStageDragOver={handleStageDragOver}
+              onStageDragEnd={handleStageDragEnd}
+              onStageDropAndSave={handleStageDropAndSave}
+              isStageDragged={isStageDragged}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
               searchQuery={filters.title}

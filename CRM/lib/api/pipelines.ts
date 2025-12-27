@@ -348,16 +348,59 @@ export async function updateStage(id: string, data: UpdateStageDto): Promise<Sta
 }
 
 export async function deleteStage(id: string): Promise<void> {
-  const API_BASE_URL = getApiBaseUrl()
-  const response = await fetch(`${API_BASE_URL}/stages/${id}`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-    },
-  })
+  if (typeof window === 'undefined') {
+    throw new Error('deleteStage can only be called on the client side')
+  }
 
-  if (!response.ok) {
-    throw new Error('Failed to delete stage')
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  try {
+    const API_BASE_URL = getApiBaseUrl()
+    const response = await fetch(`${API_BASE_URL}/stages/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401 || response.status === 403) {
+        const errorText = await response.text().catch(() => 'Unauthorized')
+        
+        // Clear invalid token
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
+        // Throw error to trigger redirect in component
+        throw new Error('UNAUTHORIZED')
+      }
+      
+      const errorText = await response.text().catch(() => 'Failed to delete stage')
+      let errorMessage = 'Failed to delete stage'
+      
+      try {
+        const errorData = JSON.parse(errorText)
+        errorMessage = errorData.message || errorData.error || errorMessage
+      } catch {
+        errorMessage = errorText || errorMessage
+      }
+      
+      throw new Error(errorMessage)
+    }
+  } catch (error) {
+    console.error('API: Error deleting stage:', error)
+    throw error
   }
 }
 
@@ -377,6 +420,79 @@ export async function deletePipeline(id: string): Promise<void> {
 
   if (!response.ok) {
     throw new Error('Failed to delete pipeline')
+  }
+}
+
+export async function reorderStages(
+  pipelineId: string,
+  stageOrders: { id: string; order: number }[]
+): Promise<Pipeline> {
+  // Check if we're on the client side
+  if (typeof window === 'undefined') {
+    throw new Error('reorderStages can only be called on the client side')
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  try {
+    const API_BASE_URL = getApiBaseUrl()
+    const response = await fetch(`${API_BASE_URL}/pipelines/${pipelineId}/stages/reorder`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ stageOrders }),
+    })
+
+    if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401 || response.status === 403) {
+        const errorText = await response.text().catch(() => 'Unauthorized')
+        
+        // Clear invalid token
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('user')
+        
+        // Redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        
+        // Throw error to trigger redirect in component
+        throw new Error('UNAUTHORIZED')
+      }
+
+      let errorMessage = 'Unknown error'
+      try {
+        const errorData = await response.json()
+        // Handle NestJS validation error format
+        if (errorData.message) {
+          if (Array.isArray(errorData.message)) {
+            errorMessage = errorData.message.join(', ')
+          } else {
+            errorMessage = errorData.message
+          }
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+      } catch {
+        // If JSON parsing fails, try text
+        const errorText = await response.text().catch(() => 'Unknown error')
+        errorMessage = errorText || `HTTP ${response.status} ${response.statusText}`
+      }
+      console.error('API: Error reordering stages:', response.status, errorMessage)
+      throw new Error(errorMessage)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error('API: Error reordering stages:', error)
+    throw error
   }
 }
 

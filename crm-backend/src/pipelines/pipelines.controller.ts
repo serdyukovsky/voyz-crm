@@ -23,6 +23,7 @@ import { UpdatePipelineDto } from './dto/update-pipeline.dto';
 import { CreateStageDto } from './dto/create-stage.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { PipelineResponseDto } from './dto/pipeline-response.dto';
+import { ReorderStagesDto } from './dto/reorder-stages.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -126,6 +127,20 @@ export class PipelinesController {
   @ApiResponse({ status: 404, description: 'Pipeline not found' })
   createStage(@Param('id') pipelineId: string, @Body() createStageDto: CreateStageDto) {
     return this.pipelinesService.createStage(pipelineId, createStageDto);
+  }
+
+  @Patch(':id/stages/reorder')
+  @ApiOperation({ summary: 'Reorder stages in a pipeline', description: 'Update the order of multiple stages at once' })
+  @ApiParam({ name: 'id', description: 'Pipeline ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Stages reordered successfully',
+    type: PipelineResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Pipeline not found' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid stage orders' })
+  reorderStages(@Param('id') pipelineId: string, @Body() reorderDto: ReorderStagesDto) {
+    return this.pipelinesService.reorderStages(pipelineId, reorderDto.stageOrders);
   }
 }
 
