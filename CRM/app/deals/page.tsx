@@ -64,7 +64,7 @@ const useRouter = () => {
   }
 }
 import { PageSkeleton } from "@/components/shared/loading-skeleton"
-import { createDeal, getDeals, type Deal as APIDeal } from "@/lib/api/deals"
+import { createDeal, getDeals, deleteDeal, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines, createPipeline, createStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useAuthGuard } from '@/hooks/use-auth-guard'
@@ -472,9 +472,49 @@ export default function DealsPage() {
     setIsFunnelDropdownOpen(false)
   }
 
-  const handleBulkDelete = () => {
-    setDeals(deals.filter(d => !selectedDeals.includes(d.id)))
-    setSelectedDeals([])
+  const handleBulkDelete = async () => {
+    if (selectedDeals.length === 0) {
+      return
+    }
+
+    const dealsToDelete = [...selectedDeals]
+    const dealsCount = dealsToDelete.length
+
+    try {
+      // Delete deals in parallel for faster execution (no delays)
+      await Promise.all(
+        dealsToDelete.map(dealId => 
+          deleteDeal(dealId).catch(error => {
+            console.error(`Failed to delete deal ${dealId}:`, error)
+            // Continue with other deals even if one fails
+            return null
+          })
+        )
+      )
+
+      // Update listDeals state (used in list view)
+      setListDeals(prevDeals => prevDeals.filter(deal => !dealsToDelete.includes(deal.id)))
+      
+      // Also update deals state (used in kanban view)
+      setDeals(prevDeals => prevDeals.filter(d => !dealsToDelete.includes(d.id)))
+      
+      // Clear selection
+      setSelectedDeals([])
+      
+      // Формируем правильное сообщение в зависимости от количества
+      let message = ''
+      if (dealsCount === 1) {
+        message = 'Сделка успешно удалена'
+      } else if (dealsCount >= 2 && dealsCount <= 4) {
+        message = `Удалено ${dealsCount} сделки`
+      } else {
+        message = `Удалено ${dealsCount} сделок`
+      }
+      showSuccess(message)
+    } catch (error) {
+      console.error('Failed to delete deals:', error)
+      showError('Ошибка при удалении сделок', error instanceof Error ? error.message : 'Unknown error')
+    }
   }
 
   const handleBulkChangeStage = (newStage: string) => {

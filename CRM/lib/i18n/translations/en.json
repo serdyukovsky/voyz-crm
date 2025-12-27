@@ -190,6 +190,8 @@
     "createPipelineWithStages": "Please create a pipeline with stages first",
     "dealCreatedSuccess": "Deal created successfully",
     "failedToCreateDeal": "Failed to create deal",
+    "dealsDeleted": "Deleted {{count}} {{count, plural, one {deal} other {deals}}}",
+    "deleteError": "Error deleting deals",
     "rejectionReasons": "Rejection Reasons",
     "selectRejectionReason": "Select rejection reason",
     "rejectionReason": {
