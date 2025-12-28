@@ -451,6 +451,7 @@ function KanbanColumn({
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const isDeletingRef = useRef(false)
   const colorPickerRef = useRef<HTMLDivElement>(null)
+  const isDraggingStageRef = useRef(false)
 
   // Reset editing state when stage changes
   useEffect(() => {
