@@ -153,6 +153,8 @@ model Contact {
   @@index([createdAt])
   @@index([fullName])
   @@index([email, phone])
+  @@index([fullName(ops: raw("gin_trgm_ops"))], map: "contacts_fullname_gin_idx", type: Gin)
+  @@index([tags], map: "contacts_tags_gin_idx", type: Gin)
   @@map("contacts")
 }
 
@@ -176,6 +178,7 @@ model Company {
   @@index([industry])
   @@index([email])
   @@index([createdAt])
+  @@index([phone])
   @@map("companies")
 }
 
@@ -222,8 +225,8 @@ model Deal {
   @@index([companyId])
   @@index([createdAt])
   @@index([updatedAt])
-  @@index([updatedAt, id]) // Composite index for cursor-based pagination
-  @@index([closedAt]) // Index for filtering active/closed deals
+  @@index([tags], map: "deals_tags_gin_idx", type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "deals_title_gin_idx", type: Gin)
   @@map("deals")
 }
 
@@ -304,7 +307,8 @@ model Task {
   @@index([status])
   @@index([deadline])
   @@index([type])
-  @@index([createdAt, id]) // Composite index for cursor-based pagination
+  @@index([createdAt])
+  @@index([createdById])
   @@map("tasks")
 }
 
@@ -491,9 +495,9 @@ model ExportJob {
 
 model SystemFieldOptions {
   id         String   @id @default(uuid())
-  entityType String   // 'deal' or 'contact'
-  fieldName  String   // 'rejectionReasons', 'directions', 'contactMethods'
-  options    String[] @default([]) // Array of available options
+  entityType String
+  fieldName  String
+  options    String[] @default([])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
