@@ -25,7 +25,9 @@ export function useChat() {
   useEffect(() => {
     if (!token) return
 
-    const newSocket = io(`${API_BASE_URL}/realtime`, {
+    // Remove /api suffix if present, Socket.IO will add its own path
+    const baseUrl = API_BASE_URL.replace(/\/api\/?$/, '')
+    const newSocket = io(`${baseUrl}/realtime`, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
