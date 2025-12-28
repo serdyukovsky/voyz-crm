@@ -794,6 +794,7 @@ function KanbanColumn({
   }
 
   const handleStageDragEnd = (e: React.DragEvent) => {
+    isDraggingStageRef.current = false
     console.log('🔥🔥🔥 KanbanColumn handleStageDragEnd CALLED', { 
       stageId: stage.id,
       hasOnStageDragEnd: !!onStageDragEnd,
