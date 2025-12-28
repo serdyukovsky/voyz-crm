@@ -165,3 +165,4 @@ const totalDeals = dealsByStageData.reduce((sum, stage) => sum + stage._count.id
 - Время загрузки: **5-10x быстрее**
 - Нагрузка на БД: **Снижение на 50-70%**
 
+

@@ -44,7 +44,13 @@ export function useDealTasks({ dealId }: UseDealTasksOptions) {
         return
       }
       
-      const apiTasks = await getTasks({ dealId })
+      const tasksResponse = await getTasks({ dealId })
+      
+      // Handle both array and paginated response
+      const apiTasks = Array.isArray(tasksResponse) 
+        ? tasksResponse 
+        : (tasksResponse as any).data || []
+      
       console.log('Loaded tasks from API:', apiTasks.length)
       
       // Transform API tasks to component format

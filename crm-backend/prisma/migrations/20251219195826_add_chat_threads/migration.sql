@@ -1,11 +1,11 @@
 -- DropIndex
-DROP INDEX "companies_phone_idx";
+DROP INDEX IF EXISTS "companies_phone_idx";
 
 -- DropIndex
-DROP INDEX "tasks_createdAt_idx";
+DROP INDEX IF EXISTS "tasks_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "tasks_createdById_idx";
+DROP INDEX IF EXISTS "tasks_createdById_idx";
 
 -- AlterTable
 ALTER TABLE "messages" ADD COLUMN     "threadId" TEXT;

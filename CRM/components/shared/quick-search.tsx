@@ -91,7 +91,10 @@ export function QuickSearch({ open, onOpenChange }: QuickSearchProps) {
         const [serverContacts, serverDeals, allTasks, serverCompanies, allUsers] = await Promise.all([
           getContacts({ search }).catch((e) => { console.error('Contacts error:', e); return [] }),
           getDeals({ search }).then(r => r.data).catch((e) => { console.error('Deals error:', e); return [] }),
-          getTasks().catch((e) => { console.error('Tasks error:', e); return [] }),
+          getTasks().then((tasks) => {
+            // Handle both array and paginated response
+            return Array.isArray(tasks) ? tasks : (tasks as any).data || [];
+          }).catch((e) => { console.error('Tasks error:', e); return [] }),
           getCompanies({ search }).catch((e) => { console.error('Companies error:', e); return [] }),
           getUsers().catch((e) => { console.error('Users error:', e); return [] }),
         ])

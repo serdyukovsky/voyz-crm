@@ -139,9 +139,17 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
   const loadTasks = async () => {
     try {
       setLoading(true)
-      const tasksData = await getTasks({
+      // For kanban, we need ALL tasks (no pagination limit)
+      // Use a large limit to get all tasks for the kanban board
+      const tasksResponse = await getTasks({
         status: statusFilter || undefined,
+        limit: 10000, // Large limit for kanban to show all tasks
       })
+      
+      // Handle both array and paginated response
+      const tasksData = Array.isArray(tasksResponse) 
+        ? tasksResponse 
+        : (tasksResponse as any).data || []
       
       // Transform API tasks to component format
       const transformedTasks: Task[] = tasksData.map((task: any) => {

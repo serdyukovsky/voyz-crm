@@ -23,12 +23,20 @@ export interface Task {
   updatedAt?: string
 }
 
+export interface PaginatedTasksResponse {
+  data: Task[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
 export async function getTasks(params?: {
   dealId?: string
   contactId?: string
   assignedToId?: string
   status?: string
-}): Promise<Task[]> {
+  limit?: number
+  cursor?: string
+}): Promise<Task[] | PaginatedTasksResponse> {
   // Check if we're on the client side
   if (typeof window === 'undefined') {
     return []
@@ -47,6 +55,8 @@ export async function getTasks(params?: {
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
   if (params?.status) queryParams.append('status', params.status)
+  if (params?.limit) queryParams.append('limit', String(params.limit))
+  if (params?.cursor) queryParams.append('cursor', params.cursor)
 
   try {
     const API_BASE_URL = getApiBaseUrl()
@@ -74,7 +84,20 @@ export async function getTasks(params?: {
       return [] // Return empty array instead of throwing
     }
 
-    return response.json()
+    const data = await response.json()
+    
+    // API returns paginated response if limit/cursor is provided, otherwise array
+    if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
+      return data as PaginatedTasksResponse
+    }
+    
+    // Fallback: if we get an array, return it
+    if (Array.isArray(data)) {
+      return data
+    }
+    
+    // Fallback: return empty array
+    return []
   } catch (error) {
     console.error('Error fetching tasks:', error)
     return [] // Return empty array instead of throwing
