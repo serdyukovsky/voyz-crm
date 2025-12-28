@@ -718,35 +718,51 @@ function KanbanColumn({
     }
   }
 
+  // Use a ref to track if we're currently dragging a stage
+  const isDraggingStageRef = React.useRef(false)
+  
   const handleStageDragStart = (e: React.DragEvent) => {
+    isDraggingStageRef.current = true
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', stage.id)
     e.dataTransfer.setData('application/json', JSON.stringify({ stageId: stage.id, type: 'stage' }))
     e.dataTransfer.setData('drag-type', 'stage') // Add explicit drag type
     onStageDragStart?.(stage.id)
   }
+  
+  const handleStageDragEnd = (e: React.DragEvent) => {
+    isDraggingStageRef.current = false
+    // ... existing code ...
+  }
 
   const handleStageDragOver = (e: React.DragEvent) => {
     // In dragOver, we can't read drag-type value, but we can check types
     const types = Array.from(e.dataTransfer.types)
     
-    // Check if this might be a stage drag (has drag-type marker)
-    // If it has drag-type, it could be either stage or deal, but we'll try stage first
-    if (types.includes('drag-type')) {
-      // Likely a stage drag, handle it
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
-      onStageDragOver?.(e, stage.id)
-      return
-    }
+    console.log('🔥 KanbanColumn handleStageDragOver:', {
+      stageId: stage.id,
+      types,
+      hasDragType: types.includes('drag-type'),
+      hasApplicationJson: types.includes('application/json'),
+      hasTextPlain: types.includes('text/plain')
+    })
     
-    // If no drag-type but has application/json, could be old format stage drag
-    if (types.includes('application/json') && types.includes('text/plain')) {
-      // Might be a stage drag, try handling it
+    // Check if this might be a stage drag
+    // Stage drags have drag-type='stage', deal drags have drag-type='deal'
+    // But we can't read the value in dragOver, so we need to be smart
+    // If it has drag-type AND application/json AND text/plain, it's likely a stage drag
+    const hasDragType = types.includes('drag-type')
+    const hasApplicationJson = types.includes('application/json')
+    const hasTextPlain = types.includes('text/plain')
+    
+    // Stage drags typically have all three types
+    // Deal drags also have all three, but we'll handle stage first at column level
+    if (hasDragType || (hasApplicationJson && hasTextPlain)) {
+      // Likely a stage drag, handle it at column level
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
+      console.log('🔥 KanbanColumn: Calling onStageDragOver for stage:', stage.id)
       onStageDragOver?.(e, stage.id)
       return
     }
