@@ -727,21 +727,32 @@ function KanbanColumn({
   }
 
   const handleStageDragOver = (e: React.DragEvent) => {
-    // In dragOver, we can't read drag-type value, so we allow all drags
-    // Filtering happens in drop handler
-    // For stage drags, we handle them here
-    // For deal drags, they will be handled by Card's onDragOver
-    
-    // Always allow dragOver - the drop handler will filter correctly
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = 'move'
-    
-    // Try to handle as stage drag if it has the right types
+    // In dragOver, we can't read drag-type value, but we can check types
     const types = Array.from(e.dataTransfer.types)
-    if (types.includes('drag-type') || types.includes('application/json')) {
+    
+    // Check if this might be a stage drag (has drag-type marker)
+    // If it has drag-type, it could be either stage or deal, but we'll try stage first
+    if (types.includes('drag-type')) {
+      // Likely a stage drag, handle it
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
       onStageDragOver?.(e, stage.id)
+      return
     }
+    
+    // If no drag-type but has application/json, could be old format stage drag
+    if (types.includes('application/json') && types.includes('text/plain')) {
+      // Might be a stage drag, try handling it
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      onStageDragOver?.(e, stage.id)
+      return
+    }
+    
+    // Otherwise, it's likely a deal drag - let Card handle it
+    // Don't prevent default here, let it bubble to Card
   }
   
   const handleStageDrop = (e: React.DragEvent) => {
@@ -1852,14 +1863,28 @@ export function DealsKanbanBoard({
   }
 
   const handleStageDragOver = (e: React.DragEvent, targetStageId: string) => {
-    if (!draggedStageId || draggedStageId === targetStageId || !selectedPipeline) return
+    if (!selectedPipeline) return
 
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
 
-    // Track the drop target
+    // Track the drop target - always set it when dragging over
+    // The draggedStageId should be set by handleStageDragStart
     console.log('🔥 handleStageDragOver: Dragging over stage:', targetStageId, 'dragged:', draggedStageId)
+    
+    // If we don't have draggedStageId yet, skip reordering but still allow dragOver
+    if (!draggedStageId) {
+      console.log('🔥 handleStageDragOver: No draggedStageId yet, allowing dragOver but skipping reorder')
+      return
+    }
+    
+    // If dragging over the same stage, skip
+    if (draggedStageId === targetStageId) {
+      return
+    }
+    
+    // Set the drop target
     setStageDropTargetId(targetStageId)
 
     const stages = [...selectedPipeline.stages].sort((a, b) => a.order - b.order)
