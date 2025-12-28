@@ -175,6 +175,7 @@ function DealCard({
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', deal.id)
     e.dataTransfer.setData('application/json', JSON.stringify({ dealId: deal.id, stageId: deal.stageId }))
+    e.dataTransfer.setData('drag-type', 'deal') // Add explicit drag type
   }
 
   const handleDragEnd = () => {
@@ -556,15 +557,8 @@ function KanbanColumn({
   }
 
   const handleDragOver = (e: React.DragEvent) => {
-    // Check if this is a stage drag by checking dataTransfer types
-    const types = Array.from(e.dataTransfer.types)
-    if (types.includes('application/json')) {
-      // Might be a stage drag, but we can't read it here
-      // Let the parent handle stage drags, we only handle deal drags
-      // Stage drags are handled at the column level
-      return
-    }
-    
+    // Allow all drags in dragOver - filtering happens in drop handler
+    // This ensures deal drags work properly
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
@@ -728,19 +722,24 @@ function KanbanColumn({
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', stage.id)
     e.dataTransfer.setData('application/json', JSON.stringify({ stageId: stage.id, type: 'stage' }))
+    e.dataTransfer.setData('drag-type', 'stage') // Add explicit drag type
     onStageDragStart?.(stage.id)
   }
 
   const handleStageDragOver = (e: React.DragEvent) => {
-    // Check if this is a stage drag by checking dataTransfer types
-    // We can't read data in dragOver, but we can check types
-    const types = Array.from(e.dataTransfer.types)
-    const hasStageData = types.includes('application/json') && types.includes('text/plain')
+    // In dragOver, we can't read drag-type value, so we allow all drags
+    // Filtering happens in drop handler
+    // For stage drags, we handle them here
+    // For deal drags, they will be handled by Card's onDragOver
     
-    if (hasStageData) {
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
+    // Always allow dragOver - the drop handler will filter correctly
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+    
+    // Try to handle as stage drag if it has the right types
+    const types = Array.from(e.dataTransfer.types)
+    if (types.includes('drag-type') || types.includes('application/json')) {
       onStageDragOver?.(e, stage.id)
     }
   }
@@ -749,11 +748,10 @@ function KanbanColumn({
     e.preventDefault()
     e.stopPropagation()
     
-    // Check if this is a stage drag by checking types
-    const types = Array.from(e.dataTransfer.types)
-    const isStageDrag = types.includes('application/json')
+    // Check if this is a stage drag by checking drag-type
+    const dragType = e.dataTransfer.getData('drag-type')
     
-    if (isStageDrag) {
+    if (dragType === 'stage') {
       // For stage drags, we just mark the drop target
       // The actual save will happen in handleStageDragEnd
       console.log('handleStageDrop: Stage drag dropped on:', stage.id)
@@ -1078,32 +1076,29 @@ function KanbanColumn({
           isDraggedOver && "border-primary border-2"
         )}
         onDragOver={(e) => {
-          // Check if this is a stage drag
-          const types = Array.from(e.dataTransfer.types)
-          const isStageDrag = types.includes('application/json')
-          
-          if (isStageDrag) {
-            // Let stage drags pass through to parent (the stage column div)
-            e.stopPropagation()
-            return
-          }
-          
-          // Handle deal drags
+          // Allow all drags in dragOver - filtering happens in drop handler
+          // This ensures deal drags work properly
+          e.preventDefault()
+          e.stopPropagation()
           handleDragOver(e)
         }}
         onDrop={(e) => {
-          // Check if this is a stage drag
-          const types = Array.from(e.dataTransfer.types)
-          const isStageDrag = types.includes('application/json')
+          // Check if this is a stage drag by checking drag-type
+          const dragType = e.dataTransfer.getData('drag-type')
           
-          if (isStageDrag) {
+          if (dragType === 'stage') {
             // Let stage drags pass through to parent (the stage column div)
             e.stopPropagation()
             return
           }
           
           // Handle deal drops
-          handleDrop(e)
+          e.preventDefault()
+          e.stopPropagation()
+          const dealId = e.dataTransfer.getData('text/plain')
+          if (dealId) {
+            onDrop(stage.id)
+          }
         }}
       >
         <CardContent className="p-3">
