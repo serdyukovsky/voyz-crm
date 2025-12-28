@@ -948,6 +948,12 @@ function KanbanColumn({
                   draggable: true
                 })
                 dragStartedRef.current = true
+                // Call handleStageDragStart first to set draggedStageId
+                // This ensures state is set before dragOver events fire
+                if (onStageDragStart) {
+                  onStageDragStart(stage.id)
+                }
+                // Then call the local handler to set dataTransfer
                 handleStageDragStart(e)
               }}
               onDragEnd={(e) => {
