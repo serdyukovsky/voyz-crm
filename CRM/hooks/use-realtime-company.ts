@@ -28,7 +28,8 @@ export function useRealtimeCompany({
     if (!token) return
 
     const wsUrl = getWsUrl()
-    const socket = io(wsUrl, {
+    // Socket.IO automatically adds /socket.io/ path, we need to specify /realtime namespace
+    const socket = io(`${wsUrl}/realtime`, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })
