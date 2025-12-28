@@ -731,11 +731,6 @@ function KanbanColumn({
     onStageDragStart?.(stage.id)
   }
   
-  const handleStageDragEnd = (e: React.DragEvent) => {
-    isDraggingStageRef.current = false
-    // ... existing code ...
-  }
-
   const handleStageDragOver = (e: React.DragEvent) => {
     // Check if we're dragging a stage (using ref)
     if (isDraggingStageRef.current) {
