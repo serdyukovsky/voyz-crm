@@ -34,7 +34,12 @@ export function CalendarView() {
     const loadTasks = async () => {
       try {
         setLoading(true)
-        const tasksData = await getTasks()
+        const tasksResponse = await getTasks()
+        
+        // Handle both array and paginated response
+        const tasksData = Array.isArray(tasksResponse) 
+          ? tasksResponse 
+          : (tasksResponse as any).data || []
         
         // Transform API tasks to component format
         const transformedTasks: Task[] = tasksData.map((task: any) => ({

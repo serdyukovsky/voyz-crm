@@ -61,9 +61,14 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
       try {
         setLoading(true)
         console.log('📋 TasksListView: Loading tasks, statusFilter:', statusFilter)
-        const tasksData = await getTasks({
+        const tasksResponse = await getTasks({
           status: statusFilter || undefined,
         })
+        
+        // Handle both array and paginated response
+        const tasksData = Array.isArray(tasksResponse) 
+          ? tasksResponse 
+          : (tasksResponse as any).data || []
         
         console.log('📋 TasksListView: Loaded tasks from API:', tasksData.length)
         
@@ -261,9 +266,14 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
       // Also reload tasks from API after a short delay to ensure consistency
       setTimeout(async () => {
         try {
-          const tasksData = await getTasks({
+          const tasksResponse = await getTasks({
             status: statusFilter || undefined,
           })
+          
+          // Handle both array and paginated response
+          const tasksData = Array.isArray(tasksResponse) 
+            ? tasksResponse 
+            : (tasksResponse as any).data || []
           
           const transformedTasks: Task[] = tasksData.map((task: any) => ({
             id: task.id,

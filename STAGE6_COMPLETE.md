@@ -35,3 +35,4 @@
 - **Удалено:** ~15 console.log из hot paths
 - **Оставлено:** console.error для ошибок, startup логи, логи редких операций
 
+

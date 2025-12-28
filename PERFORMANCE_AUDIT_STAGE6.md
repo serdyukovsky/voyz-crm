@@ -64,3 +64,4 @@
 **Backend:**
 - `crm-backend/src/chat/chat.service.ts` - проверить и удалить лишние логи
 
+

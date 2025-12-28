@@ -1317,11 +1317,14 @@ export function DealsKanbanBoard({
     try {
       setLoading(true)
       console.log('Loading deals for pipeline:', selectedPipeline.id)
+      // For kanban, we need ALL deals (no pagination limit)
+      // Use a large limit to get all deals for the kanban board
       const dealsData = await getDeals({ 
         pipelineId: selectedPipeline.id,
         companyId: filters.companyId,
         contactId: filters.contactId,
         assignedToId: filters.assignedUserId,
+        limit: 10000, // Large limit for kanban to show all deals
       })
       
       // API now returns paginated response, extract data array
