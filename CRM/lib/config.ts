@@ -23,7 +23,10 @@ export function getWsUrl(): string {
     }
     _wsUrl = import.meta.env.VITE_WS_URL
     if (!_wsUrl) {
-      throw new Error('VITE_WS_URL environment variable is not set. Please configure it in .env.local')
+      // Fallback to API URL if WS URL is not set
+      const apiUrl = getApiBaseUrl()
+      _wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://')
+      console.log('⚠️ VITE_WS_URL not set, using fallback:', _wsUrl)
     }
   }
   return _wsUrl

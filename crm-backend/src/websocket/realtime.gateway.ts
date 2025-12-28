@@ -25,7 +25,7 @@ import { JwtService } from '@nestjs/jwt';
       }
 
       // Allow local development origins
-      if (origin.match(/^http:\/\/localhost:(5173|3000)$/)) {
+      if (origin.match(/^http:\/\/localhost:(5173|3000|3002)$/)) {
         return callback(null, true);
       }
 
