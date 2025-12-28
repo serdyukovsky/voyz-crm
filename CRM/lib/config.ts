@@ -25,7 +25,9 @@ export function getWsUrl(): string {
     if (!_wsUrl) {
       // Fallback to API URL if WS URL is not set
       const apiUrl = getApiBaseUrl()
-      _wsUrl = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://')
+      // Remove /api suffix if present, Socket.IO will add its own path
+      const baseUrl = apiUrl.replace(/\/api\/?$/, '')
+      _wsUrl = baseUrl.replace('http://', 'ws://').replace('https://', 'wss://')
       console.log('⚠️ VITE_WS_URL not set, using fallback:', _wsUrl)
     }
   }
