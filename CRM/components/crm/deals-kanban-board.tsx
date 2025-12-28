@@ -737,33 +737,32 @@ function KanbanColumn({
   }
 
   const handleStageDragOver = (e: React.DragEvent) => {
-    // In dragOver, we can't read drag-type value, but we can check types
+    // Check if we're dragging a stage (using ref)
+    if (isDraggingStageRef.current) {
+      // This is definitely a stage drag
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected via ref, calling onStageDragOver for stage:', stage.id)
+      onStageDragOver?.(e, stage.id)
+      return
+    }
+    
+    // Otherwise, check types as fallback (for stage drags from other columns)
     const types = Array.from(e.dataTransfer.types)
-    
-    console.log('🔥 KanbanColumn handleStageDragOver:', {
-      stageId: stage.id,
-      types,
-      hasDragType: types.includes('drag-type'),
-      hasApplicationJson: types.includes('application/json'),
-      hasTextPlain: types.includes('text/plain')
-    })
-    
-    // Check if this might be a stage drag
-    // Stage drags have drag-type='stage', deal drags have drag-type='deal'
-    // But we can't read the value in dragOver, so we need to be smart
-    // If it has drag-type AND application/json AND text/plain, it's likely a stage drag
     const hasDragType = types.includes('drag-type')
     const hasApplicationJson = types.includes('application/json')
     const hasTextPlain = types.includes('text/plain')
     
-    // Stage drags typically have all three types
-    // Deal drags also have all three, but we'll handle stage first at column level
-    if (hasDragType || (hasApplicationJson && hasTextPlain)) {
-      // Likely a stage drag, handle it at column level
+    // If it has all three types, it could be either stage or deal
+    // But since we're at the column level, we'll try stage first
+    // The Card component will handle deal drags if this doesn't match
+    if (hasDragType && hasApplicationJson && hasTextPlain) {
+      // Could be a stage drag from another column, try handling it
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn: Calling onStageDragOver for stage:', stage.id)
+      console.log('🔥 KanbanColumn handleStageDragOver: Possible stage drag (fallback), calling onStageDragOver for stage:', stage.id)
       onStageDragOver?.(e, stage.id)
       return
     }
