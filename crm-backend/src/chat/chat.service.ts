@@ -10,12 +10,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => RealtimeGateway)) private readonly websocketGateway: RealtimeGateway,
-  ) {
-    if (!this.prisma) {
-      console.error('❌ PrismaService is not injected in ChatService constructor!')
-      throw new Error('PrismaService injection failed')
-    }
-  }
+  ) {}
 
   /**
    * Get or create a thread between users

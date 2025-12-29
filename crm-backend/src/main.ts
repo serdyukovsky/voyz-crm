@@ -8,9 +8,19 @@ import * as express from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
+function validateEnv() {
+  const required = ['DATABASE_URL'];
+  const missing = required.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '));
+    console.error('Please check your .env file and ensure all required variables are set.');
+    process.exit(1);
+  }
+}
+
 async function bootstrap() {
-  // 🔥 DIAGNOSTIC TEST: Remove this after verification
-  // throw new Error('BACKEND RELOADED TEST');
+  // Validate required environment variables before starting
+  validateEnv();
   
   const app = await NestFactory.create(AppModule, {
     bodyParser: false, // Disable default body parser to configure custom limit
@@ -101,25 +111,7 @@ async function bootstrap() {
   // Cookie parser
   app.use(cookieParser());
 
-  // Diagnostic middleware (disabled in production)
-  app.use((req: any, res: any, next: any) => {
-    // Logging disabled for performance
-    // Uncomment for debugging if needed:
-    // if (req.path === '/api/import/deals' || req.path.includes('/import/deals')) {
-    //   console.log('🔥 MIDDLEWARE - Request to import/deals:', {
-    //     method: req.method,
-    //     path: req.path,
-    //     query: req.query,
-    //     contentType: req.headers['content-type'],
-    //     bodyKeys: req.body ? Object.keys(req.body) : [],
-    //     hasRows: !!req.body?.rows,
-    //     rowsCount: req.body?.rows?.length || 0,
-    //     hasMapping: !!req.body?.mapping,
-    //     hasFile: 'file' in (req.body || {}),
-    //   });
-    // }
-    next();
-  });
+  // Diagnostic middleware removed for production
 
   // Validation
   // CRITICAL: Temporarily disable forbidNonWhitelisted for import endpoints
@@ -192,4 +184,7 @@ async function bootstrap() {
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('❌ Failed to start application:', error);
+  process.exit(1);
+});
