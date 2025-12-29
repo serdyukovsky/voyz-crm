@@ -37,24 +37,7 @@ export class CsvImportService {
     private readonly prisma: PrismaService,
     private readonly customFieldsService: CustomFieldsService,
     private readonly systemFieldOptionsService: SystemFieldOptionsService,
-  ) {
-    // CRITICAL: Verify PrismaService injection in constructor
-    if (!this.prisma) {
-      console.error('[CSV IMPORT SERVICE] CRITICAL ERROR: PrismaService is NOT injected in constructor!');
-      console.error('[CSV IMPORT SERVICE] Constructor params:', {
-        hasImportBatchService: !!this.importBatchService,
-        hasPrisma: !!this.prisma,
-        prismaType: typeof this.prisma,
-        prismaValue: this.prisma,
-      });
-      throw new Error('PrismaService is NOT injected in CsvImportService constructor. Check ImportExportModule providers.');
-    }
-    console.log('[CSV IMPORT SERVICE] Constructor: PrismaService injected successfully:', {
-      hasPrisma: !!this.prisma,
-      prismaType: typeof this.prisma,
-      prismaMethods: this.prisma ? Object.keys(this.prisma).slice(0, 10) : [],
-    });
-  }
+  ) {}
 
 
   /**

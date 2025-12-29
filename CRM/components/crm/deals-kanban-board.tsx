@@ -720,7 +720,6 @@ function KanbanColumn({
   }
 
   // Use a ref to track if we're currently dragging a stage
-  const isDraggingStageRef = React.useRef(false)
   
   const handleStageDragStart = (e: React.DragEvent) => {
     isDraggingStageRef.current = true

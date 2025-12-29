@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '@/common/services/prisma.service';
 import { IntegrationType } from '@prisma/client';
 import { IntegrationServiceInterface, IntegrationConfig } from './common/integration.interface';
@@ -9,7 +9,7 @@ import { EmailService } from './email/email.service';
 import { TelephonyService } from './telephony/telephony.service';
 
 @Injectable()
-export class IntegrationRegistryService implements OnModuleInit {
+export class IntegrationRegistryService implements OnApplicationBootstrap {
   private readonly logger = new Logger(IntegrationRegistryService.name);
   private integrations: Map<IntegrationType, IntegrationServiceInterface> = new Map();
 
@@ -22,7 +22,7 @@ export class IntegrationRegistryService implements OnModuleInit {
     private readonly telephonyService: TelephonyService,
   ) {}
 
-  async onModuleInit() {
+  async onApplicationBootstrap() {
     await this.loadIntegrations();
   }
 

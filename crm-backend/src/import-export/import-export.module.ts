@@ -17,7 +17,6 @@ import { CustomFieldsModule } from '@/custom-fields/custom-fields.module';
     ImportBatchService,
     CsvImportService,
     AutoMappingService,
-    PrismaService, // CRITICAL: Explicitly add PrismaService to ensure injection
   ],
   exports: [ImportExportService, ImportBatchService, CsvImportService, AutoMappingService],
 })
