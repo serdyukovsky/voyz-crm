@@ -212,7 +212,10 @@ function App() {
           <Toaster />
           <ToastToaster />
           {/* <Analytics /> */}
-          <ReactQueryDevtools initialIsOpen={false} />
+          {/* React Query DevTools disabled */}
+          {/* {import.meta.env.DEV && (
+            <ReactQueryDevtools initialIsOpen={false} />
+          )} */}
         </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>

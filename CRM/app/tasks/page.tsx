@@ -388,24 +388,6 @@ export default function TasksPage() {
         }}
         onSave={handleCreateTask}
       />
-      
-      {/* Debug info - only in development */}
-      {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
-        <div style={{
-          position: 'fixed',
-          bottom: 10,
-          right: 10,
-          background: 'rgba(0,0,0,0.8)',
-          color: 'white',
-          padding: '8px',
-          fontSize: '12px',
-          zIndex: 9999,
-          borderRadius: '4px',
-          fontFamily: 'monospace'
-        }}>
-          <div>Modal Open: {isCreateTaskModalOpen ? 'YES' : 'NO'}</div>
-        </div>
-      )}
     </CRMLayout>
   )
 }

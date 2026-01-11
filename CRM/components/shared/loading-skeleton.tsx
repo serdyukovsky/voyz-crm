@@ -3,33 +3,74 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { useTheme } from 'next-themes'
+import { useState, useEffect } from 'react'
 
 export function PageSkeleton() {
+  const { theme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [isDark, setIsDark] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    
+    const updateTheme = () => {
+      if (theme === 'dark') {
+        setIsDark(true)
+      } else if (theme === 'light') {
+        setIsDark(false)
+      } else if (theme === 'system') {
+        setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
+      }
+    }
+    
+    updateTheme()
+    
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      mediaQuery.addEventListener('change', updateTheme)
+      return () => mediaQuery.removeEventListener('change', updateTheme)
+    }
+  }, [theme, mounted])
+
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300">
-      <div className="flex items-center justify-between">
-        <div className="space-y-3">
-          <Skeleton className="h-9 w-56 rounded-lg" />
-          <Skeleton className="h-4 w-72 rounded-md" />
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center justify-center space-y-6 animate-in fade-in-50 duration-500">
+        {/* Logo with pulse animation */}
+        {mounted && (
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={cn(
+                "w-24 h-24 rounded-full animate-pulse",
+                isDark ? "bg-primary/20" : "bg-primary/10"
+              )} />
+            </div>
+            <img 
+              src="/logo_voyz_crm.svg" 
+              alt="Voyz CRM" 
+              className={cn(
+                "h-12 w-auto relative z-10 transition-all duration-300",
+                isDark ? "invert brightness-0" : "",
+                "animate-pulse"
+              )}
+              style={{ animationDuration: '2s' }}
+            />
+          </div>
+        )}
+        
+        {/* Loading text */}
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0s' }} />
+            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">Загрузка...</p>
         </div>
-        <Skeleton className="h-10 w-36 rounded-lg" />
-      </div>
-      <Skeleton className="h-11 w-full rounded-lg" />
-      <div className="grid gap-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} className="border shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-5 w-48 rounded-md" />
-                  <Skeleton className="h-4 w-64 rounded-sm" />
-                </div>
-                <Skeleton className="h-8 w-24 rounded-md" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
       </div>
     </div>
   )

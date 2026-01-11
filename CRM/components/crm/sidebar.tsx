@@ -30,6 +30,7 @@ export function Sidebar() {
   const pathname = location.pathname
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [isDark, setIsDark] = useState(false)
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const { t, language, setLanguage } = useTranslation()
   const chatContext = useChatContext()
@@ -37,6 +38,28 @@ export function Sidebar() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    
+    const updateTheme = () => {
+      if (theme === 'dark') {
+        setIsDark(true)
+      } else if (theme === 'light') {
+        setIsDark(false)
+      } else if (theme === 'system') {
+        setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
+      }
+    }
+    
+    updateTheme()
+    
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      mediaQuery.addEventListener('change', updateTheme)
+      return () => mediaQuery.removeEventListener('change', updateTheme)
+    }
+  }, [theme, mounted])
   
   const navItems = navItemsConfig.map(item => ({
     ...item,
@@ -60,11 +83,25 @@ export function Sidebar() {
         <div className="flex h-12 items-center border-b border-border/50 px-4">
           {isCollapsed ? (
             <div className="flex items-center justify-center w-full relative">
-              <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
+              <img 
+                src="/logo_voyz_crm.svg" 
+                alt="Voyz CRM" 
+                className={cn(
+                  "h-4 w-auto transition-all duration-200",
+                  isDark ? "invert brightness-0" : ""
+                )}
+              />
             </div>
           ) : (
             <div className="flex items-center gap-2 w-full min-w-0">
-              <div className="h-6 w-6 rounded-md bg-primary flex-shrink-0" aria-hidden="true" />
+              <img 
+                src="/logo_voyz_crm.svg" 
+                alt="Voyz CRM" 
+                className={cn(
+                  "h-4 w-auto flex-shrink-0 transition-all duration-200",
+                  isDark ? "invert brightness-0" : ""
+                )}
+              />
               <span 
                 className={cn(
                   "text-sm font-medium text-sidebar-foreground whitespace-nowrap",
