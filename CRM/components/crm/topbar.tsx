@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useSidebar } from './sidebar-context'
 import { useSearch } from './search-context'
+import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 import { DealSearchPanel, type DealSearchFilters } from './deal-search-panel'
 
@@ -47,6 +48,7 @@ export function Topbar() {
   const navigate = useNavigate()
   const { isCollapsed } = useSidebar()
   const { searchValue, setSearchValue } = useSearch()
+  const { logout: logoutFromContext } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [appliedFilters, setAppliedFilters] = useState<DealSearchFilters | null>(null)
@@ -87,12 +89,12 @@ export function Topbar() {
 
   const handleLogout = async () => {
     try {
-      const { logout } = await import('@/lib/api/auth')
-      await logout()
+      await logoutFromContext()
     } catch (error) {
       console.error('Logout error:', error)
+      // Fallback navigation if logout fails
+      navigate("/login", { replace: true })
     }
-    navigate("/login")
   }
 
   const handleRemoveNotification = (id: string, e: React.MouseEvent) => {

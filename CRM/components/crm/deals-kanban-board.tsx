@@ -2469,26 +2469,6 @@ export function DealsKanbanBoard({
           totalAmount={selectedStageTotalAmount}
         />
       )}
-      
-      {/* Debug info - только в development */}
-      {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
-        <div style={{ 
-          position: 'fixed', 
-          bottom: 10, 
-          right: 10, 
-          background: 'rgba(0,0,0,0.8)', 
-          color: 'white', 
-          padding: '8px', 
-          fontSize: '12px', 
-          zIndex: 9999, 
-          borderRadius: '4px',
-          fontFamily: 'monospace'
-        }}>
-          <div>Modal: {isCreateModalOpen ? 'OPEN' : 'CLOSED'}</div>
-          <div>Stage: {selectedStageId || 'NONE'}</div>
-          <div>Pipeline: {selectedPipeline?.id?.slice(0, 8) || 'NONE'}</div>
-        </div>
-      )}
 
       {/* Add Stage Modal */}
       {selectedPipeline && afterStageId && (
