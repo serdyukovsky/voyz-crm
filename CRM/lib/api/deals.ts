@@ -259,7 +259,6 @@ export async function deleteDeal(id: string): Promise<void> {
   }
 }
 
-
 export interface BulkDeleteRequest {
   mode: 'IDS' | 'FILTER'
   ids?: string[]
