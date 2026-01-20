@@ -33,5 +33,6 @@ export interface PaginatedResponse<T> {
   data: T[];
   nextCursor?: string;
   hasMore: boolean;
+  total?: number; // Total count of items matching the filter (optional for performance)
 }
 

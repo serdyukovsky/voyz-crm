@@ -27,6 +27,7 @@ export interface PaginatedTasksResponse {
   data: Task[]
   nextCursor?: string
   hasMore: boolean
+  total?: number // Total count matching filters
 }
 
 export async function getTasks(params?: {
@@ -364,6 +365,80 @@ export async function deleteTask(id: string): Promise<void> {
     console.error('API: Error deleting task:', error)
     throw error
   }
+}
+
+export interface BulkDeleteRequest {
+  mode: 'IDS' | 'FILTER'
+  ids?: string[]
+  excludedIds?: string[]
+  filter?: {
+    dealId?: string
+    contactId?: string
+    assignedToId?: string
+    status?: string
+  }
+}
+
+export interface BulkDeleteResponse {
+  deletedCount: number
+  failedCount: number
+  errors?: Array<{ id: string; error: string }>
+}
+
+export async function bulkDeleteTasks(request: BulkDeleteRequest): Promise<BulkDeleteResponse> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/tasks/bulk`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    throw new Error(`Failed to bulk delete tasks: ${response.status} ${errorText}`)
+  }
+
+  return response.json()
+}
+
+export async function getTasksCount(params?: {
+  dealId?: string
+  contactId?: string
+  assignedToId?: string
+  status?: string
+}): Promise<number> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const queryParams = new URLSearchParams()
+  if (params?.dealId) queryParams.append('dealId', params.dealId)
+  if (params?.contactId) queryParams.append('contactId', params.contactId)
+  if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
+  if (params?.status) queryParams.append('status', params.status)
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/tasks/count?${queryParams.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get tasks count')
+  }
+
+  const data = await response.json()
+  return data.count || 0
 }
 
 

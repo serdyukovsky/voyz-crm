@@ -7,6 +7,7 @@ import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
 import { Task, TaskStatus, ActivityType } from '@prisma/client';
 import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
+import { BulkDeleteDto, BulkDeleteResult, BulkDeleteMode } from './dto/bulk-delete.dto';
 
 @Injectable()
 export class TasksService {
@@ -211,11 +212,22 @@ export class TasksService {
       take,
     });
 
+    // Calculate total count (only if cursor is not provided, to avoid performance issues)
+    let total: number | undefined = undefined;
+    if (!decodedCursor) {
+      try {
+        total = await this.prisma.task.count({ where });
+      } catch (error) {
+        console.error('Failed to count tasks:', error);
+        // Continue without total if count fails
+      }
+    }
+
     // Always return an array, even if empty
     if (tasks.length === 0) {
       // If cursor was provided, return paginated response, otherwise return empty array (backward compatibility)
       if (decodedCursor) {
-        return { data: [], nextCursor: undefined, hasMore: false };
+        return { data: [], nextCursor: undefined, hasMore: false, total };
       }
       return [];
     }
@@ -241,6 +253,7 @@ export class TasksService {
         data: formattedTasks,
         nextCursor,
         hasMore,
+        total,
       };
     }
 
@@ -632,6 +645,194 @@ export class TasksService {
 
     // Emit WebSocket event
     this.websocketGateway.emitTaskDeleted(id, { dealId: task.dealId, contactId: task.contactId });
+  }
+
+  /**
+   * Count tasks matching filters (for bulk operations)
+   */
+  async count(filters?: {
+    dealId?: string;
+    contactId?: string;
+    assignedToId?: string;
+    status?: TaskStatus;
+  }): Promise<number> {
+    const where: any = {};
+
+    // Base filters (same as findAll)
+    if (filters?.dealId) where.dealId = filters.dealId;
+    if (filters?.contactId) where.contactId = filters.contactId;
+    if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
+    if (filters?.status) where.status = filters.status;
+
+    return this.prisma.task.count({ where });
+  }
+
+  /**
+   * Bulk delete tasks by IDs or filters
+   * Deletes in batches of 1000 to avoid timeout
+   */
+  async bulkDelete(dto: BulkDeleteDto, userId: string): Promise<BulkDeleteResult> {
+    const result: BulkDeleteResult = {
+      deletedCount: 0,
+      failedCount: 0,
+      errors: [],
+    };
+
+    if (dto.mode === BulkDeleteMode.IDS) {
+      // Delete by specific IDs
+      if (!dto.ids || dto.ids.length === 0) {
+        return result;
+      }
+
+      // Delete in batches of 1000
+      const batchSize = 1000;
+      for (let i = 0; i < dto.ids.length; i += batchSize) {
+        const batch = dto.ids.slice(i, i + batchSize);
+        
+        try {
+          // Use transaction for each batch
+          await this.prisma.$transaction(async (tx) => {
+            // Get tasks before deletion for logging
+            const tasksToDelete = await tx.task.findMany({
+              where: { id: { in: batch } },
+              select: { id: true, title: true, dealId: true, contactId: true },
+            });
+
+            // Delete tasks
+            await tx.task.deleteMany({
+              where: { id: { in: batch } },
+            });
+
+            // Log each deletion and emit WebSocket events
+            for (const task of tasksToDelete) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'delete',
+                  entity: 'task',
+                  entityId: task.id,
+                  userId,
+                  message: `Task "${task.title}" deleted (bulk)`,
+                  metadata: {
+                    taskTitle: task.title,
+                    bulkOperation: true,
+                  },
+                });
+
+                // Emit WebSocket event
+                this.websocketGateway.emitTaskDeleted(task.id, { 
+                  dealId: task.dealId, 
+                  contactId: task.contactId 
+                });
+              } catch (logError) {
+                console.error(`Failed to log deletion for task ${task.id}:`, logError);
+              }
+            }
+          });
+
+          result.deletedCount += batch.length;
+        } catch (error) {
+          console.error(`Failed to delete batch starting at index ${i}:`, error);
+          result.failedCount += batch.length;
+          batch.forEach((id) => {
+            result.errors?.push({
+              id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          });
+        }
+      }
+    } else if (dto.mode === BulkDeleteMode.FILTER) {
+      // Delete by filter
+      if (!dto.filter) {
+        throw new Error('Filter is required for FILTER mode');
+      }
+
+      const where: any = {};
+
+      // Build filter (same as findAll)
+      if (dto.filter.dealId) where.dealId = dto.filter.dealId;
+      if (dto.filter.contactId) where.contactId = dto.filter.contactId;
+      if (dto.filter.assignedToId) where.assignedToId = dto.filter.assignedToId;
+      if (dto.filter.status) where.status = dto.filter.status;
+
+      // Exclude specific IDs if provided
+      if (dto.excludedIds && dto.excludedIds.length > 0) {
+        where.id = { notIn: dto.excludedIds };
+      }
+
+      // Delete in batches to avoid timeout
+      const batchSize = 1000;
+      let hasMore = true;
+      let deletedInBatch = 0;
+
+      while (hasMore) {
+        try {
+          // Get batch of IDs to delete
+          const tasksBatch = await this.prisma.task.findMany({
+            where,
+            select: { id: true, title: true, dealId: true, contactId: true },
+            take: batchSize,
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          });
+
+          if (tasksBatch.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const batchIds = tasksBatch.map((t) => t.id);
+
+          // Delete batch in transaction
+          await this.prisma.$transaction(async (tx) => {
+            await tx.task.deleteMany({
+              where: { id: { in: batchIds } },
+            });
+
+            // Log each deletion and emit WebSocket events
+            for (const task of tasksBatch) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'delete',
+                  entity: 'task',
+                  entityId: task.id,
+                  userId,
+                  message: `Task "${task.title}" deleted (bulk filter)`,
+                  metadata: {
+                    taskTitle: task.title,
+                    bulkOperation: true,
+                    filterMode: true,
+                  },
+                });
+
+                // Emit WebSocket event
+                this.websocketGateway.emitTaskDeleted(task.id, { 
+                  dealId: task.dealId, 
+                  contactId: task.contactId 
+                });
+              } catch (logError) {
+                console.error(`Failed to log deletion for task ${task.id}:`, logError);
+              }
+            }
+          });
+
+          deletedInBatch = tasksBatch.length;
+          result.deletedCount += deletedInBatch;
+
+          // If we got less than batchSize, we're done
+          if (tasksBatch.length < batchSize) {
+            hasMore = false;
+          }
+        } catch (error) {
+          console.error('Failed to delete batch in FILTER mode:', error);
+          result.failedCount += batchSize; // Estimate
+          hasMore = false;
+        }
+      }
+    }
+
+    return result;
   }
 
   async getHistory(taskId: string) {

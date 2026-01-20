@@ -36,6 +36,7 @@ export interface PaginatedDealsResponse {
   data: Deal[]
   nextCursor?: string
   hasMore: boolean
+  total?: number // Total count matching filters
 }
 
 export async function getDeals(params?: {
@@ -258,3 +259,83 @@ export async function deleteDeal(id: string): Promise<void> {
   }
 }
 
+
+export interface BulkDeleteRequest {
+  mode: 'IDS' | 'FILTER'
+  ids?: string[]
+  excludedIds?: string[]
+  filter?: {
+    pipelineId?: string
+    stageId?: string
+    assignedToId?: string
+    contactId?: string
+    companyId?: string
+    search?: string
+  }
+}
+
+export interface BulkDeleteResponse {
+  deletedCount: number
+  failedCount: number
+  errors?: Array<{ id: string; error: string }>
+}
+
+export async function bulkDeleteDeals(request: BulkDeleteRequest): Promise<BulkDeleteResponse> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/deals/bulk`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    throw new Error(`Failed to bulk delete deals: ${response.status} ${errorText}`)
+  }
+
+  return response.json()
+}
+
+export async function getDealsCount(params?: {
+  pipelineId?: string
+  stageId?: string
+  assignedToId?: string
+  contactId?: string
+  companyId?: string
+  search?: string
+}): Promise<number> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const queryParams = new URLSearchParams()
+  if (params?.pipelineId) queryParams.append('pipelineId', params.pipelineId)
+  if (params?.stageId) queryParams.append('stageId', params.stageId)
+  if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
+  if (params?.contactId) queryParams.append('contactId', params.contactId)
+  if (params?.companyId) queryParams.append('companyId', params.companyId)
+  if (params?.search) queryParams.append('search', params.search)
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/deals/count?${queryParams.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get deals count')
+  }
+
+  const data = await response.json()
+  return data.count || 0
+}

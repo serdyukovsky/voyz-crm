@@ -9,11 +9,14 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { BulkDeleteDto } from './dto/bulk-delete.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -61,6 +64,24 @@ export class TasksController {
     });
   }
 
+  @Get('count')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
+  @ApiOperation({ summary: 'Count tasks matching filters' })
+  @ApiResponse({ status: 200, description: 'Count of tasks' })
+  count(
+    @Query('dealId') dealId?: string,
+    @Query('contactId') contactId?: string,
+    @Query('assignedToId') assignedToId?: string,
+    @Query('status') status?: TaskStatus,
+  ) {
+    return this.tasksService.count({
+      dealId,
+      contactId,
+      assignedToId,
+      status,
+    }).then(count => ({ count }));
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
   @ApiOperation({ summary: 'Get task by ID' })
@@ -88,6 +109,15 @@ export class TasksController {
   @ApiResponse({ status: 200, description: 'Task history' })
   getHistory(@Param('id') id: string) {
     return this.tasksService.getHistory(id);
+  }
+
+  @Delete('bulk')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk delete tasks by IDs or filters' })
+  @ApiResponse({ status: 200, description: 'Bulk delete result' })
+  bulkDelete(@Body() dto: BulkDeleteDto, @CurrentUser() user: any) {
+    return this.tasksService.bulkDelete(dto, user.userId || user.id);
   }
 
   @Delete(':id')

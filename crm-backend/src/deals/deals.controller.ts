@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { DealsService } from './deals.service';
+import { BulkDeleteDto } from './dto/bulk-delete.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -72,6 +73,28 @@ export class DealsController {
     });
   }
 
+  @Get('count')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
+  @ApiOperation({ summary: 'Count deals matching filters' })
+  @ApiResponse({ status: 200, description: 'Count of deals' })
+  count(
+    @Query('pipelineId') pipelineId?: string,
+    @Query('stageId') stageId?: string,
+    @Query('assignedToId') assignedToId?: string,
+    @Query('contactId') contactId?: string,
+    @Query('companyId') companyId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.dealsService.count({
+      pipelineId,
+      stageId,
+      assignedToId,
+      contactId,
+      companyId,
+      search,
+    }).then(count => ({ count }));
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
   @ApiOperation({ summary: 'Get deal by ID' })
@@ -111,6 +134,15 @@ export class DealsController {
   @ApiResponse({ status: 200, description: 'Contact unlinked' })
   unlinkContact(@Param('id') dealId: string, @CurrentUser() user: any) {
     return this.dealsService.unlinkContact(dealId, user.userId || user.id);
+  }
+
+  @Delete('bulk')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk delete deals by IDs or filters' })
+  @ApiResponse({ status: 200, description: 'Bulk delete result' })
+  bulkDelete(@Body() dto: BulkDeleteDto, @CurrentUser() user: any) {
+    return this.dealsService.bulkDelete(dto, user.userId || user.id);
   }
 
   @Delete(':id')
