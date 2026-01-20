@@ -6,6 +6,7 @@ import { LoggingService } from '@/logging/logging.service';
 import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 import { Deal, ActivityType, UserRole } from '@prisma/client';
 import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
+import { BulkDeleteDto, BulkDeleteResult, BulkDeleteMode } from './dto/bulk-delete.dto';
 
 @Injectable()
 export class DealsService {
@@ -366,9 +367,21 @@ export class DealsService {
       take,
     });
 
+    // Calculate total count (only if cursor is not provided, to avoid performance issues)
+    // When cursor is provided, we skip total count calculation for performance
+    let total: number | undefined = undefined;
+    if (!decodedCursor) {
+      try {
+        total = await this.prisma.deal.count({ where });
+      } catch (error) {
+        console.error('Failed to count deals:', error);
+        // Continue without total if count fails
+      }
+    }
+
     // Always return paginated response format (even if empty)
     if (deals.length === 0) {
-      return { data: [], nextCursor: undefined, hasMore: false };
+      return { data: [], nextCursor: undefined, hasMore: false, total };
     }
 
     // Check if there are more items
@@ -392,6 +405,7 @@ export class DealsService {
       data: formattedDeals,
       nextCursor,
       hasMore,
+      total,
     };
   }
 
@@ -1416,6 +1430,200 @@ export class DealsService {
     this.websocketGateway.emitContactDealUpdated(oldContactId, dealId, updatedDeal);
 
     return this.formatDealResponse(updatedDeal);
+  }
+
+  /**
+   * Count deals matching filters (for bulk operations)
+   */
+  async count(filters?: {
+    pipelineId?: string;
+    stageId?: string;
+    assignedToId?: string;
+    contactId?: string;
+    companyId?: string;
+    search?: string;
+  }): Promise<number> {
+    const where: any = {};
+
+    // Base filters (same as findAll)
+    if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
+    if (filters?.stageId) where.stageId = filters.stageId;
+    if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
+    if (filters?.contactId) where.contactId = filters.contactId;
+    if (filters?.companyId) where.companyId = filters.companyId;
+    if (filters?.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { description: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    return this.prisma.deal.count({ where });
+  }
+
+  /**
+   * Bulk delete deals by IDs or filters
+   * Deletes in batches of 1000 to avoid timeout
+   */
+  async bulkDelete(dto: BulkDeleteDto, userId: string): Promise<BulkDeleteResult> {
+    const result: BulkDeleteResult = {
+      deletedCount: 0,
+      failedCount: 0,
+      errors: [],
+    };
+
+    if (dto.mode === BulkDeleteMode.IDS) {
+      // Delete by specific IDs
+      if (!dto.ids || dto.ids.length === 0) {
+        return result;
+      }
+
+      // Delete in batches of 1000
+      const batchSize = 1000;
+      for (let i = 0; i < dto.ids.length; i += batchSize) {
+        const batch = dto.ids.slice(i, i + batchSize);
+        
+        try {
+          // Use transaction for each batch
+          await this.prisma.$transaction(async (tx) => {
+            // Get deals before deletion for logging
+            const dealsToDelete = await tx.deal.findMany({
+              where: { id: { in: batch } },
+              select: { id: true, title: true, number: true },
+            });
+
+            // Delete deals
+            await tx.deal.deleteMany({
+              where: { id: { in: batch } },
+            });
+
+            // Log each deletion
+            for (const deal of dealsToDelete) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'delete',
+                  entity: 'deal',
+                  entityId: deal.id,
+                  userId,
+                  message: `Deal "${deal.title || deal.number || deal.id}" deleted (bulk)`,
+                  metadata: {
+                    dealTitle: deal.title,
+                    dealNumber: deal.number,
+                    bulkOperation: true,
+                  },
+                });
+              } catch (logError) {
+                console.error(`Failed to log deletion for deal ${deal.id}:`, logError);
+              }
+            }
+          });
+
+          result.deletedCount += batch.length;
+        } catch (error) {
+          console.error(`Failed to delete batch starting at index ${i}:`, error);
+          result.failedCount += batch.length;
+          batch.forEach((id) => {
+            result.errors?.push({
+              id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          });
+        }
+      }
+    } else if (dto.mode === BulkDeleteMode.FILTER) {
+      // Delete by filter
+      if (!dto.filter) {
+        throw new Error('Filter is required for FILTER mode');
+      }
+
+      const where: any = {};
+
+      // Build filter (same as findAll)
+      if (dto.filter.pipelineId) where.pipelineId = dto.filter.pipelineId;
+      if (dto.filter.stageId) where.stageId = dto.filter.stageId;
+      if (dto.filter.assignedToId) where.assignedToId = dto.filter.assignedToId;
+      if (dto.filter.contactId) where.contactId = dto.filter.contactId;
+      if (dto.filter.companyId) where.companyId = dto.filter.companyId;
+      if (dto.filter.search) {
+        where.OR = [
+          { title: { contains: dto.filter.search, mode: 'insensitive' } },
+          { description: { contains: dto.filter.search, mode: 'insensitive' } },
+        ];
+      }
+
+      // Exclude specific IDs if provided
+      if (dto.excludedIds && dto.excludedIds.length > 0) {
+        where.id = { notIn: dto.excludedIds };
+      }
+
+      // Delete in batches to avoid timeout
+      const batchSize = 1000;
+      let hasMore = true;
+      let deletedInBatch = 0;
+
+      while (hasMore) {
+        try {
+          // Get batch of IDs to delete
+          const dealsBatch = await this.prisma.deal.findMany({
+            where,
+            select: { id: true, title: true, number: true },
+            take: batchSize,
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+          });
+
+          if (dealsBatch.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const batchIds = dealsBatch.map((d) => d.id);
+
+          // Delete batch in transaction
+          await this.prisma.$transaction(async (tx) => {
+            await tx.deal.deleteMany({
+              where: { id: { in: batchIds } },
+            });
+
+            // Log each deletion
+            for (const deal of dealsBatch) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'delete',
+                  entity: 'deal',
+                  entityId: deal.id,
+                  userId,
+                  message: `Deal "${deal.title || deal.number || deal.id}" deleted (bulk filter)`,
+                  metadata: {
+                    dealTitle: deal.title,
+                    dealNumber: deal.number,
+                    bulkOperation: true,
+                    filterMode: true,
+                  },
+                });
+              } catch (logError) {
+                console.error(`Failed to log deletion for deal ${deal.id}:`, logError);
+              }
+            }
+          });
+
+          deletedInBatch = dealsBatch.length;
+          result.deletedCount += deletedInBatch;
+
+          // If we got less than batchSize, we're done
+          if (dealsBatch.length < batchSize) {
+            hasMore = false;
+          }
+        } catch (error) {
+          console.error('Failed to delete batch in FILTER mode:', error);
+          result.failedCount += batchSize; // Estimate
+          hasMore = false;
+        }
+      }
+    }
+
+    return result;
   }
 
   async remove(id: string, userId: string) {

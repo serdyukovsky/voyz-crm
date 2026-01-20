@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react"
+import { useState, useEffect, lazy, Suspense, useMemo } from "react"
 import { useNavigate } from 'react-router-dom'
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
@@ -18,7 +18,8 @@ import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
-import { getDeals, deleteDeal, type Deal as APIDeal } from "@/lib/api/deals"
+import { getDeals, deleteDeal, bulkDeleteDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
+import { useSelectionState } from "@/hooks/use-selection-state"
 import { getPipelines } from "@/lib/api/pipelines"
 import { useTranslation } from "@/lib/i18n/i18n-context"
 import { useSearch } from "@/components/crm/search-context"
@@ -222,7 +223,10 @@ function DealsPageContent() {
   }, [currentFunnelId])
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [deals, setDeals] = useState<Deal[]>(demoDeals)
-  const [selectedDeals, setSelectedDeals] = useState<string[]>([])
+  
+  // Use new selection state hook
+  const selection = useSelectionState()
+  const [totalCount, setTotalCount] = useState<number | undefined>(undefined)
   const [dealSources, setDealSources] = useState<DealSource[]>([
     {
       id: "unsorted",
@@ -550,9 +554,12 @@ function DealsPageContent() {
   }
 
   const handleBulkDelete = () => {
-    if (selectedDeals.length === 0) {
+    const selectedCount = selection.getSelectedCount()
+    if (selectedCount === 0) {
       return
     }
+    // Set default delete mode based on selection mode
+    setDeleteMode(selection.state.selectionMode === 'ALL_MATCHING' ? 'ALL_MATCHING' : 'PAGE')
     setIsDeleteDialogOpen(true)
   }
 
@@ -560,43 +567,73 @@ function DealsPageContent() {
     e?.preventDefault()
     e?.stopPropagation()
     
-    if (selectedDeals.length === 0) {
+    const selectedCount = selection.getSelectedCount()
+    if (selectedCount === 0) {
       return
     }
 
-    const dealsCount = selectedDeals.length
-    const dealsToDelete = [...selectedDeals]
-    
     try {
       setIsDeleting(true)
-      setDeletionProgress({ current: 0, total: dealsCount })
+      setDeletionProgress({ current: 0, total: selectedCount })
       
-      // Delete deals one by one to show progress
-      for (let i = 0; i < dealsToDelete.length; i++) {
-        const dealId = dealsToDelete[i]
-        try {
-          await deleteDeal(dealId)
-          setDeletionProgress({ current: i + 1, total: dealsCount })
-          // Small delay to make progress visible
-          await new Promise(resolve => setTimeout(resolve, 100))
-        } catch (error) {
-          console.error(`Failed to delete deal ${dealId}:`, error)
-          // Continue with other deals even if one fails
-          setDeletionProgress({ current: i + 1, total: dealsCount })
-        }
+      let result: { deletedCount: number; failedCount: number }
+      
+      if (deleteMode === 'PAGE' || selection.state.selectionMode === 'PAGE') {
+        // Delete by IDs (page selection)
+        const idsToDelete = Array.from(selection.state.selectedIds)
+        result = await bulkDeleteDeals({
+          mode: 'IDS',
+          ids: idsToDelete,
+        })
+      } else {
+        // Delete by filter (all matching)
+        const excludedIds = Array.from(selection.state.excludedIds)
+        result = await bulkDeleteDeals({
+          mode: 'FILTER',
+          filter: {
+            pipelineId: selectedPipelineForList,
+            companyId: filters.companyId,
+            contactId: filters.contactId,
+            assignedToId: filters.assignedUserId,
+            search: filters.title,
+          },
+          excludedIds: excludedIds.length > 0 ? excludedIds : undefined,
+        })
       }
       
-      // Remove deleted deals from listDeals
-      setListDeals(prevDeals => prevDeals.filter(deal => !dealsToDelete.includes(deal.id)))
+      setDeletionProgress({ current: result.deletedCount, total: selectedCount })
+      
+      // Remove deleted deals from listDeals (only if PAGE mode)
+      if (deleteMode === 'PAGE' || selection.state.selectionMode === 'PAGE') {
+        const idsToDelete = Array.from(selection.state.selectedIds)
+        setListDeals(prevDeals => prevDeals.filter(deal => !idsToDelete.includes(deal.id)))
+      } else {
+        // For ALL_MATCHING mode, reload the list
+        // This will be handled by the useEffect that watches filters
+      }
       
       // Clear selection
-      setSelectedDeals([])
+      selection.clearSelection()
       
       // Close dialog and show success
       setIsDeleting(false)
       setDeletionProgress({ current: 0, total: 0 })
       setIsDeleteDialogOpen(false)
-      showSuccess(t('deals.dealsDeleted', { count: dealsCount }) || `${dealsCount} ${dealsCount === 1 ? 'сделка удалена' : 'сделок удалено'}`)
+      
+      const message = result.deletedCount > 0
+        ? `${result.deletedCount} ${result.deletedCount === 1 ? 'сделка удалена' : 'сделок удалено'}`
+        : 'Удаление не выполнено'
+      showSuccess(message)
+      
+      if (result.failedCount > 0) {
+        showError(`Не удалось удалить ${result.failedCount} ${result.failedCount === 1 ? 'сделку' : 'сделок'}`)
+      }
+      
+      // Reload deals if needed
+      if (viewMode === 'list' && deleteMode === 'ALL_MATCHING') {
+        // Trigger reload by updating a dependency
+        setKanbanRefreshKey(prev => prev + 1)
+      }
     } catch (error) {
       console.error('Failed to delete deals:', error)
       setIsDeleting(false)
@@ -606,10 +643,15 @@ function DealsPageContent() {
   }
 
   const handleBulkChangeStage = (newStage: string) => {
+    // This is for kanban view, keep as is for now
+    const selectedIds = selection.state.selectionMode === 'PAGE' 
+      ? Array.from(selection.state.selectedIds)
+      : listDeals.map(d => d.id).filter(id => selection.isSelected(id))
+    
     setDeals(deals.map(d => 
-      selectedDeals.includes(d.id) ? { ...d, stage: newStage } : d
+      selectedIds.includes(d.id) ? { ...d, stage: newStage } : d
     ))
-    setSelectedDeals([])
+    selection.clearSelection()
   }
 
   const { showSuccess, showError } = useToastNotification()
@@ -623,6 +665,7 @@ function DealsPageContent() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletionProgress, setDeletionProgress] = useState({ current: 0, total: 0 })
+  const [deleteMode, setDeleteMode] = useState<'PAGE' | 'ALL_MATCHING'>('PAGE') // Mode for deletion dialog
   
   // Filters and sort state
   const [showFilters, setShowFilters] = useState(false)
@@ -701,6 +744,10 @@ function DealsPageContent() {
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
+            // Update total count if available
+            if (response.total !== undefined) {
+              setTotalCount(response.total)
+            }
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)
@@ -728,6 +775,10 @@ function DealsPageContent() {
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
+            // Update total count if available
+            if (response.total !== undefined) {
+              setTotalCount(response.total)
+            }
           })
           .catch((error) => {
             console.error('Failed to load deals for list:', error)
@@ -744,6 +795,55 @@ function DealsPageContent() {
       setListDeals([])
       setNextCursor(undefined)
       setHasMore(false)
+    }
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
+  
+  // Memoize selectedDeals array for DealsListView (must be before conditional rendering)
+  const selectedDealsArray = useMemo(() => {
+    const mode = selection.state.selectionMode
+    if (mode === 'PAGE') {
+      return Array.from(selection.state.selectedIds)
+    } else {
+      const excludedIds = Array.from(selection.state.excludedIds)
+      return (listDeals || [])
+        .filter(d => d && d.id) // Filter out undefined/null deals
+        .map(d => d.id!)
+        .filter(id => !excludedIds.includes(id))
+    }
+  }, [
+    selection.state.selectionMode,
+    selection.state.selectedIds.size,
+    Array.from(selection.state.selectedIds).sort().join(','),
+    selection.state.excludedIds.size,
+    Array.from(selection.state.excludedIds).sort().join(','),
+    listDeals.length,
+    (listDeals || []).map(d => d?.id).filter(Boolean).sort().join(',')
+  ])
+  
+  // Clear selection when switching away from list view
+  useEffect(() => {
+    if (viewMode !== 'list') {
+      selection.clearSelection()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode])
+  
+  // Load total count when filters change (for "select all" feature)
+  useEffect(() => {
+    if (viewMode === 'list') {
+      getDealsCount({
+        pipelineId: selectedPipelineForList,
+        companyId: filters.companyId,
+        contactId: filters.contactId,
+        assignedToId: filters.assignedUserId,
+        search: filters.title,
+      })
+        .then(count => {
+          setTotalCount(count)
+        })
+        .catch(error => {
+          console.error('Failed to load deals count:', error)
+        })
     }
   }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
 
@@ -1175,7 +1275,9 @@ function DealsPageContent() {
                   }
                   return true
                 })
+                .filter(deal => deal && deal.id) // Filter out undefined/null deals
                 .map(deal => {
+                  if (!deal || !deal.id) return null // Safety check
                   // Use stageId from deal object or from nested stage object
                   const stageId = (deal as any).stageId || deal.stage?.id || 'new'
                   // Use stage name directly from deal.stage if available
@@ -1203,8 +1305,16 @@ function DealsPageContent() {
                     } : undefined,
                   }
                 })}
-              selectedDeals={selectedDeals}
-              onSelectDeals={setSelectedDeals}
+              selectedDeals={selectedDealsArray}
+              onSelectDeals={(ids) => {
+                if (ids.length === 0) {
+                  selection.clearSelection()
+                } else {
+                  selection.selectAllOnPage(ids)
+                }
+              }}
+              totalCount={totalCount}
+              selectionMode={selection.state.selectionMode}
               onBulkDelete={handleBulkDelete}
               onBulkChangeStage={handleBulkChangeStage}
               searchQuery={searchValue}
@@ -1269,11 +1379,53 @@ function DealsPageContent() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {isDeleting 
                       ? `Удаление ${deletionProgress.current} из ${deletionProgress.total}...`
-                      : `Вы уверены, что хотите удалить ${selectedDeals.length} ${selectedDeals.length === 1 ? 'сделку' : 'сделок'}? Это действие нельзя отменить.`
+                      : 'Выберите режим удаления:'
                     }
                   </p>
                 </div>
               </div>
+
+              {/* Delete Mode Selection */}
+              {!isDeleting && (
+                <div className="space-y-3 py-2 border-b border-border/40">
+                  <label className="flex items-start gap-3 p-3 rounded-md border border-border/40 hover:bg-surface/30 cursor-pointer transition-colors">
+                    <input
+                      type="radio"
+                      name="deleteMode"
+                      checked={deleteMode === 'PAGE'}
+                      onChange={() => setDeleteMode('PAGE')}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-foreground">
+                        Удалить только выбранные на странице
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Будет удалено {selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length} {selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length === 1 ? 'сделка' : 'сделок'}
+                      </div>
+                    </div>
+                  </label>
+                  {totalCount !== undefined && totalCount > (selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length) && (
+                    <label className="flex items-start gap-3 p-3 rounded-md border border-border/40 hover:bg-surface/30 cursor-pointer transition-colors">
+                      <input
+                        type="radio"
+                        name="deleteMode"
+                        checked={deleteMode === 'ALL_MATCHING'}
+                        onChange={() => setDeleteMode('ALL_MATCHING')}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          Удалить все найденные по текущему фильтру
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Будет удалено {selection.state.selectionMode === 'ALL_MATCHING' ? totalCount - selection.state.excludedIds.size : totalCount} из {totalCount} {totalCount === 1 ? 'сделки' : 'сделок'} по текущим фильтрам
+                        </div>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              )}
 
               {/* Progress Bar */}
               {isDeleting && (
@@ -1303,14 +1455,14 @@ function DealsPageContent() {
               )}
 
               {/* Deals List */}
-              {!isDeleting && selectedDeals.length > 0 && (
+              {!isDeleting && deleteMode === 'PAGE' && (
                 <div className="max-h-[300px] overflow-y-auto rounded-md border border-border/40 bg-surface/30 p-4">
                   <p className="mb-3 text-sm font-medium text-foreground">
-                    Сделки для удаления ({selectedDeals.length}):
+                    Сделки для удаления ({selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length}):
                   </p>
                   <div className="space-y-2">
                     {listDeals
-                      .filter(deal => selectedDeals.includes(deal.id))
+                      .filter(deal => selection.isSelected(deal.id))
                       .slice(0, 10)
                       .map(deal => (
                         <div key={deal.id} className="flex items-center gap-2 text-sm py-1">
@@ -1318,12 +1470,24 @@ function DealsPageContent() {
                           <span className="truncate text-foreground">{deal.title || 'Untitled Deal'}</span>
                         </div>
                       ))}
-                    {selectedDeals.length > 10 && (
+                    {(selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length) > 10 && (
                       <p className="text-xs text-muted-foreground pt-1">
-                        и еще {selectedDeals.length - 10}...
+                        и еще {(selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length) - 10}...
                       </p>
                     )}
                   </div>
+                </div>
+              )}
+              {!isDeleting && deleteMode === 'ALL_MATCHING' && totalCount !== undefined && (
+                <div className="rounded-md border border-border/40 bg-surface/30 p-4">
+                  <p className="text-sm text-foreground">
+                    Будет удалено <strong>{totalCount - selection.state.excludedIds.size}</strong> из <strong>{totalCount}</strong> сделок, соответствующих текущим фильтрам.
+                  </p>
+                  {selection.state.excludedIds.size > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Исключено из удаления: {selection.state.excludedIds.size} {selection.state.excludedIds.size === 1 ? 'сделка' : 'сделок'}
+                    </p>
+                  )}
                 </div>
               )}
 

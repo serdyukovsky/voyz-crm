@@ -28,6 +28,8 @@ interface DealsListViewProps {
   hasMore?: boolean
   loadingMore?: boolean
   onLoadMore?: () => void
+  totalCount?: number // Total count matching filters (M)
+  selectionMode?: 'PAGE' | 'ALL_MATCHING' // Selection mode
 }
 
 export function DealsListView({ 
@@ -42,7 +44,9 @@ export function DealsListView({
   searchQuery = '',
   hasMore = false,
   loadingMore = false,
-  onLoadMore
+  onLoadMore,
+  totalCount,
+  selectionMode = 'PAGE'
 }: DealsListViewProps) {
   const { t } = useTranslation()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
@@ -145,7 +149,10 @@ export function DealsListView({
       {selectedDeals.length > 0 && (
         <div className="mb-4 p-3 bg-surface border border-border/40 rounded-lg flex items-center justify-between">
           <span className="text-sm text-foreground">
-            {selectedDeals.length} {selectedDeals.length === 1 ? t('deals.deal') : t('deals.deals')} {t('common.selected')}
+            {selectionMode === 'ALL_MATCHING' && totalCount !== undefined
+              ? `${totalCount - (totalCount - selectedDeals.length)} из ${totalCount} ${t('deals.deals')} ${t('common.selected')}`
+              : `${selectedDeals.length} ${selectedDeals.length === 1 ? t('deals.deal') : t('deals.deals')} ${t('common.selected')}`
+            }
           </span>
           <div className="flex gap-2">
             <div className="relative">
