@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Search, Bell, Command, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { 
@@ -46,6 +46,7 @@ interface User {
 export function Topbar() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { isCollapsed } = useSidebar()
   const { searchValue, setSearchValue } = useSearch()
   const { logout: logoutFromContext } = useAuth()
@@ -54,6 +55,16 @@ export function Topbar() {
   const [appliedFilters, setAppliedFilters] = useState<DealSearchFilters | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [user, setUser] = useState<User | null>(null)
+
+  // Check if we're on the deals page
+  const isDealsPage = location.pathname.startsWith('/deals')
+
+  // Close search panel when leaving deals page
+  useEffect(() => {
+    if (!isDealsPage && searchPanelOpen) {
+      setSearchPanelOpen(false)
+    }
+  }, [isDealsPage, searchPanelOpen])
 
   // Load user data from localStorage
   useEffect(() => {
@@ -128,7 +139,11 @@ export function Topbar() {
               placeholder={t('common.searchPlaceholder') || 'Поиск и фильтр'}
               className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-12 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               aria-label={t('common.search')}
-              onFocus={() => setSearchPanelOpen(true)}
+              onFocus={() => {
+                if (isDealsPage) {
+                  setSearchPanelOpen(true)
+                }
+              }}
             />
             {searchValue.length > 0 && (
               <button
@@ -152,17 +167,19 @@ export function Topbar() {
             </kbd>
           </div>
           
-          {/* Deal Search Panel - позиционируется под инпутом */}
-          <DealSearchPanel
-            open={searchPanelOpen}
-            onClose={() => setSearchPanelOpen(false)}
-            onApplyFilters={(filters) => {
-              setAppliedFilters(filters)
-              // Здесь можно добавить логику применения фильтров
-              // Например, обновить URL или передать фильтры в родительский компонент
-              console.log('Applied filters:', filters)
-            }}
-          />
+          {/* Deal Search Panel - позиционируется под инпутом, только на странице сделок */}
+          {isDealsPage && (
+            <DealSearchPanel
+              open={searchPanelOpen}
+              onClose={() => setSearchPanelOpen(false)}
+              onApplyFilters={(filters) => {
+                setAppliedFilters(filters)
+                // Здесь можно добавить логику применения фильтров
+                // Например, обновить URL или передать фильтры в родительский компонент
+                console.log('Applied filters:', filters)
+              }}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-3">

@@ -2,8 +2,6 @@
 
 import { CRMLayout } from "@/components/crm/layout"
 import { Dashboard } from "@/components/crm/dashboard"
-import { Button } from "@/components/ui/button"
-import { Plus } from 'lucide-react'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
 
 export default function DashboardPage() {
@@ -18,10 +16,6 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Dashboard</h1>
             <p className="text-sm text-muted-foreground">Welcome back, Alex</p>
           </div>
-          <Button size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            New Deal
-          </Button>
         </div>
 
         {/* Dashboard Content */}
