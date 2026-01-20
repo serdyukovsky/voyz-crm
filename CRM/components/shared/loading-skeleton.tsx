@@ -39,37 +39,38 @@ export function PageSkeleton() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="flex flex-col items-center justify-center space-y-6 animate-in fade-in-50 duration-500">
+      <div className="flex flex-col items-center justify-center space-y-8 animate-in fade-in-50 duration-500">
         {/* Logo with pulse animation */}
         {mounted && (
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className={cn(
-                "w-24 h-24 rounded-full animate-pulse",
-                isDark ? "bg-primary/20" : "bg-primary/10"
-              )} />
-            </div>
+          <div className="flex items-center justify-center">
             <img 
               src="/logo_voyz_crm.svg" 
               alt="Voyz CRM" 
               className={cn(
-                "h-12 w-auto relative z-10 transition-all duration-300",
+                "h-16 w-auto animate-logo-pulse",
                 isDark ? "invert brightness-0" : "",
-                "animate-pulse"
               )}
-              style={{ animationDuration: '2s' }}
             />
           </div>
         )}
         
-        {/* Loading text */}
-        <div className="flex flex-col items-center space-y-2">
+        {/* Loading dots with wave animation */}
+        <div className="flex flex-col items-center space-y-4">
           <div className="flex items-center gap-2">
-            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0s' }} />
-            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
-            <div className="h-1 w-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+            <div 
+              className="h-2 w-2 rounded-full bg-primary animate-dot-bounce"
+              style={{ animationDelay: '0s' }}
+            />
+            <div 
+              className="h-2 w-2 rounded-full bg-primary animate-dot-bounce"
+              style={{ animationDelay: '0.2s' }}
+            />
+            <div 
+              className="h-2 w-2 rounded-full bg-primary animate-dot-bounce"
+              style={{ animationDelay: '0.4s' }}
+            />
           </div>
-          <p className="text-sm text-muted-foreground font-medium">Загрузка...</p>
+          <p className="text-sm text-muted-foreground font-medium animate-pulse">Загрузка...</p>
         </div>
       </div>
     </div>
