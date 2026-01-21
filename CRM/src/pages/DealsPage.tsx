@@ -834,6 +834,9 @@ function DealsPageContent() {
     field: 'updatedAt', 
     direction: 'desc' 
   })
+
+  const effectiveStageIds = dealFilters?.stageIds ?? filters.stageIds
+  const effectiveStageId = effectiveStageIds?.length === 1 ? effectiveStageIds[0] : undefined
   
   // Обновляем фильтры при изменении поиска или панели
   useEffect(() => {
@@ -895,7 +898,8 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
-          stageIds: dealFilters?.stageIds ?? filters.stageIds,
+          stageId: effectiveStageId,
+          stageIds: effectiveStageIds,
           limit: 50,
         }
         getDeals(listParams)
@@ -931,7 +935,8 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
-          stageIds: dealFilters?.stageIds ?? filters.stageIds,
+          stageId: effectiveStageId,
+          stageIds: effectiveStageIds,
           limit: 50,
         }
         getDeals(listParams)
@@ -965,7 +970,7 @@ function DealsPageContent() {
       setNextCursor(undefined)
       setHasMore(false)
     }
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds, listRefreshKey])
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, effectiveStageIds, listRefreshKey])
 
   // Ensure total count always matches active filters (for list view)
   useEffect(() => {
@@ -976,7 +981,8 @@ function DealsPageContent() {
       contactId: filters.contactId,
       assignedToId: filters.assignedUserId,
       search: filters.title,
-      stageIds: dealFilters?.stageIds ?? filters.stageIds,
+      stageId: effectiveStageId,
+      stageIds: effectiveStageIds,
     }
     getDealsCount(countParams)
       .then(count => {
@@ -985,7 +991,7 @@ function DealsPageContent() {
       .catch(error => {
         console.error('Failed to load deals count:', error)
       })
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds, dealFilters?.stageIds])
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, effectiveStageIds])
   
   // Memoize selectedDeals array for DealsListView (must be before conditional rendering)
   const selectedDealsArray = useMemo(() => {
@@ -1019,12 +1025,12 @@ function DealsPageContent() {
         return true
       })
       .filter(deal => {
-        if (!filters.stageIds || filters.stageIds.length === 0) return true
+        if (!effectiveStageIds || effectiveStageIds.length === 0) return true
         const dealStageId = (deal as any).stageId || deal.stage?.id
-        return dealStageId ? filters.stageIds.includes(dealStageId) : false
+        return dealStageId ? effectiveStageIds.includes(dealStageId) : false
       })
       .filter(deal => deal && deal.id)
-  }, [listDeals, filters.title, filters.stageIds])
+  }, [listDeals, filters.title, effectiveStageIds])
   
   // Clear selection when switching away from list view
   useEffect(() => {
@@ -1066,7 +1072,8 @@ function DealsPageContent() {
         contactId: filters.contactId,
         assignedToId: filters.assignedUserId,
         search: filters.title,
-        stageIds: dealFilters?.stageIds ?? filters.stageIds,
+        stageId: effectiveStageId,
+        stageIds: effectiveStageIds,
         limit: 50,
         cursor: nextCursor,
       }
