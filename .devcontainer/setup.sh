@@ -3,10 +3,13 @@ set -e
 
 echo "🚀 Setting up CRM Development Environment..."
 
-# Start PostgreSQL
-echo "▶️  Starting PostgreSQL..."
-sudo service postgresql start
-sleep 2
+# PostgreSQL is started by the container entrypoint; just verify readiness here.
+echo "▶️  Checking PostgreSQL..."
+if pg_isready -h localhost > /dev/null 2>&1; then
+  echo "✅ PostgreSQL is already running"
+else
+  echo "⚠️  PostgreSQL is not ready yet. It should come up shortly."
+fi
 
 # Setup Backend
 echo "📦 Setting up backend..."

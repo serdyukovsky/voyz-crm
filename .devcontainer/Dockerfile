@@ -15,16 +15,10 @@ RUN apt-get update && apt-get install -y \
 # Give node user sudo privileges
 RUN echo "node ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Configure PostgreSQL
-RUN service postgresql start && \
-    su - postgres -c "psql -c \"CREATE USER node WITH SUPERUSER PASSWORD 'postgres';\"" && \
-    su - postgres -c "psql -c \"CREATE DATABASE crm_db OWNER node;\"" || true
+# Entrypoint handles PostgreSQL init/start with persistent data dir
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Ensure PostgreSQL starts automatically
-RUN echo '#!/bin/bash\nservice postgresql start\nexec "$@"' > /usr/local/bin/entrypoint.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh
-
-USER node
 WORKDIR /workspace
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -137,7 +137,7 @@ export default defineConfig({
   // Оптимизация worker
   worker: {
     format: 'es',
-    plugins: [],
+    plugins: () => [],
   },
   // Оптимизация логирования
   logLevel: 'warn',
