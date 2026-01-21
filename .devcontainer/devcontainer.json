@@ -46,6 +46,7 @@
 
   "remoteUser": "node",
   "remoteEnv": {
-    "DATABASE_URL": "postgresql://node:postgres@localhost:5432/crm_db?schema=public"
+    "DATABASE_URL": "postgresql://node:postgres@localhost:5432/crm_db?schema=public",
+    "GH_CONFIG_DIR": "/workspaces/voyz-crm/.gh"
   }
 }
