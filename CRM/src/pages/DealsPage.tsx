@@ -200,7 +200,7 @@ const demoDeals: Deal[] = [
 function DealsPageContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { searchValue } = useSearch()
+  const { searchValue, dealFilters } = useSearch()
   const { canManagePipelines } = useUserRole()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -828,20 +828,29 @@ function DealsPageContent() {
     updatedAfter?: string
     updatedBefore?: string
     title?: string
+    stageIds?: string[]
   }>({})
   const [sort, setSort] = useState<{ field: 'amount' | 'updatedAt'; direction: 'asc' | 'desc' }>({ 
     field: 'updatedAt', 
     direction: 'desc' 
   })
   
-  // Обновляем фильтр по названию при изменении поискового запроса
+  // Обновляем фильтры при изменении поиска или панели
   useEffect(() => {
-    const newTitle = searchValue.trim() || undefined
+    const newTitle = searchValue.trim() || dealFilters?.title?.trim() || undefined
     setFilters(prev => ({
       ...prev,
-      title: newTitle
+      title: newTitle,
+      stageIds: dealFilters?.stageIds,
+      companyId: dealFilters?.companyId,
+      contactId: dealFilters?.contactId,
+      assignedUserId: dealFilters?.assignedToId,
+      amountMin: dealFilters?.amountMin,
+      amountMax: dealFilters?.amountMax,
+      updatedAfter: dealFilters?.dateFrom,
+      updatedBefore: dealFilters?.dateTo,
     }))
-  }, [searchValue])
+  }, [searchValue, dealFilters])
 
   // Sync selectedPipelineForList with currentFunnelId when switching to list view
   useEffect(() => {
@@ -886,6 +895,7 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
+          stageIds: filters.stageIds,
           limit: 50,
         })
           .then((response) => {
@@ -917,6 +927,7 @@ function DealsPageContent() {
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
+          stageIds: filters.stageIds,
           limit: 50,
         })
           .then((response) => {
@@ -946,7 +957,7 @@ function DealsPageContent() {
       setNextCursor(undefined)
       setHasMore(false)
     }
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, listRefreshKey])
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds, listRefreshKey])
   
   // Memoize selectedDeals array for DealsListView (must be before conditional rendering)
   const selectedDealsArray = useMemo(() => {
@@ -987,6 +998,7 @@ function DealsPageContent() {
         contactId: filters.contactId,
         assignedToId: filters.assignedUserId,
         search: filters.title,
+        stageIds: filters.stageIds,
       })
         .then(count => {
           setTotalCount(count)
@@ -995,7 +1007,7 @@ function DealsPageContent() {
           console.error('Failed to load deals count:', error)
         })
     }
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds])
 
   // Load users for bulk assignee change
   useEffect(() => {
@@ -1029,6 +1041,7 @@ function DealsPageContent() {
         contactId: filters.contactId,
         assignedToId: filters.assignedUserId,
         search: filters.title,
+        stageIds: filters.stageIds,
         limit: 50,
         cursor: nextCursor,
       }
@@ -1440,11 +1453,16 @@ function DealsPageContent() {
                 deals={listDeals
                 .filter(deal => {
                   // Фильтрация по названию сделки
-                  if (searchValue) {
-                    const searchLower = searchValue.toLowerCase()
+                  if (filters.title) {
+                    const searchLower = filters.title.toLowerCase()
                     return deal.title?.toLowerCase().includes(searchLower)
                   }
                   return true
+                })
+                .filter(deal => {
+                  if (!filters.stageIds || filters.stageIds.length === 0) return true
+                  const dealStageId = (deal as any).stageId || deal.stage?.id
+                  return dealStageId ? filters.stageIds.includes(dealStageId) : false
                 })
                 .filter(deal => deal && deal.id) // Filter out undefined/null deals
                 .map(deal => {

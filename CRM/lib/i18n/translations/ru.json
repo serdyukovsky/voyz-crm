@@ -217,7 +217,7 @@
         "number": "Номер сделки",
         "description": "Описание",
         "dateRange": "За все время",
-        "activeStages": "Активные статусы",
+        "activeStages": "Активные этапы",
         "allActiveStages": "Все активные этапы",
         "pipeline": "Воронка",
         "assignedTo": "Менеджеры",
