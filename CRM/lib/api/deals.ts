@@ -303,6 +303,51 @@ export async function bulkDeleteDeals(request: BulkDeleteRequest): Promise<BulkD
   return response.json()
 }
 
+export interface BulkAssignRequest {
+  mode: 'IDS' | 'FILTER'
+  ids?: string[]
+  excludedIds?: string[]
+  filter?: {
+    pipelineId?: string
+    stageId?: string
+    assignedToId?: string
+    contactId?: string
+    companyId?: string
+    search?: string
+  }
+  assignedToId?: string | null
+}
+
+export interface BulkAssignResponse {
+  updatedCount: number
+  failedCount: number
+  errors?: Array<{ id: string; error: string }>
+}
+
+export async function bulkAssignDeals(request: BulkAssignRequest): Promise<BulkAssignResponse> {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/deals/bulk-assignee`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    throw new Error(`Failed to bulk assign deals: ${response.status} ${errorText}`)
+  }
+
+  return response.json()
+}
+
 export async function getDealsCount(params?: {
   pipelineId?: string
   stageId?: string

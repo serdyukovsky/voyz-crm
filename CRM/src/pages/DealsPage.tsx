@@ -18,7 +18,8 @@ import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
-import { getDeals, deleteDeal, bulkDeleteDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
+import { getDeals, deleteDeal, bulkDeleteDeals, bulkAssignDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
+import { getUsers, type User as APIUser } from "@/lib/api/users"
 import { useSelectionState } from "@/hooks/use-selection-state"
 import { getPipelines } from "@/lib/api/pipelines"
 import { useTranslation } from "@/lib/i18n/i18n-context"
@@ -649,6 +650,96 @@ function DealsPageContent() {
     }
   }
 
+  const handleOpenAssignDialog = () => {
+    if (selection.getSelectedCount() === 0) {
+      return
+    }
+    setAssignUserId(undefined)
+    setIsAssignDialogOpen(true)
+  }
+
+  const confirmBulkAssign = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+
+    if (assignUserId === undefined) {
+      return
+    }
+
+    const selectedCount = selection.getSelectedCount()
+    if (selectedCount === 0) {
+      return
+    }
+
+    try {
+      setIsAssigning(true)
+
+      let result: { updatedCount: number; failedCount: number }
+
+      if (selection.state.selectionMode === 'PAGE') {
+        const idsToUpdate = Array.from(selection.state.selectedIds)
+        result = await bulkAssignDeals({
+          mode: 'IDS',
+          ids: idsToUpdate,
+          assignedToId: assignUserId,
+        })
+
+        const selectedUser = users.find(u => u.id === assignUserId) || null
+        setListDeals(prevDeals => prevDeals.map(deal => {
+          if (!idsToUpdate.includes(deal.id)) {
+            return deal
+          }
+          return {
+            ...deal,
+            assignedToId: assignUserId === null ? null : assignUserId,
+            assignedTo: selectedUser
+              ? {
+                  id: selectedUser.id,
+                  name: selectedUser.fullName || `${selectedUser.firstName} ${selectedUser.lastName}`.trim(),
+                  avatar: selectedUser.avatar,
+                }
+              : null,
+          }
+        }))
+      } else {
+        const excludedIds = Array.from(selection.state.excludedIds)
+        result = await bulkAssignDeals({
+          mode: 'FILTER',
+          filter: {
+            pipelineId: selectedPipelineForList,
+            companyId: filters.companyId,
+            contactId: filters.contactId,
+            assignedToId: filters.assignedUserId,
+            search: filters.title,
+          },
+          excludedIds: excludedIds.length > 0 ? excludedIds : undefined,
+          assignedToId: assignUserId,
+        })
+      }
+
+      selection.clearSelection()
+      setIsAssigning(false)
+      setIsAssignDialogOpen(false)
+
+      const message = result.updatedCount > 0
+        ? `Ответственный обновлен для ${result.updatedCount} ${result.updatedCount === 1 ? 'сделки' : 'сделок'}`
+        : 'Обновление не выполнено'
+      showSuccess(message)
+
+      if (result.failedCount > 0) {
+        showError(`Не удалось обновить ${result.failedCount} ${result.failedCount === 1 ? 'сделку' : 'сделок'}`)
+      }
+
+      if (viewMode === 'list') {
+        setListRefreshKey(prev => prev + 1)
+      }
+    } catch (error) {
+      console.error('Failed to bulk assign deals:', error)
+      setIsAssigning(false)
+      showError('Ошибка при изменении ответственного', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }
+
   const handleBulkChangeStage = (newStage: string) => {
     // This is for kanban view, keep as is for now
     const selectedIds = selection.state.selectionMode === 'PAGE' 
@@ -674,6 +765,12 @@ function DealsPageContent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletionProgress, setDeletionProgress] = useState({ current: 0, total: 0 })
   const [deleteMode, setDeleteMode] = useState<'PAGE' | 'ALL_MATCHING'>('PAGE') // Mode for deletion dialog
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [assignUserId, setAssignUserId] = useState<string | null | undefined>(undefined)
+  const [users, setUsers] = useState<APIUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
   
   // Filters and sort state
   const [showFilters, setShowFilters] = useState(false)
@@ -854,6 +951,27 @@ function DealsPageContent() {
         })
     }
   }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
+
+  // Load users for bulk assignee change
+  useEffect(() => {
+    if (!isAssignDialogOpen || users.length > 0 || usersLoading) {
+      return
+    }
+
+    setUsersLoading(true)
+    setUsersError(null)
+    getUsers()
+      .then(data => {
+        setUsers(data)
+      })
+      .catch(error => {
+        console.error('Failed to load users:', error)
+        setUsersError(error instanceof Error ? error.message : 'Failed to load users')
+      })
+      .finally(() => {
+        setUsersLoading(false)
+      })
+  }, [isAssignDialogOpen, users.length, usersLoading])
 
   // Load more deals handler
   const handleLoadMore = async () => {
@@ -1324,6 +1442,7 @@ function DealsPageContent() {
               totalCount={totalCount}
               selectionMode={selection.state.selectionMode}
               onBulkDelete={handleBulkDelete}
+              onBulkAssign={handleOpenAssignDialog}
               onBulkChangeStage={handleBulkChangeStage}
               searchQuery={searchValue}
               stages={(() => {
@@ -1361,6 +1480,103 @@ function DealsPageContent() {
           onAddFunnel={handleAddFunnel}
           onDeleteFunnel={handleDeleteFunnel}
         />
+
+        {/* Bulk Assign Confirmation Dialog */}
+        <Dialog
+          open={isAssignDialogOpen}
+          onOpenChange={(open) => {
+            if (!open && isAssigning) {
+              return
+            }
+            setIsAssignDialogOpen(open)
+          }}
+        >
+          <DialogContent className="max-w-lg p-5 space-y-4 rounded-br-3xl">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 pb-2 border-b border-border/40">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Изменить ответственного
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Выбрано сделок: {selection.getSelectedCount()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Новый ответственный
+                </label>
+                {usersLoading ? (
+                  <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-muted/20">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Загрузка пользователей...</span>
+                  </div>
+                ) : usersError ? (
+                  <div className="p-3 border border-destructive/20 bg-destructive/5 rounded-lg text-sm text-destructive">
+                    {usersError}
+                  </div>
+                ) : (
+                  <Select
+                    value={assignUserId === null ? '__UNASSIGNED__' : assignUserId ?? ''}
+                    onValueChange={(value) => {
+                      if (value === '__UNASSIGNED__') {
+                        setAssignUserId(null)
+                      } else if (value) {
+                        setAssignUserId(value)
+                      } else {
+                        setAssignUserId(undefined)
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Выберите пользователя" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__UNASSIGNED__">— Без ответственного —</SelectItem>
+                      {users.map(user => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.fullName || `${user.firstName} ${user.lastName}`.trim()} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAssignDialogOpen(false)}
+                  disabled={isAssigning}
+                >
+                  Отмена
+                </Button>
+                <Button
+                  onClick={confirmBulkAssign}
+                  disabled={isAssigning || assignUserId === undefined}
+                  className="bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {isAssigning ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Обновление...
+                    </>
+                  ) : (
+                    <>
+                      <User className="mr-2 h-4 w-4" />
+                      Изменить
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Deals Confirmation Dialog */}
         <Dialog 
