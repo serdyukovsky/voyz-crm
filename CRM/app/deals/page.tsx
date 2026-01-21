@@ -64,8 +64,8 @@ const useRouter = () => {
   }
 }
 import { PageSkeleton } from "@/components/shared/loading-skeleton"
-import { createDeal, getDeals, deleteDeal, type Deal as APIDeal } from "@/lib/api/deals"
-import { getPipelines, createPipeline, createStage } from "@/lib/api/pipelines"
+import { createDeal, getDeals, deleteDeal, updateDeal, type Deal as APIDeal } from "@/lib/api/deals"
+import { getPipelines, createPipeline, createStage, type Pipeline, type Stage as PipelineStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useAuthGuard } from '@/hooks/use-auth-guard'
 
@@ -282,6 +282,7 @@ export default function DealsPage() {
   const [isFunnelDropdownOpen, setIsFunnelDropdownOpen] = useState(false)
   const [funnels, setFunnels] = useState<Funnel[]>([])
   const [pipelinesLoading, setPipelinesLoading] = useState(true)
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [currentFunnelId, setCurrentFunnelId] = useState<string>("")
   const [stages, setStages] = useState<Stage[]>(defaultStages)
   const [deals, setDeals] = useState<Deal[]>(demoDeals)
@@ -321,6 +322,16 @@ export default function DealsPage() {
     },
   ])
 
+  const mapPipelineStages = (pipelineStages: PipelineStage[]) =>
+    [...pipelineStages]
+      .sort((a, b) => a.order - b.order)
+      .map(stage => ({
+        id: stage.id,
+        label: stage.name,
+        color: stage.color || "#6B7280",
+        isCustom: !stage.isDefault
+      }))
+
   // Load pipelines from API
   useEffect(() => {
     const loadPipelines = async () => {
@@ -331,6 +342,8 @@ export default function DealsPage() {
         setPipelinesLoading(true)
         const pipelines = await getPipelines()
         
+        setPipelines(pipelines)
+
         // Convert Pipeline[] to Funnel[]
         const funnelsList: Funnel[] = pipelines.map(p => ({
           id: p.id,
@@ -344,6 +357,9 @@ export default function DealsPage() {
           const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
           if (defaultPipeline) {
             setCurrentFunnelId(defaultPipeline.id)
+            if (defaultPipeline.stages?.length) {
+              setStages(mapPipelineStages(defaultPipeline.stages))
+            }
           }
         }
       } catch (error) {
@@ -356,6 +372,7 @@ export default function DealsPage() {
         }
         // Fallback to empty array on error
         setFunnels([])
+        setPipelines([])
       } finally {
         setPipelinesLoading(false)
       }
@@ -365,6 +382,16 @@ export default function DealsPage() {
   }, [])
 
   const currentFunnel = funnels.find(f => f.id === currentFunnelId) || funnels[0] || null
+
+  useEffect(() => {
+    if (pipelines.length === 0) return
+    const targetPipelineId = selectedPipelineForList || currentFunnelId
+    if (!targetPipelineId) return
+    const pipeline = pipelines.find(p => p.id === targetPipelineId)
+    if (pipeline?.stages?.length) {
+      setStages(mapPipelineStages(pipeline.stages))
+    }
+  }, [pipelines, selectedPipelineForList, currentFunnelId])
 
   const handleAddFunnel = async (name: string) => {
     if (!name.trim()) {
@@ -416,6 +443,8 @@ export default function DealsPage() {
       }
       
       // Update funnels list with all pipelines from API
+      setPipelines(pipelines)
+
       const funnelsList: Funnel[] = pipelines.map(p => ({
         id: p.id,
         name: p.name,
@@ -425,6 +454,9 @@ export default function DealsPage() {
       
       // Select the newly created pipeline
       setCurrentFunnelId(newPipeline.id)
+      if (createdPipeline?.stages?.length) {
+        setStages(mapPipelineStages(createdPipeline.stages))
+      }
       
       // Force Kanban board to refresh by changing key - this will make it reload pipelines
       setKanbanRefreshKey(prev => prev + 1)
@@ -517,11 +549,58 @@ export default function DealsPage() {
     }
   }
 
-  const handleBulkChangeStage = (newStage: string) => {
-    setDeals(deals.map(d => 
-      selectedDeals.includes(d.id) ? { ...d, stage: newStage } : d
-    ))
+  const handleBulkChangeStage = async (newStage: string) => {
+    if (selectedDeals.length === 0) {
+      return
+    }
+
+    const dealsToUpdate = [...selectedDeals]
+    const updatedAt = new Date().toISOString()
+    const stageLabel = stages.find(stage => stage.id === newStage)?.label
+
+    // Optimistically update list and kanban data
+    setListDeals(prevDeals =>
+      prevDeals.map(deal =>
+        dealsToUpdate.includes(deal.id)
+          ? {
+              ...deal,
+              stageId: newStage,
+              stage: {
+                id: newStage,
+                name: stageLabel || deal.stage?.name || newStage
+              },
+              updatedAt
+            }
+          : deal
+      )
+    )
+    setDeals(prevDeals =>
+      prevDeals.map(deal =>
+        dealsToUpdate.includes(deal.id)
+          ? { ...deal, stage: newStage, updatedAt }
+          : deal
+      )
+    )
     setSelectedDeals([])
+
+    const results = await Promise.all(
+      dealsToUpdate.map(dealId =>
+        updateDeal(dealId, { stageId: newStage }).catch(error => {
+          console.error(`Failed to update deal ${dealId} stage:`, error)
+          return null
+        })
+      )
+    )
+
+    const failedCount = results.filter(result => result === null).length
+    if (failedCount > 0) {
+      showError(
+        'Ошибка при изменении стадии',
+        `Не удалось обновить ${failedCount} сдел${failedCount === 1 ? 'ку' : failedCount <= 4 ? 'ки' : 'ок'}`
+      )
+    } else {
+      showSuccess('Стадия сделки обновлена')
+    }
   }
 
   const { showSuccess, showError } = useToastNotification()
@@ -864,7 +943,8 @@ export default function DealsPage() {
                   title: deal.title || 'Untitled Deal',
                   client: deal.contact?.fullName || deal.company?.name || 'No client',
                   amount: deal.amount || 0,
-                  stage: deal.stage?.id || deal.stageId || 'new',
+                  stage: deal.stageId || deal.stage?.id || 'new',
+                  stageName: deal.stage?.name || (deal as any).stageName,
                   assignedTo: deal.assignedTo ? {
                     name: deal.assignedTo.firstName && deal.assignedTo.lastName 
                       ? `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}`
