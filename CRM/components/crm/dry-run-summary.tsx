@@ -18,6 +18,8 @@ interface DryRunSummaryProps {
   onConfirm?: () => void
   onCancel?: () => void
   isConfirmDisabled?: boolean
+  previewRowCount?: number
+  totalRowCount?: number
 }
 
 export function DryRunSummary({
@@ -29,6 +31,8 @@ export function DryRunSummary({
   onConfirm,
   onCancel,
   isConfirmDisabled = false,
+  previewRowCount,
+  totalRowCount,
 }: DryRunSummaryProps) {
   const { t } = useTranslation()
   const [isErrorsExpanded, setIsErrorsExpanded] = useState(true)
@@ -41,6 +45,8 @@ export function DryRunSummary({
   const hasWarnings = summary.skipped > 0
   const hasStagesToCreate = stagesToCreate.length > 0
   const canProceed = summary.created > 0 || summary.updated > 0
+  const importCount = totalRowCount ?? summary.created + summary.updated
+  const showPreviewNote = totalRowCount !== undefined && previewRowCount !== undefined && totalRowCount > previewRowCount
 
   // Filter errors based on search term
   const filteredErrors = errors.filter(error => {
@@ -73,12 +79,17 @@ export function DryRunSummary({
         <h3 className="text-sm font-semibold text-foreground">Import Preview</h3>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
+      {showPreviewNote && (
+        <p className="text-xs text-muted-foreground">
+          Preview table shows first {previewRowCount} of {totalRowCount} rows. Summary is calculated for all rows.
+        </p>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-3 border border-border rounded-lg bg-card">
           <p className="text-xs text-muted-foreground mb-1">Total</p>
-          <p className="text-lg font-semibold text-foreground">{summary.total}</p>
+          <p className="text-lg font-semibold text-foreground">{totalRowCount ?? summary.total}</p>
         </div>
         <div className="p-3 border border-green-500/20 rounded-lg bg-green-500/5">
           <p className="text-xs text-muted-foreground mb-1">Will Create</p>
@@ -328,7 +339,7 @@ export function DryRunSummary({
               Ready to import
             </p>
             <p className="text-xs text-green-600/80 dark:text-green-400/80">
-              {summary.created + summary.updated} record{summary.created + summary.updated !== 1 ? 's' : ''} will be {summary.created > 0 && summary.updated > 0 ? 'created or updated' : summary.created > 0 ? 'created' : 'updated'}.
+              {summary.created + summary.updated} record{summary.created + summary.updated !== 1 ? 's' : ''} will be {summary.created > 0 && summary.updated > 0 ? 'created or updated' : summary.created > 0 ? 'created' : 'updated'} in the previewed rows.
             </p>
           </div>
         </div>
@@ -370,8 +381,8 @@ export function DryRunSummary({
                 </>
               ) : (
                 hasStagesToCreate
-                  ? `${t('importExport.importAndCreateStages')} (${summary.created + summary.updated} ${t('importExport.records')})`
-                  : `${t('importExport.confirmImport')} (${summary.created + summary.updated} ${t('importExport.records')})`
+                  ? `${t('importExport.importAndCreateStages')} (${importCount} ${t('importExport.records')})`
+                  : `${t('importExport.confirmImport')} (${importCount} ${t('importExport.records')})`
               )}
             </Button>
           )}

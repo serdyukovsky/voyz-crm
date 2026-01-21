@@ -695,6 +695,7 @@
     "selectPipelineAndOwner": "Configure pipeline and default owner for imported deals",
     "columnMapping": "Column Mapping",
     "mapCsvColumnsDescription": "Match your CSV columns to CRM fields. Required fields must be mapped.",
+    "selectTitleColumn": "Select the CSV column that contains the deal title.",
     "selectPipelineFirst": "Please select a pipeline above to see available stages",
     "noStagesInPipeline": "No stages found in selected pipeline",
     "mapCsvValueToStage": "Map CSV value to Stage",

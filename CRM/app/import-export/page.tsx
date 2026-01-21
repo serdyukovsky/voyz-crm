@@ -164,13 +164,11 @@ function ImportExportContent() {
 
     try {
       // Combined import: always use deals API which handles both contacts and deals
-      // CRITICAL: For dry-run, use only first 20 rows (previewRows)
-      // csvRows contains ALL rows, but dry-run should only process preview
-      const previewRows = csvRows.slice(0, 20) // Create new array, don't mutate csvRows
-      console.log('[IMPORT] Dry-run: using previewRows (first 20 of', csvRows.length, 'total rows)')
+      // Dry-run should evaluate all rows to provide accurate totals
+      console.log('[IMPORT] Dry-run: using all rows (', csvRows.length, 'total rows)')
       
       const result = await importDeals(
-        previewRows, // Only first 20 rows for dry-run preview
+        csvRows, // All rows for dry-run totals
         mapping, 
         selectedPipelineId!, 
         true, // dryRun
@@ -545,6 +543,8 @@ function ImportExportContent() {
                   globalErrors={dryRunResult.globalErrors}
                   stagesToCreate={dryRunResult.stagesToCreate}
                   isLoading={isImporting}
+                  previewRowCount={Math.min(csvRows.length, 20)}
+                  totalRowCount={csvRows.length}
                   onConfirm={handleConfirmImport}
                   onCancel={() => setCurrentStep('mapping')}
                 />

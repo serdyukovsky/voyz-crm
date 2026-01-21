@@ -1327,8 +1327,11 @@ export class CsvImportService {
                     const row: any = validRows[rowIndex];
                     const rowNumber = rowIndex + 1;
                     
-                    // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен (same as actual import)
-                    if (!row.stageId || row.stageId.trim() === '') {
+                    // DRY-RUN: allow stageValue without stageId (stage may be created on import)
+                    // Only fail when both stageId and stageValue are missing
+                    const stageIdValue = typeof row.stageId === 'string' ? row.stageId.trim() : '';
+                    const stageValueValue = typeof row.stageValue === 'string' ? row.stageValue.trim() : '';
+                    if (!stageIdValue && !stageValueValue) {
                       const reason = 'Stage is required for deal import';
                       console.log('[IMPORT ROW SKIPPED]', {
                         row: rowNumber,
@@ -1336,6 +1339,7 @@ export class CsvImportService {
                         title: row.title || 'N/A',
                         pipelineId: row.pipelineId || 'N/A',
                         stageId: row.stageId || 'MISSING',
+                        stageValue: row.stageValue || 'MISSING',
                         hasErrors: 1
                       });
                       errors.push({
@@ -1576,29 +1580,49 @@ export class CsvImportService {
                           continue;
                         }
                         
-                        // CRITICAL: Fix stageId if it doesn't belong to current pipeline
-                        // When importing to a new pipeline, stageId from old pipeline needs to be resolved
+                        // CRITICAL: Resolve stageId using stagesMap (includes newly created stages)
+                        // Also fix stageId if it doesn't belong to current pipeline
                         let resolvedStageId = row.stageId;
-                        if (pipeline && row.stageId && pipeline.stages) {
-                          const stageExists = pipeline.stages.some((s: any) => s.id === row.stageId);
+                        const stageValueStr = row.stageValue
+                          ? (typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || ''))
+                          : '';
+                        const normalizedStageName = stageValueStr.trim().toLowerCase();
+                        
+                        // Prefer stageValue if provided (even if stageId was prefilled with default)
+                        if (normalizedStageName) {
+                          for (const [name, id] of stagesMap.entries()) {
+                            const nameStr = typeof name === 'string' ? name : String(name || '');
+                            if (nameStr.toLowerCase().trim() === normalizedStageName) {
+                              resolvedStageId = id;
+                              break;
+                            }
+                          }
+                          if (resolvedStageId) {
+                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Resolved stage "${stageValueStr}" via stagesMap`);
+                          }
+                        }
+                        
+                        if (pipeline && resolvedStageId && pipeline.stages) {
+                          const stageExists = pipeline.stages.some((s: any) => s.id === resolvedStageId);
                           if (!stageExists) {
                             // StageId doesn't belong to current pipeline - need to resolve
-                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: StageId "${row.stageId}" doesn't belong to pipeline "${rowPipelineId}", attempting to resolve...`);
+                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: StageId "${resolvedStageId}" doesn't belong to pipeline "${rowPipelineId}", attempting to resolve...`);
                             
                             // Try to resolve by stageValue (stage name from CSV)
-                            if (row.stageValue) {
-                              const stageValueStr = typeof row.stageValue === 'string' ? row.stageValue : String(row.stageValue || '');
-                              const normalizedStageName = stageValueStr.trim().toLowerCase();
+                            if (normalizedStageName) {
+                              // First try stagesMap (includes created stages)
+                              let foundStageId: string | undefined;
+                              for (const [name, id] of stagesMap.entries()) {
+                                const nameStr = typeof name === 'string' ? name : String(name || '');
+                                if (nameStr.toLowerCase().trim() === normalizedStageName) {
+                                  foundStageId = id;
+                                  break;
+                                }
+                              }
                               
-                              // Find stage with matching name in current pipeline
-                              const matchingStage = pipeline.stages.find((s: any) => {
-                                const stageName = typeof s.name === 'string' ? s.name : String(s.name || '');
-                                return stageName.trim().toLowerCase() === normalizedStageName;
-                              });
-                              
-                              if (matchingStage) {
-                                resolvedStageId = matchingStage.id;
-                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Found matching stage "${matchingStage.name}" (${matchingStage.id}) in pipeline`);
+                              if (foundStageId) {
+                                resolvedStageId = foundStageId;
+                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Found matching stage via stagesMap (${foundStageId})`);
                               } else {
                                 // No matching stage found - use default stage
                                 if (defaultStageId) {
