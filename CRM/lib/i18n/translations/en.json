@@ -67,6 +67,12 @@
   "deals": {
     "title": "Deals",
     "managePipeline": "Manage your sales pipeline",
+    "totalDeals": "Total deals",
+    "dealsShown": "Shown",
+    "dealsOf": "of",
+    "search": {
+      "apply": "Apply"
+    },
     "newDeal": "New Deal",
     "createDeal": "Create Deal",
     "kanbanView": "Kanban view",
