@@ -230,11 +230,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   // Автоприменение фильтров при изменениях, пока панель открыта
   useEffect(() => {
     if (!open) return
-    const timeoutId = window.setTimeout(() => {
-      onApplyFilters?.(filters)
-    }, 150)
-
-    return () => window.clearTimeout(timeoutId)
+    onApplyFilters?.(filters)
   }, [filters, open, onApplyFilters])
 
   const handleClear = () => {
@@ -1273,6 +1269,17 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
             className="h-6 text-[11px] text-muted-foreground hover:text-foreground px-2"
           >
             {t('deals.search.clear') || 'Очистить'}
+          </Button>
+        </div>
+
+        {/* Кнопка применения в правом нижнем углу */}
+        <div className="absolute bottom-3 right-3">
+          <Button
+            size="sm"
+            onClick={handleApply}
+            className="h-6 text-[11px] px-3"
+          >
+            {t('deals.search.apply') || 'Применить'}
           </Button>
         </div>
 

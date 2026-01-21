@@ -397,10 +397,30 @@ export async function bulkAssignDeals(request: BulkAssignRequest): Promise<BulkA
 export async function getDealsCount(params?: {
   pipelineId?: string
   stageId?: string
+  stageIds?: string[]
   assignedToId?: string
   contactId?: string
   companyId?: string
+  createdById?: string
   search?: string
+  title?: string
+  number?: string
+  description?: string
+  amountMin?: number
+  amountMax?: number
+  budgetMin?: number
+  budgetMax?: number
+  dateFrom?: string
+  dateTo?: string
+  dateType?: 'created' | 'closed' | 'expectedClose'
+  expectedCloseFrom?: string
+  expectedCloseTo?: string
+  tags?: string[]
+  rejectionReasons?: string[]
+  activeStagesOnly?: boolean
+  contactSubscriberCountMin?: number
+  contactSubscriberCountMax?: number
+  contactDirections?: string[]
 }): Promise<number> {
   const token = localStorage.getItem('access_token')
   if (!token) {
@@ -410,10 +430,30 @@ export async function getDealsCount(params?: {
   const queryParams = new URLSearchParams()
   if (params?.pipelineId) queryParams.append('pipelineId', params.pipelineId)
   if (params?.stageId) queryParams.append('stageId', params.stageId)
+  if (params?.stageIds?.length) queryParams.append('stageIds', params.stageIds.join(','))
   if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.companyId) queryParams.append('companyId', params.companyId)
+  if (params?.createdById) queryParams.append('createdById', params.createdById)
   if (params?.search) queryParams.append('search', params.search)
+  if (params?.title) queryParams.append('title', params.title)
+  if (params?.number) queryParams.append('number', params.number)
+  if (params?.description) queryParams.append('description', params.description)
+  if (params?.amountMin !== undefined) queryParams.append('amountMin', String(params.amountMin))
+  if (params?.amountMax !== undefined) queryParams.append('amountMax', String(params.amountMax))
+  if (params?.budgetMin !== undefined) queryParams.append('budgetMin', String(params.budgetMin))
+  if (params?.budgetMax !== undefined) queryParams.append('budgetMax', String(params.budgetMax))
+  if (params?.dateFrom) queryParams.append('dateFrom', params.dateFrom)
+  if (params?.dateTo) queryParams.append('dateTo', params.dateTo)
+  if (params?.dateType) queryParams.append('dateType', params.dateType)
+  if (params?.expectedCloseFrom) queryParams.append('expectedCloseFrom', params.expectedCloseFrom)
+  if (params?.expectedCloseTo) queryParams.append('expectedCloseTo', params.expectedCloseTo)
+  if (params?.tags?.length) queryParams.append('tags', params.tags.join(','))
+  if (params?.rejectionReasons?.length) queryParams.append('rejectionReasons', params.rejectionReasons.join(','))
+  if (params?.activeStagesOnly !== undefined) queryParams.append('activeStagesOnly', String(params.activeStagesOnly))
+  if (params?.contactSubscriberCountMin !== undefined) queryParams.append('contactSubscriberCountMin', String(params.contactSubscriberCountMin))
+  if (params?.contactSubscriberCountMax !== undefined) queryParams.append('contactSubscriberCountMax', String(params.contactSubscriberCountMax))
+  if (params?.contactDirections?.length) queryParams.append('contactDirections', params.contactDirections.join(','))
 
   const API_BASE_URL = getApiBaseUrl()
   const response = await fetch(`${API_BASE_URL}/deals/count?${queryParams.toString()}`, {

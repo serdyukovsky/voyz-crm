@@ -67,6 +67,9 @@
   "deals": {
     "title": "Сделки",
     "managePipeline": "Управление воронкой продаж",
+    "totalDeals": "Всего сделок",
+    "dealsShown": "Показано",
+    "dealsOf": "из",
     "newDeal": "Новая сделка",
     "createDeal": "Создать сделку",
     "kanbanView": "Канбан",
@@ -212,6 +215,7 @@
         "closedLost": "Нереализованные сделки",
         "noTasks": "Сделки без задач"
       },
+      "apply": "Применить",
       "fields": {
         "title": "Название сделки",
         "number": "Номер сделки",

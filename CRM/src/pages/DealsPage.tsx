@@ -889,24 +889,28 @@ function DealsPageContent() {
       if (selectedPipelineForList) {
         console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList, 'filters:', filters)
         setListLoading(true)
-        getDeals({ 
+        const listParams = { 
           pipelineId: selectedPipelineForList,
           companyId: filters.companyId,
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
-          stageIds: filters.stageIds,
+          stageIds: dealFilters?.stageIds ?? filters.stageIds,
           limit: 50,
-        })
+        }
+        getDeals(listParams)
           .then((response) => {
             // API now always returns paginated response
             console.log('📋 DealsPage: Loaded deals for list:', response.data.length, 'deals (paginated format)')
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
-            // Update total count if available
             if (response.total !== undefined) {
               setTotalCount(response.total)
+            } else {
+              getDealsCount(listParams).then(setTotalCount).catch(error => {
+                console.error('Failed to load deals count:', error)
+              })
             }
           })
           .catch((error) => {
@@ -922,23 +926,27 @@ function DealsPageContent() {
         console.log('📋 DealsPage: List view but no pipeline selected yet')
         // Try to load all deals if no pipeline is selected
         setListLoading(true)
-        getDeals({
+        const listParams = {
           companyId: filters.companyId,
           contactId: filters.contactId,
           assignedToId: filters.assignedUserId,
           search: filters.title,
-          stageIds: filters.stageIds,
+          stageIds: dealFilters?.stageIds ?? filters.stageIds,
           limit: 50,
-        })
+        }
+        getDeals(listParams)
           .then((response) => {
             // API now always returns paginated response
             console.log('📋 DealsPage: Loaded all deals for list view:', response.data.length, 'deals (paginated format)')
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
-            // Update total count if available
             if (response.total !== undefined) {
               setTotalCount(response.total)
+            } else {
+              getDealsCount(listParams).then(setTotalCount).catch(error => {
+                console.error('Failed to load deals count:', error)
+              })
             }
           })
           .catch((error) => {
@@ -958,6 +966,26 @@ function DealsPageContent() {
       setHasMore(false)
     }
   }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds, listRefreshKey])
+
+  // Ensure total count always matches active filters (for list view)
+  useEffect(() => {
+    if (viewMode !== 'list') return
+    const countParams = {
+      pipelineId: selectedPipelineForList,
+      companyId: filters.companyId,
+      contactId: filters.contactId,
+      assignedToId: filters.assignedUserId,
+      search: filters.title,
+      stageIds: dealFilters?.stageIds ?? filters.stageIds,
+    }
+    getDealsCount(countParams)
+      .then(count => {
+        setTotalCount(count)
+      })
+      .catch(error => {
+        console.error('Failed to load deals count:', error)
+      })
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds, dealFilters?.stageIds])
   
   // Memoize selectedDeals array for DealsListView (must be before conditional rendering)
   const selectedDealsArray = useMemo(() => {
@@ -980,6 +1008,23 @@ function DealsPageContent() {
     listDeals.length,
     (listDeals || []).map(d => d?.id).filter(Boolean).sort().join(',')
   ])
+
+  const filteredListDeals = useMemo(() => {
+    return (listDeals || [])
+      .filter(deal => {
+        if (filters.title) {
+          const searchLower = filters.title.toLowerCase()
+          return deal.title?.toLowerCase().includes(searchLower)
+        }
+        return true
+      })
+      .filter(deal => {
+        if (!filters.stageIds || filters.stageIds.length === 0) return true
+        const dealStageId = (deal as any).stageId || deal.stage?.id
+        return dealStageId ? filters.stageIds.includes(dealStageId) : false
+      })
+      .filter(deal => deal && deal.id)
+  }, [listDeals, filters.title, filters.stageIds])
   
   // Clear selection when switching away from list view
   useEffect(() => {
@@ -989,26 +1034,6 @@ function DealsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode])
   
-  // Load total count when filters change (for "select all" feature)
-  useEffect(() => {
-    if (viewMode === 'list') {
-      getDealsCount({
-        pipelineId: selectedPipelineForList,
-        companyId: filters.companyId,
-        contactId: filters.contactId,
-        assignedToId: filters.assignedUserId,
-        search: filters.title,
-        stageIds: filters.stageIds,
-      })
-        .then(count => {
-          setTotalCount(count)
-        })
-        .catch(error => {
-          console.error('Failed to load deals count:', error)
-        })
-    }
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, filters.stageIds])
-
   // Load users for bulk assignee change
   useEffect(() => {
     if (!isAssignDialogOpen || users.length > 0 || usersLoading) {
@@ -1041,7 +1066,7 @@ function DealsPageContent() {
         contactId: filters.contactId,
         assignedToId: filters.assignedUserId,
         search: filters.title,
-        stageIds: filters.stageIds,
+        stageIds: dealFilters?.stageIds ?? filters.stageIds,
         limit: 50,
         cursor: nextCursor,
       }
@@ -1178,7 +1203,7 @@ function DealsPageContent() {
             </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div>
               <div className="relative">
                 <button
@@ -1237,7 +1262,16 @@ function DealsPageContent() {
                 </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{t('deals.managePipeline')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('deals.managePipeline')}
+              {viewMode === 'list' && (
+                <span className="ml-2">
+                  · {t('deals.dealsShown') || 'Показано'} {filteredListDeals.length}
+                  {' '}
+                  {t('deals.dealsOf') || 'из'} {totalCount ?? filteredListDeals.length}
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2">
             <div className="flex border border-border/40 rounded-md overflow-hidden">
@@ -1450,22 +1484,7 @@ function DealsPageContent() {
             <>
               {console.log('📋 DealsPage: Rendering list view, deals:', listDeals.length, 'searchValue:', searchValue)}
               <DealsListView
-                deals={listDeals
-                .filter(deal => {
-                  // Фильтрация по названию сделки
-                  if (filters.title) {
-                    const searchLower = filters.title.toLowerCase()
-                    return deal.title?.toLowerCase().includes(searchLower)
-                  }
-                  return true
-                })
-                .filter(deal => {
-                  if (!filters.stageIds || filters.stageIds.length === 0) return true
-                  const dealStageId = (deal as any).stageId || deal.stage?.id
-                  return dealStageId ? filters.stageIds.includes(dealStageId) : false
-                })
-                .filter(deal => deal && deal.id) // Filter out undefined/null deals
-                .map(deal => {
+                deals={filteredListDeals.map(deal => {
                   if (!deal || !deal.id) return null // Safety check
                   // Use stageId from deal object or from nested stage object
                   const stageId = (deal as any).stageId || deal.stage?.id || 'new'
