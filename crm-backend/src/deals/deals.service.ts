@@ -7,6 +7,7 @@ import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 import { Deal, ActivityType, UserRole } from '@prisma/client';
 import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
 import { BulkDeleteDto, BulkDeleteResult, BulkDeleteMode } from './dto/bulk-delete.dto';
+import { BulkAssignDto, BulkAssignResult, BulkAssignMode } from './dto/bulk-assign.dto';
 
 @Injectable()
 export class DealsService {
@@ -1618,6 +1619,164 @@ export class DealsService {
         } catch (error) {
           console.error('Failed to delete batch in FILTER mode:', error);
           result.failedCount += batchSize; // Estimate
+          hasMore = false;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk update assignee for deals by IDs or filters
+   * Updates in batches of 1000 to avoid timeout
+   */
+  async bulkAssign(dto: BulkAssignDto, userId: string): Promise<BulkAssignResult> {
+    const result: BulkAssignResult = {
+      updatedCount: 0,
+      failedCount: 0,
+      errors: [],
+    };
+
+    if (dto.assignedToId === undefined) {
+      throw new Error('assignedToId is required');
+    }
+
+    const assignedToId = dto.assignedToId === '' ? null : dto.assignedToId;
+
+    if (dto.mode === BulkAssignMode.IDS) {
+      if (!dto.ids || dto.ids.length === 0) {
+        return result;
+      }
+
+      const batchSize = 1000;
+      for (let i = 0; i < dto.ids.length; i += batchSize) {
+        const batch = dto.ids.slice(i, i + batchSize);
+
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            const dealsToUpdate = await tx.deal.findMany({
+              where: { id: { in: batch } },
+              select: { id: true, title: true, number: true },
+            });
+
+            await tx.deal.updateMany({
+              where: { id: { in: batch } },
+              data: { assignedToId },
+            });
+
+            for (const deal of dealsToUpdate) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'update',
+                  entity: 'deal',
+                  entityId: deal.id,
+                  userId,
+                  message: `Deal "${deal.title || deal.number || deal.id}" assignee updated (bulk)`,
+                  metadata: {
+                    dealTitle: deal.title,
+                    dealNumber: deal.number,
+                    bulkOperation: true,
+                    assignedToId: assignedToId,
+                  },
+                });
+              } catch (logError) {
+                console.error(`Failed to log assignee update for deal ${deal.id}:`, logError);
+              }
+            }
+          });
+
+          result.updatedCount += batch.length;
+        } catch (error) {
+          console.error(`Failed to update assignee for batch starting at index ${i}:`, error);
+          result.failedCount += batch.length;
+          batch.forEach((id) => {
+            result.errors?.push({
+              id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          });
+        }
+      }
+    } else if (dto.mode === BulkAssignMode.FILTER) {
+      if (!dto.filter) {
+        throw new Error('Filter is required for FILTER mode');
+      }
+
+      const where: any = {};
+      if (dto.filter.pipelineId) where.pipelineId = dto.filter.pipelineId;
+      if (dto.filter.stageId) where.stageId = dto.filter.stageId;
+      if (dto.filter.assignedToId) where.assignedToId = dto.filter.assignedToId;
+      if (dto.filter.contactId) where.contactId = dto.filter.contactId;
+      if (dto.filter.companyId) where.companyId = dto.filter.companyId;
+      if (dto.filter.search) {
+        where.OR = [
+          { title: { contains: dto.filter.search, mode: 'insensitive' } },
+          { description: { contains: dto.filter.search, mode: 'insensitive' } },
+        ];
+      }
+
+      if (dto.excludedIds && dto.excludedIds.length > 0) {
+        where.id = { notIn: dto.excludedIds };
+      }
+
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        try {
+          const dealsBatch = await this.prisma.deal.findMany({
+            where,
+            select: { id: true, title: true, number: true },
+            take: batchSize,
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+          });
+
+          if (dealsBatch.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          const batchIds = dealsBatch.map((d) => d.id);
+
+          await this.prisma.$transaction(async (tx) => {
+            await tx.deal.updateMany({
+              where: { id: { in: batchIds } },
+              data: { assignedToId },
+            });
+
+            for (const deal of dealsBatch) {
+              try {
+                await this.loggingService.create({
+                  level: 'info',
+                  action: 'update',
+                  entity: 'deal',
+                  entityId: deal.id,
+                  userId,
+                  message: `Deal "${deal.title || deal.number || deal.id}" assignee updated (bulk filter)`,
+                  metadata: {
+                    dealTitle: deal.title,
+                    dealNumber: deal.number,
+                    bulkOperation: true,
+                    filterMode: true,
+                    assignedToId: assignedToId,
+                  },
+                });
+              } catch (logError) {
+                console.error(`Failed to log assignee update for deal ${deal.id}:`, logError);
+              }
+            }
+          });
+
+          result.updatedCount += dealsBatch.length;
+
+          if (dealsBatch.length < batchSize) {
+            hasMore = false;
+          }
+        } catch (error) {
+          console.error('Failed to update assignee batch in FILTER mode:', error);
+          result.failedCount += batchSize;
           hasMore = false;
         }
       }

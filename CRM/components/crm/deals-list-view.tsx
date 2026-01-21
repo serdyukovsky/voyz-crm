@@ -21,6 +21,7 @@ interface DealsListViewProps {
   onSelectDeals?: (ids: string[]) => void
   onBulkDelete?: () => void
   onBulkChangeStage?: (stage: string) => void
+  onBulkAssign?: () => void
   stages?: Stage[]
   selectedDealId?: string | null
   onDealClick?: (dealId: string | null) => void
@@ -38,6 +39,7 @@ export function DealsListView({
   onSelectDeals,
   onBulkDelete,
   onBulkChangeStage,
+  onBulkAssign,
   stages = [],
   selectedDealId: externalSelectedDealId,
   onDealClick,
@@ -187,6 +189,14 @@ export function DealsListView({
                 </>
               )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBulkAssign}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Изменить ответственного
+            </Button>
             <Button
               variant="outline"
               size="sm"

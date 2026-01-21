@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { DealsService } from './deals.service';
 import { BulkDeleteDto } from './dto/bulk-delete.dto';
+import { BulkAssignDto } from './dto/bulk-assign.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -104,18 +105,6 @@ export class DealsController {
     return this.dealsService.findOne(id);
   }
 
-  @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Update deal' })
-  @ApiResponse({ status: 200, description: 'Deal updated' })
-  update(
-    @Param('id') id: string,
-    @Body() updateDealDto: any,
-    @CurrentUser() user: any,
-  ) {
-    return this.dealsService.update(id, updateDealDto, user.userId || user.id);
-  }
-
   @Post(':id/link-contact')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Link contact to deal' })
@@ -143,6 +132,27 @@ export class DealsController {
   @ApiResponse({ status: 200, description: 'Bulk delete result' })
   bulkDelete(@Body() dto: BulkDeleteDto, @CurrentUser() user: any) {
     return this.dealsService.bulkDelete(dto, user.userId || user.id);
+  }
+
+  @Patch('bulk-assignee')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk update deal assignee by IDs or filters' })
+  @ApiResponse({ status: 200, description: 'Bulk assign result' })
+  bulkAssign(@Body() dto: BulkAssignDto, @CurrentUser() user: any) {
+    return this.dealsService.bulkAssign(dto, user.userId || user.id);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Update deal' })
+  @ApiResponse({ status: 200, description: 'Deal updated' })
+  update(
+    @Param('id') id: string,
+    @Body() updateDealDto: any,
+    @CurrentUser() user: any,
+  ) {
+    return this.dealsService.update(id, updateDealDto, user.userId || user.id);
   }
 
   @Delete(':id')
