@@ -17,12 +17,12 @@ const data = [
 export function BarChartCard() {
 
   return (
-    <Card className="border-border/50 bg-card">
-      <CardHeader className="pb-3">
+    <Card className="border-border/50 bg-card gap-4">
+      <CardHeader className="px-4 pt-4 pb-2">
         <CardTitle className="text-sm font-semibold text-foreground">Deals Per Week</CardTitle>
         <p className="text-xs text-muted-foreground">Weekly deal creation trend</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart 
             data={data}
