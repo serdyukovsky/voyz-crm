@@ -4,7 +4,7 @@ import { ActivityService } from '@/activity/activity.service';
 import { RealtimeGateway } from '@/websocket/realtime.gateway';
 import { LoggingService } from '@/logging/logging.service';
 import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
-import { Deal, ActivityType, UserRole } from '@prisma/client';
+import { Deal, ActivityType, UserRole, Prisma } from '@prisma/client';
 import { PaginationCursor, PaginatedResponse } from '@/common/dto/pagination.dto';
 import { BulkDeleteDto, BulkDeleteResult, BulkDeleteMode } from './dto/bulk-delete.dto';
 import { BulkAssignDto, BulkAssignResult, BulkAssignMode } from './dto/bulk-assign.dto';
@@ -239,30 +239,176 @@ export class DealsService {
     }
   }
 
-  async findAll(filters?: {
+  private buildWhere(filters?: {
     pipelineId?: string;
     stageId?: string;
+    stageIds?: string[];
     assignedToId?: string;
     contactId?: string;
     companyId?: string;
+    createdById?: string;
     search?: string;
-    limit?: number;
-    cursor?: string; // base64 encoded cursor
-  }): Promise<PaginatedResponse<any>> {
-    const where: any = {};
+    title?: string;
+    number?: string;
+    description?: string;
+    amountMin?: number;
+    amountMax?: number;
+    budgetMin?: number;
+    budgetMax?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    dateType?: 'created' | 'closed' | 'expectedClose';
+    expectedCloseFrom?: string;
+    expectedCloseTo?: string;
+    tags?: string[];
+    rejectionReasons?: string[];
+    activeStagesOnly?: boolean;
+    contactSubscriberCountMin?: number;
+    contactSubscriberCountMax?: number;
+    contactDirections?: string[];
+  }): Prisma.DealWhereInput {
+    const where: Prisma.DealWhereInput = {};
+    const andFilters: Prisma.DealWhereInput[] = [];
 
-    // Base filters
     if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
-    if (filters?.stageId) where.stageId = filters.stageId;
+
+    const stageIds = new Set<string>();
+    if (filters?.stageId) stageIds.add(filters.stageId);
+    if (filters?.stageIds?.length) {
+      filters.stageIds.forEach(id => stageIds.add(id));
+    }
+    if (stageIds.size > 0) {
+      where.stageId = { in: Array.from(stageIds) };
+    }
+
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
     if (filters?.contactId) where.contactId = filters.contactId;
     if (filters?.companyId) where.companyId = filters.companyId;
-    if (filters?.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-      ];
+    if (filters?.createdById) where.createdById = filters.createdById;
+
+    if (filters?.activeStagesOnly) {
+      where.stage = { isClosed: false };
     }
+
+    if (filters?.tags?.length) {
+      where.tags = { hasSome: filters.tags };
+    }
+
+    if (filters?.rejectionReasons?.length) {
+      where.rejectionReasons = { hasSome: filters.rejectionReasons };
+    }
+
+    const contactFilter: Prisma.ContactWhereInput = {};
+    if (filters?.contactDirections?.length) {
+      contactFilter.directions = { hasSome: filters.contactDirections };
+    }
+    if (filters?.contactSubscriberCountMin !== undefined || filters?.contactSubscriberCountMax !== undefined) {
+      const range: Prisma.StringFilter = {};
+      if (filters.contactSubscriberCountMin !== undefined) {
+        range.gte = String(filters.contactSubscriberCountMin);
+      }
+      if (filters.contactSubscriberCountMax !== undefined) {
+        range.lte = String(filters.contactSubscriberCountMax);
+      }
+      contactFilter.subscriberCount = range;
+    }
+    if (Object.keys(contactFilter).length > 0) {
+      where.contact = contactFilter;
+    }
+
+    if (filters?.title) {
+      andFilters.push({ title: { contains: filters.title, mode: 'insensitive' } });
+    }
+
+    if (filters?.number) {
+      andFilters.push({ number: { contains: filters.number, mode: 'insensitive' } });
+    }
+
+    if (filters?.description) {
+      andFilters.push({ description: { contains: filters.description, mode: 'insensitive' } });
+    }
+
+    if (filters?.search) {
+      andFilters.push({
+        OR: [
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { description: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (filters?.amountMin !== undefined || filters?.amountMax !== undefined) {
+      const range: Prisma.DecimalFilter = {};
+      if (filters.amountMin !== undefined) range.gte = filters.amountMin;
+      if (filters.amountMax !== undefined) range.lte = filters.amountMax;
+      andFilters.push({ amount: range });
+    }
+
+    if (filters?.budgetMin !== undefined || filters?.budgetMax !== undefined) {
+      const range: Prisma.DecimalNullableFilter = {};
+      if (filters.budgetMin !== undefined) range.gte = filters.budgetMin;
+      if (filters.budgetMax !== undefined) range.lte = filters.budgetMax;
+      andFilters.push({ budget: range });
+    }
+
+    if (filters?.dateFrom || filters?.dateTo) {
+      const range: Prisma.DateTimeFilter = {};
+      if (filters.dateFrom) range.gte = new Date(filters.dateFrom);
+      if (filters.dateTo) range.lte = new Date(filters.dateTo);
+      const dateField =
+        filters.dateType === 'closed'
+          ? 'closedAt'
+          : filters.dateType === 'expectedClose'
+            ? 'expectedCloseAt'
+            : 'createdAt';
+      andFilters.push({ [dateField]: range } as Prisma.DealWhereInput);
+    }
+
+    if (filters?.expectedCloseFrom || filters?.expectedCloseTo) {
+      const range: Prisma.DateTimeFilter = {};
+      if (filters.expectedCloseFrom) range.gte = new Date(filters.expectedCloseFrom);
+      if (filters.expectedCloseTo) range.lte = new Date(filters.expectedCloseTo);
+      andFilters.push({ expectedCloseAt: range });
+    }
+
+    if (andFilters.length > 0) {
+      where.AND = andFilters;
+    }
+
+    return where;
+  }
+
+  async findAll(filters?: {
+    pipelineId?: string;
+    stageId?: string;
+    stageIds?: string[];
+    assignedToId?: string;
+    contactId?: string;
+    companyId?: string;
+    createdById?: string;
+    search?: string;
+    title?: string;
+    number?: string;
+    description?: string;
+    amountMin?: number;
+    amountMax?: number;
+    budgetMin?: number;
+    budgetMax?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    dateType?: 'created' | 'closed' | 'expectedClose';
+    expectedCloseFrom?: string;
+    expectedCloseTo?: string;
+    tags?: string[];
+    rejectionReasons?: string[];
+    activeStagesOnly?: boolean;
+    contactSubscriberCountMin?: number;
+    contactSubscriberCountMax?: number;
+    contactDirections?: string[];
+    limit?: number;
+    cursor?: string; // base64 encoded cursor
+  }): Promise<PaginatedResponse<any>> {
+    const where = this.buildWhere(filters);
 
     // Managers can see all deals (no filtering by user)
 
@@ -288,16 +434,10 @@ export class DealsService {
         ],
       };
 
-      // If we already have OR conditions (from search), combine with AND
-      if (where.OR) {
-        where.AND = [
-          { OR: where.OR },
-          cursorCondition,
-        ];
-        delete where.OR;
+      if (where.AND) {
+        where.AND.push(cursorCondition);
       } else {
-        // Merge cursor condition into existing where
-        Object.assign(where, cursorCondition);
+        where.AND = [cursorCondition];
       }
     }
 
@@ -306,13 +446,19 @@ export class DealsService {
       where,
       select: {
         id: true,
+        number: true,
         title: true,
         amount: true,
+        budget: true,
         stageId: true,
         pipelineId: true,
         assignedToId: true,
+        createdById: true,
         contactId: true,
         companyId: true,
+        expectedCloseAt: true,
+        closedAt: true,
+        description: true,
         updatedAt: true,
         createdAt: true,
         tags: true,
@@ -599,15 +745,21 @@ export class DealsService {
   private formatDealResponseForList(deal: any) {
     return {
       id: deal.id,
+      number: deal.number || null,
       title: deal.title || 'Untitled Deal',
       amount: deal.amount ? Number(deal.amount) : 0,
+      budget: deal.budget ? Number(deal.budget) : null,
       stageId: deal.stageId || deal.stage?.id || '',
       pipelineId: deal.pipelineId,
       assignedToId: deal.assignedToId,
+      createdById: deal.createdById,
       contactId: deal.contactId,
       companyId: deal.companyId,
       tags: deal.tags || [],
       rejectionReasons: deal.rejectionReasons || [],
+      description: deal.description || null,
+      expectedCloseAt: deal.expectedCloseAt || null,
+      closedAt: deal.closedAt || null,
       createdAt: deal.createdAt,
       updatedAt: deal.updatedAt,
       stage: deal.stage ? {
@@ -1439,26 +1591,32 @@ export class DealsService {
   async count(filters?: {
     pipelineId?: string;
     stageId?: string;
+    stageIds?: string[];
     assignedToId?: string;
     contactId?: string;
     companyId?: string;
+    createdById?: string;
     search?: string;
+    title?: string;
+    number?: string;
+    description?: string;
+    amountMin?: number;
+    amountMax?: number;
+    budgetMin?: number;
+    budgetMax?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    dateType?: 'created' | 'closed' | 'expectedClose';
+    expectedCloseFrom?: string;
+    expectedCloseTo?: string;
+    tags?: string[];
+    rejectionReasons?: string[];
+    activeStagesOnly?: boolean;
+    contactSubscriberCountMin?: number;
+    contactSubscriberCountMax?: number;
+    contactDirections?: string[];
   }): Promise<number> {
-    const where: any = {};
-
-    // Base filters (same as findAll)
-    if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
-    if (filters?.stageId) where.stageId = filters.stageId;
-    if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
-    if (filters?.contactId) where.contactId = filters.contactId;
-    if (filters?.companyId) where.companyId = filters.companyId;
-    if (filters?.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
-
+    const where = this.buildWhere(filters);
     return this.prisma.deal.count({ where });
   }
 

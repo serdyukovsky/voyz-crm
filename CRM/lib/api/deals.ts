@@ -5,6 +5,11 @@ export interface Deal {
   title: string
   number?: string
   amount: number
+  budget?: number | null
+  description?: string | null
+  createdById?: string
+  expectedCloseAt?: string | null
+  closedAt?: string | null
   stage?: {
     id: string
     name: string
@@ -28,6 +33,7 @@ export interface Deal {
   assignedToId?: string // For updates
   status?: string
   tags?: string[]
+  rejectionReasons?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -43,9 +49,29 @@ export async function getDeals(params?: {
   search?: string
   pipelineId?: string
   stageId?: string
+  stageIds?: string[]
   assignedToId?: string
   contactId?: string
   companyId?: string
+  createdById?: string
+  title?: string
+  number?: string
+  description?: string
+  amountMin?: number
+  amountMax?: number
+  budgetMin?: number
+  budgetMax?: number
+  dateFrom?: string
+  dateTo?: string
+  dateType?: 'created' | 'closed' | 'expectedClose'
+  expectedCloseFrom?: string
+  expectedCloseTo?: string
+  tags?: string[]
+  rejectionReasons?: string[]
+  activeStagesOnly?: boolean
+  contactSubscriberCountMin?: number
+  contactSubscriberCountMax?: number
+  contactDirections?: string[]
   limit?: number
   cursor?: string
 }): Promise<PaginatedDealsResponse> {
@@ -71,9 +97,29 @@ export async function getDeals(params?: {
   if (params?.search) queryParams.append('search', params.search)
   if (params?.pipelineId) queryParams.append('pipelineId', params.pipelineId)
   if (params?.stageId) queryParams.append('stageId', params.stageId)
+  if (params?.stageIds?.length) queryParams.append('stageIds', params.stageIds.join(','))
   if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.companyId) queryParams.append('companyId', params.companyId)
+  if (params?.createdById) queryParams.append('createdById', params.createdById)
+  if (params?.title) queryParams.append('title', params.title)
+  if (params?.number) queryParams.append('number', params.number)
+  if (params?.description) queryParams.append('description', params.description)
+  if (params?.amountMin !== undefined) queryParams.append('amountMin', String(params.amountMin))
+  if (params?.amountMax !== undefined) queryParams.append('amountMax', String(params.amountMax))
+  if (params?.budgetMin !== undefined) queryParams.append('budgetMin', String(params.budgetMin))
+  if (params?.budgetMax !== undefined) queryParams.append('budgetMax', String(params.budgetMax))
+  if (params?.dateFrom) queryParams.append('dateFrom', params.dateFrom)
+  if (params?.dateTo) queryParams.append('dateTo', params.dateTo)
+  if (params?.dateType) queryParams.append('dateType', params.dateType)
+  if (params?.expectedCloseFrom) queryParams.append('expectedCloseFrom', params.expectedCloseFrom)
+  if (params?.expectedCloseTo) queryParams.append('expectedCloseTo', params.expectedCloseTo)
+  if (params?.tags?.length) queryParams.append('tags', params.tags.join(','))
+  if (params?.rejectionReasons?.length) queryParams.append('rejectionReasons', params.rejectionReasons.join(','))
+  if (params?.activeStagesOnly !== undefined) queryParams.append('activeStagesOnly', String(params.activeStagesOnly))
+  if (params?.contactSubscriberCountMin !== undefined) queryParams.append('contactSubscriberCountMin', String(params.contactSubscriberCountMin))
+  if (params?.contactSubscriberCountMax !== undefined) queryParams.append('contactSubscriberCountMax', String(params.contactSubscriberCountMax))
+  if (params?.contactDirections?.length) queryParams.append('contactDirections', params.contactDirections.join(','))
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.cursor) queryParams.append('cursor', params.cursor)
 

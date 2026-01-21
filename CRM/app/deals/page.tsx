@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
 import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
@@ -68,6 +68,7 @@ import { createDeal, getDeals, deleteDeal, updateDeal, type Deal as APIDeal } fr
 import { getPipelines, createPipeline, createStage, type Pipeline, type Stage as PipelineStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useAuthGuard } from '@/hooks/use-auth-guard'
+import { useSearch } from "@/components/crm/search-context"
 
 const defaultFunnels: Funnel[] = [
   { id: "default", name: "Sales Pipeline" },
@@ -237,8 +238,40 @@ export default function DealsPage() {
   useAuthGuard()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { searchValue, dealFilters } = useSearch()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+
+  const searchInput = useMemo(() => searchValue.trim(), [searchValue])
+  const titleFilter = useMemo(() => dealFilters?.title?.trim() || '', [dealFilters])
+
+  const kanbanFilters = useMemo(() => {
+    return {
+      searchQuery: searchInput || undefined,
+      title: titleFilter || undefined,
+      number: dealFilters?.number,
+      description: dealFilters?.description,
+      companyId: dealFilters?.companyId,
+      contactId: dealFilters?.contactId,
+      assignedUserId: dealFilters?.assignedToId,
+      amountMin: dealFilters?.amountMin,
+      amountMax: dealFilters?.amountMax,
+      budgetMin: dealFilters?.budgetMin,
+      budgetMax: dealFilters?.budgetMax,
+      dateFrom: dealFilters?.dateFrom,
+      dateTo: dealFilters?.dateTo,
+      dateType: dealFilters?.dateType,
+      expectedCloseFrom: dealFilters?.expectedCloseFrom,
+      expectedCloseTo: dealFilters?.expectedCloseTo,
+      tags: dealFilters?.tags,
+      rejectionReasons: dealFilters?.rejectionReasons,
+      activeStagesOnly: dealFilters?.activeStagesOnly,
+      contactSubscriberCountMin: dealFilters?.contactSubscriberCountMin,
+      contactSubscriberCountMax: dealFilters?.contactSubscriberCountMax,
+      contactDirections: dealFilters?.contactDirections,
+      stageIds: dealFilters?.stageIds,
+    }
+  }, [searchInput, titleFilter, dealFilters])
 
   // Read deal ID from URL on mount and when URL changes
   useEffect(() => {
@@ -609,6 +642,36 @@ export default function DealsPage() {
   const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
   const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0) // For forcing Kanban refresh
 
+  const listQueryParams = useMemo(() => {
+    return {
+      search: searchInput || undefined,
+      title: titleFilter || undefined,
+      number: dealFilters?.number,
+      description: dealFilters?.description,
+      pipelineId: selectedPipelineForList,
+      stageIds: dealFilters?.stageIds,
+      companyId: dealFilters?.companyId,
+      contactId: dealFilters?.contactId,
+      assignedToId: dealFilters?.assignedToId,
+      createdById: dealFilters?.createdById,
+      amountMin: dealFilters?.amountMin,
+      amountMax: dealFilters?.amountMax,
+      budgetMin: dealFilters?.budgetMin,
+      budgetMax: dealFilters?.budgetMax,
+      dateFrom: dealFilters?.dateFrom,
+      dateTo: dealFilters?.dateTo,
+      dateType: dealFilters?.dateType,
+      expectedCloseFrom: dealFilters?.expectedCloseFrom,
+      expectedCloseTo: dealFilters?.expectedCloseTo,
+      tags: dealFilters?.tags,
+      rejectionReasons: dealFilters?.rejectionReasons,
+      activeStagesOnly: dealFilters?.activeStagesOnly,
+      contactSubscriberCountMin: dealFilters?.contactSubscriberCountMin,
+      contactSubscriberCountMax: dealFilters?.contactSubscriberCountMax,
+      contactDirections: dealFilters?.contactDirections,
+    }
+  }, [searchInput, titleFilter, selectedPipelineForList, dealFilters])
+
   // Sync selectedPipelineForList with currentFunnelId when switching to list view or when currentFunnelId changes
   useEffect(() => {
     if (viewMode === 'list') {
@@ -644,44 +707,32 @@ export default function DealsPage() {
 
   // Load deals for list view
   useEffect(() => {
-    if (viewMode === 'list') {
-      if (selectedPipelineForList) {
-        console.log('📋 Loading deals for list view, pipelineId:', selectedPipelineForList)
-        setListLoading(true)
-        getDeals({ pipelineId: selectedPipelineForList, limit: 50 })
-          .then((response) => {
-            console.log('📋 Loaded deals for list view:', response.data.length, 'deals')
-            setListDeals(response.data)
-          })
-          .catch((error) => {
-            console.error('Failed to load deals for list:', error)
-            setListDeals([])
-          })
-          .finally(() => {
-            setListLoading(false)
-          })
-      } else {
-        console.log('📋 List view but no pipeline selected yet')
-        // Try to load all deals if no pipeline is selected
-        setListLoading(true)
-        getDeals({ limit: 50 })
-          .then((response) => {
-            console.log('📋 Loaded all deals for list view:', response.data.length, 'deals')
-            setListDeals(response.data)
-          })
-          .catch((error) => {
-            console.error('Failed to load deals for list:', error)
-            setListDeals([])
-          })
-          .finally(() => {
-            setListLoading(false)
-          })
-      }
-    } else {
+    if (viewMode !== 'list') {
       // Clear deals when switching away from list view
       setListDeals([])
+      return
     }
-  }, [viewMode, selectedPipelineForList])
+
+    if (listQueryParams.pipelineId) {
+      console.log('📋 Loading deals for list view, pipelineId:', listQueryParams.pipelineId)
+    } else {
+      console.log('📋 List view but no pipeline selected yet')
+    }
+
+    setListLoading(true)
+    getDeals({ ...listQueryParams, limit: 50 })
+      .then((response) => {
+        console.log('📋 Loaded deals for list view:', response.data.length, 'deals')
+        setListDeals(response.data)
+      })
+      .catch((error) => {
+        console.error('Failed to load deals for list:', error)
+        setListDeals([])
+      })
+      .finally(() => {
+        setListLoading(false)
+      })
+  }, [viewMode, listQueryParams])
 
   const handleCreateNewDeal = async () => {
     try {
@@ -927,6 +978,7 @@ export default function DealsPage() {
                   pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
                   selectedDealId={selectedDealId}
                   onDealClick={handleDealClick}
+                  filters={kanbanFilters}
                 />
               )}
             </div>

@@ -4,6 +4,9 @@ import { Page } from '@playwright/test'
  * Clear all authentication-related localStorage items
  */
 export async function clearAuthStorage(page: Page): Promise<void> {
+  if (!page.url().startsWith('http')) {
+    await page.goto('/login')
+  }
   await page.evaluate(() => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
@@ -17,6 +20,9 @@ export async function clearAuthStorage(page: Page): Promise<void> {
  * Set authentication token in localStorage
  */
 export async function setAuthToken(page: Page, token: string): Promise<void> {
+  if (!page.url().startsWith('http')) {
+    await page.goto('/login')
+  }
   await page.evaluate((token) => {
     localStorage.setItem('access_token', token)
   }, token)
@@ -29,6 +35,9 @@ export async function setUserData(
   page: Page,
   user: { id: string; email: string; firstName: string; lastName: string; role: string }
 ): Promise<void> {
+  if (!page.url().startsWith('http')) {
+    await page.goto('/login')
+  }
   await page.evaluate((user) => {
     localStorage.setItem('user', JSON.stringify(user))
     localStorage.setItem('user_id', user.id)

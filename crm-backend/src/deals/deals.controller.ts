@@ -28,6 +28,19 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 export class DealsController {
   constructor(private readonly dealsService: DealsService) {}
 
+  private parseList(value?: string | string[]): string[] | undefined {
+    if (!value) return undefined;
+    const items = Array.isArray(value) ? value : value.split(',');
+    const normalized = items.map(item => item.trim()).filter(Boolean);
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private parseNumber(value?: string): number | undefined {
+    if (value === undefined) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -51,10 +64,30 @@ export class DealsController {
   findAll(
     @Query('pipelineId') pipelineId?: string,
     @Query('stageId') stageId?: string,
+    @Query('stageIds') stageIds?: string | string[],
     @Query('assignedToId') assignedToId?: string,
     @Query('contactId') contactId?: string,
     @Query('companyId') companyId?: string,
+    @Query('createdById') createdById?: string,
     @Query('search') search?: string,
+    @Query('title') title?: string,
+    @Query('number') number?: string,
+    @Query('description') description?: string,
+    @Query('amountMin') amountMin?: string,
+    @Query('amountMax') amountMax?: string,
+    @Query('budgetMin') budgetMin?: string,
+    @Query('budgetMax') budgetMax?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('dateType') dateType?: 'created' | 'closed' | 'expectedClose',
+    @Query('expectedCloseFrom') expectedCloseFrom?: string,
+    @Query('expectedCloseTo') expectedCloseTo?: string,
+    @Query('tags') tags?: string | string[],
+    @Query('rejectionReasons') rejectionReasons?: string | string[],
+    @Query('activeStagesOnly') activeStagesOnly?: string,
+    @Query('contactSubscriberCountMin') contactSubscriberCountMin?: string,
+    @Query('contactSubscriberCountMax') contactSubscriberCountMax?: string,
+    @Query('contactDirections') contactDirections?: string | string[],
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
@@ -62,13 +95,35 @@ export class DealsController {
     // For regular lists, limit to 100 for performance
     const requestedLimit = limit ? parseInt(limit, 10) : 50;
     const limitNum = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
+    const parsedStageIds = this.parseList(stageIds);
+    const combinedStageIds = stageId ? [stageId, ...(parsedStageIds || [])] : parsedStageIds;
+
     return this.dealsService.findAll({
       pipelineId,
-      stageId,
+      stageIds: combinedStageIds,
       assignedToId,
       contactId,
       companyId,
+      createdById,
       search,
+      title,
+      number,
+      description,
+      amountMin: this.parseNumber(amountMin),
+      amountMax: this.parseNumber(amountMax),
+      budgetMin: this.parseNumber(budgetMin),
+      budgetMax: this.parseNumber(budgetMax),
+      dateFrom,
+      dateTo,
+      dateType,
+      expectedCloseFrom,
+      expectedCloseTo,
+      tags: this.parseList(tags),
+      rejectionReasons: this.parseList(rejectionReasons),
+      activeStagesOnly: activeStagesOnly === 'true',
+      contactSubscriberCountMin: this.parseNumber(contactSubscriberCountMin),
+      contactSubscriberCountMax: this.parseNumber(contactSubscriberCountMax),
+      contactDirections: this.parseList(contactDirections),
       limit: limitNum,
       cursor,
     });
@@ -81,18 +136,60 @@ export class DealsController {
   count(
     @Query('pipelineId') pipelineId?: string,
     @Query('stageId') stageId?: string,
+    @Query('stageIds') stageIds?: string | string[],
     @Query('assignedToId') assignedToId?: string,
     @Query('contactId') contactId?: string,
     @Query('companyId') companyId?: string,
+    @Query('createdById') createdById?: string,
     @Query('search') search?: string,
+    @Query('title') title?: string,
+    @Query('number') number?: string,
+    @Query('description') description?: string,
+    @Query('amountMin') amountMin?: string,
+    @Query('amountMax') amountMax?: string,
+    @Query('budgetMin') budgetMin?: string,
+    @Query('budgetMax') budgetMax?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('dateType') dateType?: 'created' | 'closed' | 'expectedClose',
+    @Query('expectedCloseFrom') expectedCloseFrom?: string,
+    @Query('expectedCloseTo') expectedCloseTo?: string,
+    @Query('tags') tags?: string | string[],
+    @Query('rejectionReasons') rejectionReasons?: string | string[],
+    @Query('activeStagesOnly') activeStagesOnly?: string,
+    @Query('contactSubscriberCountMin') contactSubscriberCountMin?: string,
+    @Query('contactSubscriberCountMax') contactSubscriberCountMax?: string,
+    @Query('contactDirections') contactDirections?: string | string[],
   ) {
+    const parsedStageIds = this.parseList(stageIds);
+    const combinedStageIds = stageId ? [stageId, ...(parsedStageIds || [])] : parsedStageIds;
+
     return this.dealsService.count({
       pipelineId,
-      stageId,
+      stageIds: combinedStageIds,
       assignedToId,
       contactId,
       companyId,
+      createdById,
       search,
+      title,
+      number,
+      description,
+      amountMin: this.parseNumber(amountMin),
+      amountMax: this.parseNumber(amountMax),
+      budgetMin: this.parseNumber(budgetMin),
+      budgetMax: this.parseNumber(budgetMax),
+      dateFrom,
+      dateTo,
+      dateType,
+      expectedCloseFrom,
+      expectedCloseTo,
+      tags: this.parseList(tags),
+      rejectionReasons: this.parseList(rejectionReasons),
+      activeStagesOnly: activeStagesOnly === 'true',
+      contactSubscriberCountMin: this.parseNumber(contactSubscriberCountMin),
+      contactSubscriberCountMax: this.parseNumber(contactSubscriberCountMax),
+      contactDirections: this.parseList(contactDirections),
     }).then(count => ({ count }));
   }
 

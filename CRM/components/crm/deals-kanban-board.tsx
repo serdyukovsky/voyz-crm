@@ -61,8 +61,11 @@ import { useSidebar } from './sidebar-context'
 
 interface DealCardData {
   id: string
+  number?: string | null
   title: string
   amount: number
+  budget?: number | null
+  description?: string | null
   contact?: {
     id: string
     fullName: string
@@ -80,8 +83,15 @@ interface DealCardData {
     name: string
     avatar?: string
   }
+  createdById?: string
+  tags?: string[]
+  rejectionReasons?: string[]
   updatedAt: string
+  createdAt?: string
+  expectedCloseAt?: string | null
+  closedAt?: string | null
   stageId: string
+  stageIsClosed?: boolean
   status?: string
 }
 
@@ -103,9 +113,24 @@ interface FilterState {
   assignedUserId?: string
   amountMin?: number
   amountMax?: number
-  updatedAfter?: string
-  updatedBefore?: string
+  budgetMin?: number
+  budgetMax?: number
+  dateFrom?: string
+  dateTo?: string
+  dateType?: 'created' | 'closed' | 'expectedClose'
+  expectedCloseFrom?: string
+  expectedCloseTo?: string
   title?: string
+  searchQuery?: string
+  number?: string
+  description?: string
+  tags?: string[]
+  rejectionReasons?: string[]
+  activeStagesOnly?: boolean
+  contactSubscriberCountMin?: number
+  contactSubscriberCountMax?: number
+  contactDirections?: string[]
+  stageIds?: string[]
 }
 
 type SortField = 'amount' | 'updatedAt'
@@ -1344,9 +1369,6 @@ export function DealsKanbanBoard({
       // Use a large limit to get all deals for the kanban board
       const dealsData = await getDeals({ 
         pipelineId: selectedPipeline.id,
-        companyId: filters.companyId,
-        contactId: filters.contactId,
-        assignedToId: filters.assignedUserId,
         limit: 10000, // Large limit for kanban to show all deals
       })
       
@@ -1356,8 +1378,11 @@ export function DealsKanbanBoard({
       const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
         return {
           id: deal.id,
+          number: deal.number ?? null,
           title: deal.title || 'Untitled Deal',
           amount: deal.amount || 0,
+          budget: deal.budget ?? null,
+          description: deal.description ?? null,
           contact: deal.contact ? {
             id: deal.contact.id,
             fullName: deal.contact.fullName || 'Unknown Contact',
@@ -1375,8 +1400,15 @@ export function DealsKanbanBoard({
             name: deal.assignedTo.name || 'Unknown User',
             avatar: deal.assignedTo.avatar,
           } : undefined,
+          createdById: deal.createdById,
+          tags: deal.tags || [],
+          rejectionReasons: deal.rejectionReasons || [],
           updatedAt: deal.updatedAt || new Date().toISOString(),
+          createdAt: deal.createdAt,
+          expectedCloseAt: deal.expectedCloseAt ?? null,
+          closedAt: deal.closedAt ?? null,
           stageId: deal.stage?.id || '',
+          stageIsClosed: deal.stage?.isClosed,
           status: deal.status,
         }
       })
@@ -1394,7 +1426,7 @@ export function DealsKanbanBoard({
     } finally {
       setLoading(false) // Always set loading to false
     }
-  }, [selectedPipeline, filters.companyId, filters.contactId, filters.assignedUserId, showError])
+  }, [selectedPipeline, showError])
 
   useEffect(() => {
     loadPipelines()
@@ -1459,7 +1491,7 @@ export function DealsKanbanBoard({
   }, [selectedPipeline])
 
   useEffect(() => {
-    console.log('useEffect triggered - selectedPipeline:', selectedPipeline?.id, 'filters:', filters)
+    console.log('useEffect triggered - selectedPipeline:', selectedPipeline?.id)
     if (selectedPipeline) {
       console.log('Calling loadDeals for pipeline:', selectedPipeline.id)
       loadDeals()
@@ -1467,7 +1499,7 @@ export function DealsKanbanBoard({
       console.log('No pipeline selected, not loading deals')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPipeline?.id, filters.companyId, filters.contactId, filters.assignedUserId])
+  }, [selectedPipeline?.id])
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -1545,11 +1577,77 @@ export function DealsKanbanBoard({
   const filteredAndSortedDeals = useMemo(() => {
     let filtered = [...deals]
 
+    if (filters.searchQuery) {
+      const searchLower = filters.searchQuery.toLowerCase()
+      filtered = filtered.filter(d => {
+        const searchableText = [
+          d.title,
+          d.number,
+          d.description,
+          d.contact?.fullName,
+          d.company?.name,
+          d.assignedTo?.name,
+          d.tags?.join(' '),
+          d.rejectionReasons?.join(' '),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        return searchableText.includes(searchLower)
+      })
+    }
+
     // Apply title filter (search by name)
     if (filters.title) {
       const searchLower = filters.title.toLowerCase()
       filtered = filtered.filter(d => 
         d.title?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    if (filters.number) {
+      const searchLower = filters.number.toLowerCase()
+      filtered = filtered.filter(d => d.number?.toLowerCase().includes(searchLower))
+    }
+
+    if (filters.description) {
+      const searchLower = filters.description.toLowerCase()
+      filtered = filtered.filter(d => d.description?.toLowerCase().includes(searchLower))
+    }
+
+    if (filters.stageIds && filters.stageIds.length > 0) {
+      const stageSet = new Set(filters.stageIds)
+      filtered = filtered.filter(d => stageSet.has(d.stageId))
+    }
+
+    if (filters.companyId) {
+      filtered = filtered.filter(d => d.company?.id === filters.companyId)
+    }
+
+    if (filters.contactId) {
+      filtered = filtered.filter(d => d.contact?.id === filters.contactId)
+    }
+
+    if (filters.assignedUserId) {
+      filtered = filtered.filter(d => d.assignedTo?.id === filters.assignedUserId)
+    }
+
+    if (filters.activeStagesOnly) {
+      filtered = filtered.filter(d => !d.stageIsClosed)
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+      const tagSet = new Set(filters.tags.map(tag => tag.toLowerCase()))
+      filtered = filtered.filter(d =>
+        (d.tags || []).some(tag => tagSet.has(tag.toLowerCase()))
+      )
+    }
+
+    if (filters.rejectionReasons && filters.rejectionReasons.length > 0) {
+      const reasonSet = new Set(filters.rejectionReasons.map(reason => reason.toLowerCase()))
+      filtered = filtered.filter(d =>
+        (d.rejectionReasons || []).some(reason => reasonSet.has(reason.toLowerCase()))
       )
     }
 
@@ -1561,14 +1659,62 @@ export function DealsKanbanBoard({
       filtered = filtered.filter(d => d.amount <= filters.amountMax!)
     }
 
-    // Apply date range filter
-    if (filters.updatedAfter) {
-      const afterDate = new Date(filters.updatedAfter)
-      filtered = filtered.filter(d => new Date(d.updatedAt) >= afterDate)
+    if (filters.budgetMin !== undefined) {
+      filtered = filtered.filter(d => (d.budget ?? 0) >= filters.budgetMin!)
     }
-    if (filters.updatedBefore) {
-      const beforeDate = new Date(filters.updatedBefore)
-      filtered = filtered.filter(d => new Date(d.updatedAt) <= beforeDate)
+    if (filters.budgetMax !== undefined) {
+      filtered = filtered.filter(d => (d.budget ?? 0) <= filters.budgetMax!)
+    }
+
+    if (filters.dateFrom || filters.dateTo) {
+      const fromDate = filters.dateFrom ? new Date(filters.dateFrom) : null
+      const toDate = filters.dateTo ? new Date(filters.dateTo) : null
+      filtered = filtered.filter(d => {
+        const dateValue =
+          filters.dateType === 'closed'
+            ? d.closedAt
+            : filters.dateType === 'expectedClose'
+              ? d.expectedCloseAt
+              : d.createdAt
+        if (!dateValue) return false
+        const dealDate = new Date(dateValue)
+        if (fromDate && dealDate < fromDate) return false
+        if (toDate && dealDate > toDate) return false
+        return true
+      })
+    }
+
+    if (filters.expectedCloseFrom || filters.expectedCloseTo) {
+      const fromDate = filters.expectedCloseFrom ? new Date(filters.expectedCloseFrom) : null
+      const toDate = filters.expectedCloseTo ? new Date(filters.expectedCloseTo) : null
+      filtered = filtered.filter(d => {
+        if (!d.expectedCloseAt) return false
+        const dealDate = new Date(d.expectedCloseAt)
+        if (fromDate && dealDate < fromDate) return false
+        if (toDate && dealDate > toDate) return false
+        return true
+      })
+    }
+
+    if (filters.contactDirections && filters.contactDirections.length > 0) {
+      const directionSet = new Set(filters.contactDirections.map(dir => dir.toLowerCase()))
+      filtered = filtered.filter(d =>
+        (d.contact?.directions || []).some(dir => directionSet.has(dir.toLowerCase()))
+      )
+    }
+
+    if (filters.contactSubscriberCountMin !== undefined || filters.contactSubscriberCountMax !== undefined) {
+      filtered = filtered.filter(d => {
+        const value = Number(d.contact?.subscriberCount)
+        if (!Number.isFinite(value)) return false
+        if (filters.contactSubscriberCountMin !== undefined && value < filters.contactSubscriberCountMin) {
+          return false
+        }
+        if (filters.contactSubscriberCountMax !== undefined && value > filters.contactSubscriberCountMax) {
+          return false
+        }
+        return true
+      })
     }
 
     // Apply sorting
@@ -2171,7 +2317,13 @@ export function DealsKanbanBoard({
     setFilters({})
   }
 
-  const hasActiveFilters = Object.keys(filters).length > 0
+  const hasActiveFilters = Object.values(filters).some(value => {
+    if (Array.isArray(value)) return value.length > 0
+    if (value === undefined || value === null) return false
+    if (typeof value === 'string') return value.trim().length > 0
+    if (typeof value === 'boolean') return value
+    return true
+  })
 
   // Get unique assigned users from deals - MUST be called before any conditional returns
   const assignedUsers = useMemo(() => {
@@ -2446,7 +2598,7 @@ export function DealsKanbanBoard({
               isStageDragged={isStageDragged}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
-              searchQuery={filters.title}
+              searchQuery={filters.searchQuery || filters.title}
             />
           )
           })}

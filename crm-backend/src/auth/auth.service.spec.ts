@@ -5,6 +5,7 @@ import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '@/common/services/prisma.service';
 import { UsersService } from '@/users/users.service';
+import { LoggingService } from '@/logging/logging.service';
 import { UserRole } from '@prisma/client';
 import * as argon2 from 'argon2';
 
@@ -78,6 +79,14 @@ describe('AuthService', () => {
               };
               return config[key];
             }),
+          },
+        },
+        {
+          provide: LoggingService,
+          useValue: {
+            log: jest.fn(),
+            error: jest.fn(),
+            warn: jest.fn(),
           },
         },
       ],
