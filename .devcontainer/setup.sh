@@ -3,6 +3,10 @@ set -e
 
 echo "🚀 Setting up CRM Development Environment..."
 
+# Persist GitHub auth/credentials across rebuilds
+git config --global credential.helper "store --file /workspaces/voyz-crm/.git-credentials"
+mkdir -p /workspaces/voyz-crm/.gh
+
 # PostgreSQL is started by the container entrypoint; just verify readiness here.
 echo "▶️  Checking PostgreSQL..."
 if pg_isready -h localhost > /dev/null 2>&1; then
