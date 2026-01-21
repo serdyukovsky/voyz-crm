@@ -52,6 +52,11 @@ desktop.ini
 *.temp
 .cache/
 
+# Credentials and test artifacts
+.git-credentials
+CRM/playwright-report/
+CRM/test-results/
+
 # Archives
 *.zip
 *.tar.gz

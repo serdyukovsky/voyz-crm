@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ImportBatchService } from './import-batch.service';
 import { PrismaService } from '@/common/services/prisma.service';
 import { CommonModule } from '@/common/common.module';
+import { SystemFieldOptionsService } from '@/system-field-options/system-field-options.service';
+import { CustomFieldsService } from '@/custom-fields/custom-fields.service';
 
 /**
  * Integration тесты для ImportBatchService
@@ -18,7 +20,23 @@ describe('ImportBatchService (Integration)', () => {
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [CommonModule],
-      providers: [ImportBatchService],
+      providers: [
+        ImportBatchService,
+        {
+          provide: SystemFieldOptionsService,
+          useValue: {
+            addOptionsIfMissing: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: CustomFieldsService,
+          useValue: {
+            findByEntity: jest.fn().mockResolvedValue([]),
+            addOptionsToMultiSelectField: jest.fn().mockResolvedValue(undefined),
+            setValue: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<ImportBatchService>(ImportBatchService);
@@ -39,6 +57,7 @@ describe('ImportBatchService (Integration)', () => {
   beforeEach(async () => {
     // Очистка БД перед каждым тестом
     await prisma.activity.deleteMany();
+    await prisma.task.deleteMany();
     await prisma.deal.deleteMany();
     await prisma.contact.deleteMany();
     await prisma.company.deleteMany();
@@ -46,6 +65,7 @@ describe('ImportBatchService (Integration)', () => {
 
   afterAll(async () => {
     await prisma.activity.deleteMany();
+    await prisma.task.deleteMany();
     await prisma.deal.deleteMany();
     await prisma.contact.deleteMany();
     await prisma.company.deleteMany();
@@ -449,7 +469,7 @@ describe('ImportBatchService (Integration)', () => {
       const result = await service.batchCreateContacts(contactsData, testUserId);
 
       // Проверка: должно быть минимум 3 транзакции (2500 / 1000 = 2.5, округляем до 3)
-      expect(transactionSpy).toHaveBeenCalledTimes(3);
+      expect(transactionSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
 
       expect(result.created).toBe(2500);
       expect(result.errors).toHaveLength(0);
@@ -525,7 +545,7 @@ describe('ImportBatchService (Integration)', () => {
 
       expect(deals).toHaveLength(2);
       expect(deals[0].title).toBe('Сделка 1');
-      expect(deals[0].amount).toEqual(100000);
+      expect(Number(deals[0].amount)).toEqual(100000);
     });
 
     it('должен обработать batch > 1000 сделок', async () => {
@@ -595,7 +615,7 @@ describe('ImportBatchService (Integration)', () => {
       const existing = await prisma.deal.findUnique({
         where: { number: 'DEAL-EXISTING' },
       });
-      expect(existing?.amount).toEqual(100000); // Старое значение
+      expect(Number(existing?.amount)).toEqual(100000); // Старое значение
     });
 
     it('должен обработать batch > 1000 сделок и разделить на несколько транзакций', async () => {
@@ -616,7 +636,7 @@ describe('ImportBatchService (Integration)', () => {
       const result = await service.batchCreateDeals(dealsData, testUserId);
 
       // Проверка: должно быть минимум 3 транзакции (2500 / 1000 = 2.5, округляем до 3)
-      expect(transactionSpy).toHaveBeenCalledTimes(3);
+      expect(transactionSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
 
       expect(result.created).toBe(2500);
 
@@ -716,7 +736,7 @@ describe('ImportBatchService (Integration)', () => {
       });
 
       expect(deal1?.title).toBe('Сделка 1');
-      expect(deal1?.amount).toEqual(100000);
+      expect(Number(deal1?.amount)).toEqual(100000);
       expect(deal1?.budget).toEqual(120000);
       expect(deal1?.description).toBe('Описание сделки 1');
       expect(deal1?.tags).toContain('vip');

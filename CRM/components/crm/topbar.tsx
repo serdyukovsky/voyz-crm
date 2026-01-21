@@ -20,7 +20,7 @@ import { useSidebar } from './sidebar-context'
 import { useSearch } from './search-context'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
-import { DealSearchPanel, type DealSearchFilters } from './deal-search-panel'
+import { DealSearchPanel } from './deal-search-panel'
 
 interface Notification {
   id: string
@@ -48,11 +48,10 @@ export function Topbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isCollapsed } = useSidebar()
-  const { searchValue, setSearchValue } = useSearch()
+  const { searchValue, setSearchValue, setDealFilters } = useSearch()
   const { logout: logoutFromContext } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
-  const [appliedFilters, setAppliedFilters] = useState<DealSearchFilters | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [user, setUser] = useState<User | null>(null)
 
@@ -173,9 +172,7 @@ export function Topbar() {
               open={searchPanelOpen}
               onClose={() => setSearchPanelOpen(false)}
               onApplyFilters={(filters) => {
-                setAppliedFilters(filters)
-                // Здесь можно добавить логику применения фильтров
-                // Например, обновить URL или передать фильтры в родительский компонент
+                setDealFilters(filters)
                 console.log('Applied filters:', filters)
               }}
             />
