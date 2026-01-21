@@ -18,7 +18,7 @@ import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
-import { getDeals, deleteDeal, bulkDeleteDeals, bulkAssignDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
+import { getDeals, deleteDeal, updateDeal, bulkDeleteDeals, bulkAssignDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
 import { getUsers, type User as APIUser } from "@/lib/api/users"
 import { useSelectionState } from "@/hooks/use-selection-state"
 import { getPipelines } from "@/lib/api/pipelines"
@@ -740,16 +740,61 @@ function DealsPageContent() {
     }
   }
 
-  const handleBulkChangeStage = (newStage: string) => {
-    // This is for kanban view, keep as is for now
+  const handleBulkChangeStage = async (newStage: string) => {
+    if (selection.getSelectedCount() === 0) {
+      return
+    }
+
     const selectedIds = selection.state.selectionMode === 'PAGE' 
       ? Array.from(selection.state.selectedIds)
       : listDeals.map(d => d.id).filter(id => selection.isSelected(id))
-    
-    setDeals(deals.map(d => 
-      selectedIds.includes(d.id) ? { ...d, stage: newStage } : d
+
+    if (selectedIds.length === 0) {
+      return
+    }
+
+    const updatedAt = new Date().toISOString()
+    const stageLabel = stages.find(stage => stage.id === newStage)?.label
+
+    // Optimistic UI update for list and kanban data
+    setListDeals(prevDeals => prevDeals.map(deal => {
+      if (!selectedIds.includes(deal.id)) {
+        return deal
+      }
+      return {
+        ...deal,
+        stageId: newStage,
+        stage: {
+          id: newStage,
+          name: stageLabel || deal.stage?.name || newStage
+        },
+        updatedAt
+      }
+    }))
+    setDeals(prevDeals => prevDeals.map(deal =>
+      selectedIds.includes(deal.id) ? { ...deal, stage: newStage, updatedAt } : deal
     ))
+
     selection.clearSelection()
+
+    const results = await Promise.all(
+      selectedIds.map(dealId =>
+        updateDeal(dealId, { stageId: newStage }).catch(error => {
+          console.error(`Failed to update deal ${dealId} stage:`, error)
+          return null
+        })
+      )
+    )
+
+    const failedCount = results.filter(result => result === null).length
+    if (failedCount > 0) {
+      showError(
+        'Ошибка при изменении стадии',
+        `Не удалось обновить ${failedCount} сдел${failedCount === 1 ? 'ку' : failedCount <= 4 ? 'ки' : 'ок'}`
+      )
+    } else {
+      showSuccess('Стадия сделки обновлена')
+    }
   }
 
   const { showSuccess, showError } = useToastNotification()

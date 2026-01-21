@@ -14,6 +14,7 @@ export interface Deal {
   client: string
   amount: number
   stage: string
+  stageName?: string
   assignedTo: {
     name: string
     avatar: string

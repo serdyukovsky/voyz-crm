@@ -149,7 +149,7 @@ export function DealsListView({
   return (
     <div>
       {selectedDeals.length > 0 && (
-        <div className="mb-4 p-3 bg-surface border border-border/40 rounded-lg flex items-center justify-between">
+        <div className="mb-4 p-3 bg-card border border-border/40 rounded-lg flex items-center justify-between">
           <span className="text-sm text-foreground">
             {selectionMode === 'ALL_MATCHING' && totalCount !== undefined
               ? `${totalCount - (totalCount - selectedDeals.length)} из ${totalCount} ${t('deals.deals')} ${t('common.selected')}`
@@ -169,10 +169,10 @@ export function DealsListView({
               {isStageDropdownOpen && (
                 <>
                   <div
-                    className="fixed inset-0 z-10"
+                    className="fixed inset-0 z-40"
                     onClick={() => setIsStageDropdownOpen(false)}
                   />
-                  <div className="absolute top-full right-0 mt-2 w-48 bg-surface border border-border/40 rounded-lg shadow-lg z-20 overflow-hidden">
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-popover text-popover-foreground border border-border/40 rounded-lg shadow-lg z-50 overflow-hidden">
                     {stages.map((stage) => (
                       <button
                         key={stage.id}
@@ -180,7 +180,7 @@ export function DealsListView({
                           if (onBulkChangeStage) onBulkChangeStage(stage.id)
                           setIsStageDropdownOpen(false)
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface/50 transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
                       >
                         {stage.label}
                       </button>
@@ -213,7 +213,7 @@ export function DealsListView({
       <div className="border border-border/40 rounded-lg overflow-hidden">
         <table className="w-full table-fixed">
           <thead>
-            <tr className="border-b border-border/40 bg-surface/30">
+            <tr className="border-b border-border/40 bg-card/30">
               <th className="w-12 px-2 py-2 align-middle">
                 <div className="flex items-center justify-center">
                   <input
@@ -266,7 +266,7 @@ export function DealsListView({
                 <tr
                   key={deal.id}
                   className={cn(
-                    "border-b border-border/40 hover:bg-surface/30 transition-colors",
+                    "border-b border-border/40 hover:bg-card/30 transition-colors",
                     isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
                   )}
                 >
