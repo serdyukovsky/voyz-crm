@@ -65,12 +65,12 @@ const activities = [
 export function RecentActivityCard() {
   const { t } = useTranslation()
   return (
-    <Card className="border-border/50 bg-card">
-      <CardHeader className="pb-3">
+    <Card className="border-border/50 bg-card gap-4">
+      <CardHeader className="px-4 pt-4 pb-2">
         <CardTitle className="text-sm font-semibold text-foreground">{t('dashboard.recentActivity')}</CardTitle>
         <p className="text-xs text-muted-foreground">{t('dashboard.latestUpdates')}</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         <div className="space-y-4">
           {activities.map((activity, index) => {
             const Icon = activity.icon
