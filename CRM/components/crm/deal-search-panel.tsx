@@ -227,6 +227,16 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
     onClose()
   }
 
+  // Автоприменение фильтров при изменениях, пока панель открыта
+  useEffect(() => {
+    if (!open) return
+    const timeoutId = window.setTimeout(() => {
+      onApplyFilters?.(filters)
+    }, 150)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [filters, open, onApplyFilters])
+
   const handleClear = () => {
     setFilters({
       activeStagesOnly: true,
@@ -599,7 +609,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                 )}
               </div>
 
-              {/* Активные статусы (этапы) */}
+              {/* Активные этапы */}
               <div className="space-y-1.5">
                 {(() => {
                   const hasSelectedStages = filters.stageIds && filters.stageIds.length > 0
@@ -667,7 +677,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                       )
                     }
                   } else {
-                    // Если список закрыт, показываем "Активные статусы" или выбранные этапы
+                    // Если список закрыт, показываем "Активные этапы" или выбранные этапы
                     const selectedStages = filters.stageIds 
                       ? allStages.filter(s => filters.stageIds?.includes(s.id))
                       : []
@@ -717,7 +727,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                           <>
                             <Filter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                             <span className="truncate">
-                              {t('deals.search.fields.activeStages') || 'Активные статусы'}
+                              {t('deals.search.fields.activeStages') || 'Активные этапы'}
                             </span>
                           </>
                         )}
