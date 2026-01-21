@@ -371,15 +371,28 @@ export function AutoMappingForm({
         )}
       </div>
 
+      {/* Required mapping hint (shown once) */}
+      {!Object.values(mapping).includes('title') && (
+        <div className="flex items-start gap-2 p-3 border border-destructive/20 bg-destructive/5 rounded-lg">
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+          <div>
+            <p className="text-xs font-medium text-destructive">Deal: Title mapping is required</p>
+            <p className="text-xs text-destructive/80 mt-1">
+              {t('importExport.selectTitleColumn')}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Unified Mapping Table */}
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wide w-1/2">
                 CSV Column
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase tracking-wide w-1/2">
                 CRM Field
               </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-foreground uppercase tracking-wide w-12">
@@ -471,128 +484,82 @@ export function AutoMappingForm({
                     }}
                   >
                     <SelectTrigger className={cn(
-                      "h-9 bg-card border-border w-full",
-                      // Highlight required field (title) if not mapped
-                      normalizedMapping !== 'title' && !Object.values(mapping).includes('title') && crmFields.find(f => f.key === 'title' && f.required) && "border-destructive/50"
+                      "h-9 bg-card border-border w-full"
                     )}>
                       <SelectValue placeholder={t('common.select')} />
                     </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[300px] w-[var(--radix-select-trigger-width)]">
                     {/* Sentinel value for "skip" */}
                     <SelectItem value={SKIP_COLUMN_VALUE}>{t('importExport.skipColumn')}</SelectItem>
                     
-                    {/* If current mapping is a stage field, show stages from selected pipeline */}
-                    {isStageField(normalizedMapping) ? (
-                      <>
-                        {!selectedPipelineId ? (
-                          <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/50 rounded-md mx-2 my-1">
-                            <span className="font-medium">ℹ️ {t('importExport.selectPipelineToSeeStages')}</span>
+                    {/* Show grouped fields: DEAL, CONTACT, OTHER */}
+                    <>
+                      {/* DEAL Fields Group */}
+                      {groupedFields.deal.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20 sticky top-0">
+                            DEAL Fields
                           </div>
-                        ) : getSelectedPipelineStages().length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-yellow-600 bg-yellow-50 rounded-md mx-2 my-1">
-                            <span className="font-medium">ℹ️ {t('importExport.noStagesInPipeline')}</span>
+                          {groupedFields.deal.map((field, fieldIdx) => (
+                            <SelectItem key={`deal-${field.key}-${fieldIdx}`} value={field.key}>
+                              <div className="flex items-center gap-2 w-full">
+                                <span className="truncate">{getFieldLabel(field)}</span>
+                                {field.required && (
+                                  <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {/* CONTACT Fields Group */}
+                      {groupedFields.contact.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20 sticky top-0">
+                            CONTACT Fields
                           </div>
-                        ) : (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20 sticky top-0">
-                              📍 {t('importExport.mapCsvValueToStage')}
-                            </div>
-                            {getSelectedPipelineStages().map((stage) => (
-                              <SelectItem key={stage.id} value={stage.name}>
-                                <div className="flex items-center gap-2">
-                                  {stage.color && (
-                                    <div 
-                                      className="w-2 h-2 rounded-full" 
-                                      style={{ backgroundColor: stage.color }}
-                                    />
-                                  )}
-                                  <span>{stage.name}</span>
-                                  {stage.isDefault && (
-                                    <Badge variant="outline" className="text-xs">Default</Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      /* Show grouped fields: DEAL, CONTACT, OTHER */
-                      <>
-                        {/* DEAL Fields Group */}
-                        {groupedFields.deal.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20 sticky top-0">
-                              DEAL Fields
-                            </div>
-                            {groupedFields.deal.map((field, fieldIdx) => (
-                              <SelectItem key={`deal-${field.key}-${fieldIdx}`} value={field.key}>
-                                <div className="flex items-center gap-2">
-                                  <span>{getFieldLabel(field)}</span>
-                                  {field.required && (
-                                    <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        
-                        {/* CONTACT Fields Group */}
-                        {groupedFields.contact.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-primary bg-primary/5 border-b border-primary/20 sticky top-0">
-                              CONTACT Fields
-                            </div>
-                            {groupedFields.contact.map((field, fieldIdx) => (
-                              <SelectItem key={`contact-${field.key}-${fieldIdx}`} value={field.key}>
-                                <div className="flex items-center gap-2">
-                                  <span>{getFieldLabel(field)}</span>
-                                  {field.required && (
-                                    <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        
-                        {/* Other Fields Group (if any) */}
-                        {groupedFields.other.length > 0 && (
-                          <>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border sticky top-0">
-                              Other Fields
-                            </div>
-                            {groupedFields.other.map((field, fieldIdx) => (
-                              <SelectItem key={`other-${field.key}-${fieldIdx}`} value={field.key}>
-                                <div className="flex items-center gap-2">
-                                  <span>{getFieldLabel(field)}</span>
-                                  {field.required && (
-                                    <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                        
-                        {/* Fallback if no fields available */}
-                        {crmFields.length === 0 && (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                            {t('importExport.noFieldsAvailable')}
+                          {groupedFields.contact.map((field, fieldIdx) => (
+                            <SelectItem key={`contact-${field.key}-${fieldIdx}`} value={field.key}>
+                              <div className="flex items-center gap-2 w-full">
+                                <span className="truncate">{getFieldLabel(field)}</span>
+                                {field.required && (
+                                  <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {/* Other Fields Group (if any) */}
+                      {groupedFields.other.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border sticky top-0">
+                            Other Fields
                           </div>
-                        )}
-                      </>
-                    )}
+                          {groupedFields.other.map((field, fieldIdx) => (
+                            <SelectItem key={`other-${field.key}-${fieldIdx}`} value={field.key}>
+                              <div className="flex items-center gap-2 w-full">
+                                <span className="truncate">{getFieldLabel(field)}</span>
+                                {field.required && (
+                                  <Badge variant="outline" className="text-xs">{t('importExport.required')}</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {/* Fallback if no fields available */}
+                      {crmFields.length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {t('importExport.noFieldsAvailable')}
+                        </div>
+                      )}
+                    </>
                   </SelectContent>
                 </Select>
-                {/* Inline error for required field (title) if not mapped */}
-                {!Object.values(mapping).includes('title') && crmFields.find(f => f.key === 'title' && f.required) && (
-                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    Deal: Title mapping is required
-                  </p>
-                )}
                 </div>
               </td>
               

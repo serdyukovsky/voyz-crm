@@ -567,7 +567,9 @@ function DealsPageContent() {
     e?.preventDefault()
     e?.stopPropagation()
     
-    const selectedCount = selection.getSelectedCount()
+    const selectedCount = deleteMode === 'ALL_MATCHING'
+      ? Math.max(0, (totalCount ?? 0) - selection.state.excludedIds.size)
+      : selection.getSelectedCount()
     if (selectedCount === 0) {
       return
     }
@@ -578,7 +580,7 @@ function DealsPageContent() {
       
       let result: { deletedCount: number; failedCount: number }
       
-      if (deleteMode === 'PAGE' || selection.state.selectionMode === 'PAGE') {
+      if (deleteMode === 'PAGE') {
         // Delete by IDs (page selection)
         const idsToDelete = Array.from(selection.state.selectedIds)
         result = await bulkDeleteDeals({
@@ -604,12 +606,17 @@ function DealsPageContent() {
       setDeletionProgress({ current: result.deletedCount, total: selectedCount })
       
       // Remove deleted deals from listDeals (only if PAGE mode)
-      if (deleteMode === 'PAGE' || selection.state.selectionMode === 'PAGE') {
+      if (deleteMode === 'PAGE') {
         const idsToDelete = Array.from(selection.state.selectedIds)
         setListDeals(prevDeals => prevDeals.filter(deal => !idsToDelete.includes(deal.id)))
       } else {
         // For ALL_MATCHING mode, reload the list
         // This will be handled by the useEffect that watches filters
+      }
+
+      // Update total count locally if known
+      if (totalCount !== undefined && result.deletedCount > 0) {
+        setTotalCount(Math.max(0, totalCount - result.deletedCount))
       }
       
       // Clear selection
@@ -630,9 +637,9 @@ function DealsPageContent() {
       }
       
       // Reload deals if needed
-      if (viewMode === 'list' && deleteMode === 'ALL_MATCHING') {
-        // Trigger reload by updating a dependency
-        setKanbanRefreshKey(prev => prev + 1)
+      if (viewMode === 'list') {
+        // Trigger reload for list view
+        setListRefreshKey(prev => prev + 1)
       }
     } catch (error) {
       console.error('Failed to delete deals:', error)
@@ -662,6 +669,7 @@ function DealsPageContent() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [selectedPipelineForList, setSelectedPipelineForList] = useState<string | undefined>()
   const [kanbanRefreshKey, setKanbanRefreshKey] = useState(0)
+  const [listRefreshKey, setListRefreshKey] = useState(0)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deletionProgress, setDeletionProgress] = useState({ current: 0, total: 0 })
@@ -796,7 +804,7 @@ function DealsPageContent() {
       setNextCursor(undefined)
       setHasMore(false)
     }
-  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title])
+  }, [viewMode, selectedPipelineForList, filters.companyId, filters.contactId, filters.assignedUserId, filters.title, listRefreshKey])
   
   // Memoize selectedDeals array for DealsListView (must be before conditional rendering)
   const selectedDealsArray = useMemo(() => {
@@ -1388,7 +1396,7 @@ function DealsPageContent() {
               {/* Delete Mode Selection */}
               {!isDeleting && (
                 <div className="space-y-3 py-2 border-b border-border/40">
-                  <label className="flex items-start gap-3 p-3 rounded-md border border-border/40 hover:bg-surface/30 cursor-pointer transition-colors">
+                    <label className="flex items-start gap-3 p-3 rounded-md border border-border/40 hover:bg-surface/30 cursor-pointer transition-colors">
                     <input
                       type="radio"
                       name="deleteMode"
@@ -1401,7 +1409,7 @@ function DealsPageContent() {
                         Удалить только выбранные на странице
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        Будет удалено {selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length} {selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length === 1 ? 'сделка' : 'сделок'}
+                        Будет удалено {selection.state.selectedIds.size} {selection.state.selectedIds.size === 1 ? 'сделка' : 'сделок'}
                       </div>
                     </div>
                   </label>
@@ -1419,7 +1427,7 @@ function DealsPageContent() {
                           Удалить все найденные по текущему фильтру
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          Будет удалено {selection.state.selectionMode === 'ALL_MATCHING' ? totalCount - selection.state.excludedIds.size : totalCount} из {totalCount} {totalCount === 1 ? 'сделки' : 'сделок'} по текущим фильтрам
+                          Будет удалено {totalCount - selection.state.excludedIds.size} из {totalCount} {totalCount === 1 ? 'сделки' : 'сделок'} по текущим фильтрам
                         </div>
                       </div>
                     </label>
@@ -1458,7 +1466,7 @@ function DealsPageContent() {
               {!isDeleting && deleteMode === 'PAGE' && (
                 <div className="max-h-[300px] overflow-y-auto rounded-md border border-border/40 bg-surface/30 p-4">
                   <p className="mb-3 text-sm font-medium text-foreground">
-                    Сделки для удаления ({selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length}):
+                    Сделки для удаления ({selection.state.selectedIds.size}):
                   </p>
                   <div className="space-y-2">
                     {listDeals
@@ -1470,9 +1478,9 @@ function DealsPageContent() {
                           <span className="truncate text-foreground">{deal.title || 'Untitled Deal'}</span>
                         </div>
                       ))}
-                    {(selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length) > 10 && (
+                    {selection.state.selectedIds.size > 10 && (
                       <p className="text-xs text-muted-foreground pt-1">
-                        и еще {(selection.state.selectionMode === 'PAGE' ? selection.state.selectedIds.size : listDeals.filter(d => selection.isSelected(d.id)).length) - 10}...
+                        и еще {selection.state.selectedIds.size - 10}...
                       </p>
                     )}
                   </div>
