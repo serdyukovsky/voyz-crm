@@ -111,6 +111,7 @@ async function main() {
 
     // Создаём тестовые сделки
     console.log('💼 Создание тестовых сделок...');
+    const deals: any[] = [];
     for (const dealData of TEST_DEALS) {
       const stageId = stagesMap.get(dealData.stageName);
       if (!stageId) {
@@ -130,7 +131,61 @@ async function main() {
           createdById: firstUser.id,
         },
       });
+      deals.push(deal);
       console.log(`  ✅ "${deal.title}" → ${dealData.stageName} (${dealData.amount}₽)`);
+    }
+
+    // Создаём тестовые задачи для сделок
+    console.log('\n📋 Создание тестовых задач...');
+    if (deals.length > 0) {
+      // Добавляем активную задачу (без просрочки) к первой сделке
+      await prisma.task.create({
+        data: {
+          title: 'Активная задача - подготовить документы',
+          description: 'Необходимо подготовить все необходимые документы для клиента',
+          dealId: deals[0].id,
+          assignedToId: firstUser.id,
+          createdById: firstUser.id,
+          status: 'TODO',
+          priority: 'HIGH',
+          deadline: new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000), // 5 дней в будущем
+        },
+      });
+      console.log(`  ✅ Активная задача добавлена к "${deals[0].title}"`);
+
+      // Добавляем просроченную задачу (на 5 дней) ко второй сделке
+      if (deals.length > 1) {
+        await prisma.task.create({
+          data: {
+            title: 'Просроченная задача - связаться с клиентом',
+            description: 'Требуется срочно связаться с клиентом по поводу КП',
+            dealId: deals[1].id,
+            assignedToId: firstUser.id,
+            createdById: firstUser.id,
+            status: 'IN_PROGRESS',
+            priority: 'HIGH',
+            deadline: new Date(new Date().getTime() - 5 * 24 * 60 * 60 * 1000), // 5 дней назад
+          },
+        });
+        console.log(`  ✅ Просроченная задача (5 дней) добавлена к "${deals[1].title}"`);
+      }
+
+      // Добавляем задачу с большей просрочкой к третьей сделке
+      if (deals.length > 2) {
+        await prisma.task.create({
+          data: {
+            title: 'Критична просроченная задача - согласовать КП',
+            description: 'КП согласован и готов к отправке',
+            dealId: deals[2].id,
+            assignedToId: firstUser.id,
+            createdById: firstUser.id,
+            status: 'IN_PROGRESS',
+            priority: 'HIGH',
+            deadline: new Date(new Date().getTime() - 10 * 24 * 60 * 60 * 1000), // 10 дней назад
+          },
+        });
+        console.log(`  ✅ Критичная просроченная задача (10 дней) добавлена к "${deals[2].title}"`);
+      }
     }
 
     console.log('\n🎉 ГОТОВО! Тестовая воронка успешно создана!\n');

@@ -36,6 +36,11 @@ export interface Deal {
   rejectionReasons?: string[]
   createdAt?: string
   updatedAt?: string
+  tasks?: Array<{
+    id: string
+    status: string
+    deadline: string | null
+  }>
 }
 
 export interface PaginatedDealsResponse {

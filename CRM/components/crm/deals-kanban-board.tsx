@@ -58,6 +58,7 @@ import { getWsUrl } from '@/lib/config'
 import { CreateDealModal } from './create-deal-modal'
 import { AddStageModal } from './add-stage-modal'
 import { useSidebar } from './sidebar-context'
+import { TaskIndicator } from './task-indicator'
 
 interface DealCardData {
   id: string
@@ -398,11 +399,12 @@ function DealCard({
           </div>
         )}
 
-        {/* Updated Date */}
-        <div className="mb-2">
+        {/* Updated Date + Task Indicator */}
+        <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
             {formatRelativeTime(deal.updatedAt)}
           </div>
+          <TaskIndicator tasks={deal.tasks} />
         </div>
       </CardContent>
     </Card>
@@ -1379,10 +1381,15 @@ export function DealsKanbanBoard({
         limit: 10000, // Large limit for kanban to show all deals
       }
       const dealsData = await getDeals(apiParams)
-      
+      console.log('📦 Deals loaded from API:', dealsData)
+
       // API now returns paginated response, extract data array
       const safeDealsData = dealsData.data || []
-      
+      console.log('📋 Safe deals data length:', safeDealsData.length)
+      if (safeDealsData.length > 0) {
+        console.log('📌 First deal tasks:', safeDealsData[0].tasks)
+      }
+
       const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
         return {
           id: deal.id,
