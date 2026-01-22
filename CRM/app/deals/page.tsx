@@ -245,8 +245,14 @@ export default function DealsPage() {
   const searchInput = useMemo(() => searchValue.trim(), [searchValue])
   const titleFilter = useMemo(() => dealFilters?.title?.trim() || '', [dealFilters])
 
+  // Debug: Log dealFilters changes
+  useEffect(() => {
+    console.log('🔵 deals/page.tsx: dealFilters changed:', dealFilters)
+    console.log('🔵 deals/page.tsx: dealFilters.taskStatuses =', dealFilters?.taskStatuses)
+  }, [dealFilters])
+
   const kanbanFilters = useMemo(() => {
-    return {
+    const filters = {
       searchQuery: searchInput || undefined,
       title: titleFilter || undefined,
       number: dealFilters?.number,
@@ -270,7 +276,11 @@ export default function DealsPage() {
       contactSubscriberCountMax: dealFilters?.contactSubscriberCountMax,
       contactDirections: dealFilters?.contactDirections,
       stageIds: dealFilters?.stageIds,
+      taskStatuses: dealFilters?.taskStatuses,
     }
+    console.log('🔵 kanbanFilters useMemo: dealFilters =', dealFilters)
+    console.log('🔵 kanbanFilters useMemo: taskStatuses =', filters.taskStatuses)
+    return filters
   }, [searchInput, titleFilter, dealFilters])
 
   // Read deal ID from URL on mount and when URL changes
@@ -669,6 +679,7 @@ export default function DealsPage() {
       contactSubscriberCountMin: dealFilters?.contactSubscriberCountMin,
       contactSubscriberCountMax: dealFilters?.contactSubscriberCountMax,
       contactDirections: dealFilters?.contactDirections,
+      taskStatuses: dealFilters?.taskStatuses,
     }
   }, [searchInput, titleFilter, selectedPipelineForList, dealFilters])
 

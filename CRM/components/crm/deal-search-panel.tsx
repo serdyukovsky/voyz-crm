@@ -42,6 +42,8 @@ export interface DealSearchFilters {
   contactSubscriberCountMin?: number
   contactSubscriberCountMax?: number
   contactDirections?: string[]
+  // Статусы задач
+  taskStatuses?: string[]
 }
 
 interface DealSearchPreset {
@@ -74,6 +76,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const [isContactOpen, setIsContactOpen] = useState(false)
   const [isCompanyOpen, setIsCompanyOpen] = useState(false)
   const [isDirectionsOpen, setIsDirectionsOpen] = useState(false)
+  const [isTasksOpen, setIsTasksOpen] = useState(false)
   const [allDirections, setAllDirections] = useState<string[]>([])
   const stagesListRef = useRef<HTMLDivElement>(null)
   const assignedToRef = useRef<HTMLDivElement>(null)
@@ -81,6 +84,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const contactRef = useRef<HTMLDivElement>(null)
   const companyRef = useRef<HTMLDivElement>(null)
   const directionsRef = useRef<HTMLDivElement>(null)
+  const tasksRef = useRef<HTMLDivElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   const [filters, setFilters] = useState<DealSearchFilters>({
@@ -170,7 +174,8 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
         name: t('deals.search.presets.overdueTasks') || 'Сделки с просроченными задачами',
         icon: <AlertCircle className="h-4 w-4 text-orange-500" />,
         filters: {
-          activeStagesOnly: true
+          activeStagesOnly: true,
+          taskStatuses: ['overdue']
         }
       },
       {
@@ -207,7 +212,8 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
         name: t('deals.search.presets.noTasks') || 'Сделки без задач',
         icon: <AlertCircle className="h-4 w-4 text-yellow-500" />,
         filters: {
-          activeStagesOnly: true
+          activeStagesOnly: true,
+          taskStatuses: ['noTasks']
         }
       }
     ]
@@ -219,7 +225,10 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const allStages = selectedPipeline?.stages || []
 
   const handlePresetClick = (preset: DealSearchPreset) => {
-    setFilters(preset.filters)
+    setFilters({
+      ...filters,
+      ...preset.filters
+    })
   }
 
   const handleApply = () => {
@@ -298,15 +307,24 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
           setIsDirectionsOpen(false)
         }
       }
+
+      // Закрываем список задач
+      if (isTasksOpen && tasksRef.current) {
+        const isInsideList = tasksRef.current.contains(target)
+        const isOnButton = target.closest('[data-tasks-button]')
+        if (!isInsideList && !isOnButton) {
+          setIsTasksOpen(false)
+        }
+      }
     }
 
-    if (isStagesOpen || isAssignedToOpen || isCreatedByOpen || isContactOpen || isCompanyOpen || isDirectionsOpen) {
+    if (isStagesOpen || isAssignedToOpen || isCreatedByOpen || isContactOpen || isCompanyOpen || isDirectionsOpen || isTasksOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => {
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isStagesOpen, isAssignedToOpen, isCreatedByOpen, isContactOpen, isCompanyOpen, isDirectionsOpen])
+  }, [isStagesOpen, isAssignedToOpen, isCreatedByOpen, isContactOpen, isCompanyOpen, isDirectionsOpen, isTasksOpen])
 
   if (!open) return null
 
@@ -1176,6 +1194,149 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                                   className="pointer-events-none"
                                 />
                                 <span className="truncate">{direction}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+
+              {/* Задачи */}
+              <div className="space-y-1.5">
+                {(() => {
+                  const selectedTasks = filters.taskStatuses || []
+                  const taskOptions = [
+                    { id: 'today', label: t('deals.search.tasks.today') || 'На сегодня' },
+                    { id: 'tomorrow', label: t('deals.search.tasks.tomorrow') || 'На завтра' },
+                    { id: 'dayAfterTomorrow', label: t('deals.search.tasks.dayAfterTomorrow') || 'На послезавтра' },
+                    { id: 'thisWeek', label: t('deals.search.tasks.thisWeek') || 'На этой неделе' },
+                    { id: 'thisMonth', label: t('deals.search.tasks.thisMonth') || 'В этом месяце' },
+                    { id: 'thisQuarter', label: t('deals.search.tasks.thisQuarter') || 'В этом квартале' },
+                    { id: 'noTasks', label: t('deals.search.tasks.noTasks') || 'Нет задач' },
+                    { id: 'overdue', label: t('deals.search.tasks.overdue') || 'Просрочены' }
+                  ]
+
+                  return (
+                    <>
+                      <button
+                        data-tasks-button
+                        onClick={() => setIsTasksOpen(!isTasksOpen)}
+                        className={cn(
+                          "w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-transparent",
+                          "hover:bg-accent/50 transition-colors",
+                          "flex items-center gap-2",
+                          "group",
+                          "text-foreground/70 hover:text-foreground",
+                          isTasksOpen && "bg-accent"
+                        )}
+                      >
+                        <span className="truncate">
+                          {selectedTasks.length > 0 ? (
+                            <>
+                              <span className="font-medium">{t('deals.search.tasks.title') || 'Задачи'}:</span>
+                              {' '}
+                              {selectedTasks.length === taskOptions.length
+                                ? t('deals.search.tasks.allValues') || 'Все значения'
+                                : taskOptions
+                                    .filter(opt => selectedTasks.includes(opt.id))
+                                    .map(opt => opt.label)
+                                    .join(', ')}
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium">{t('deals.search.tasks.title') || 'Задачи'}:</span>
+                              {' '}
+                              <span>{t('deals.search.tasks.allValues') || 'Все значения'}</span>
+                            </>
+                          )}
+                        </span>
+                      </button>
+                      {isTasksOpen && (
+                        <div
+                          ref={tasksRef}
+                          className="bg-muted/30 rounded-md p-2 space-y-0.5 max-h-96 overflow-y-auto"
+                        >
+                          {(() => {
+                            const hasSelected = selectedTasks.length > 0
+
+                            if (hasSelected) {
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setFilters({ ...filters, taskStatuses: undefined })
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-transparent",
+                                    "hover:bg-accent/50 transition-colors",
+                                    "flex items-center gap-2",
+                                    "text-foreground/70 hover:text-foreground"
+                                  )}
+                                >
+                                  <div className="w-4 h-4 border border-muted-foreground rounded flex items-center justify-center flex-shrink-0">
+                                    <span className="text-[10px]">−</span>
+                                  </div>
+                                  <span className="truncate">
+                                    {t('deals.search.stages.deselectAll') || 'Снять выделение'}
+                                  </span>
+                                </button>
+                              )
+                            } else {
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setFilters({ ...filters, taskStatuses: taskOptions.map(t => t.id) })
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-transparent",
+                                    "hover:bg-accent/50 transition-colors",
+                                    "flex items-center gap-2",
+                                    "text-foreground/70 hover:text-foreground"
+                                  )}
+                                >
+                                  <Checkbox
+                                    checked={false}
+                                    onCheckedChange={() => {}}
+                                    className="pointer-events-none flex-shrink-0"
+                                  />
+                                  <span className="truncate">
+                                    {t('deals.search.stages.selectAll') || 'Выделить все'}
+                                  </span>
+                                </button>
+                              )
+                            }
+                          })()}
+
+                          {taskOptions.map((task) => {
+                            const isSelected = selectedTasks.includes(task.id)
+                            return (
+                              <button
+                                key={task.id}
+                                onClick={() => {
+                                  const currentTasks = filters.taskStatuses || []
+                                  if (isSelected) {
+                                    const newTasks = currentTasks.filter(t => t !== task.id)
+                                    setFilters({
+                                      ...filters,
+                                      taskStatuses: newTasks.length > 0 ? newTasks : undefined
+                                    })
+                                  } else {
+                                    setFilters({
+                                      ...filters,
+                                      taskStatuses: [...currentTasks, task.id]
+                                    })
+                                  }
+                                }}
+                                className="w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-background hover:bg-accent/50 transition-colors flex items-center gap-2"
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => {}}
+                                  className="pointer-events-none"
+                                />
+                                <span className="truncate">{task.label}</span>
                               </button>
                             )
                           })}

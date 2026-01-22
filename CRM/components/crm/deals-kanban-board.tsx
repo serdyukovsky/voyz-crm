@@ -93,6 +93,11 @@ interface DealCardData {
   stageId: string
   stageIsClosed?: boolean
   status?: string
+  tasks?: Array<{
+    id: string
+    status: string
+    deadline: string | null
+  }>
 }
 
 interface DealsKanbanBoardProps {
@@ -131,6 +136,7 @@ interface FilterState {
   contactSubscriberCountMax?: number
   contactDirections?: string[]
   stageIds?: string[]
+  taskStatuses?: string[]
 }
 
 type SortField = 'amount' | 'updatedAt'
@@ -1364,13 +1370,18 @@ export function DealsKanbanBoard({
 
     try {
       setLoading(true)
-      console.log('Loading deals for pipeline:', selectedPipeline.id)
+      console.log('🟡 Kanban: Loading deals for pipeline:', selectedPipeline.id, 'with taskStatuses:', filters.taskStatuses, 'full filters:', filters)
       // For kanban, we need ALL deals (no pagination limit)
       // Use a large limit to get all deals for the kanban board
-      const dealsData = await getDeals({ 
+      // Pass all filters to backend including taskStatuses
+      const apiParams = {
+        ...filters, // Spread all filters from props
         pipelineId: selectedPipeline.id,
         limit: 10000, // Large limit for kanban to show all deals
-      })
+      }
+      console.log('🟡 Kanban: API params being sent:', apiParams)
+      const dealsData = await getDeals(apiParams)
+      console.log('🟡 Kanban: Got', dealsData.data?.length || 0, 'deals from API')
       
       // API now returns paginated response, extract data array
       const safeDealsData = dealsData.data || []
@@ -1410,6 +1421,7 @@ export function DealsKanbanBoard({
           stageId: deal.stage?.id || '',
           stageIsClosed: deal.stage?.isClosed,
           status: deal.status,
+          tasks: (deal as any).tasks || [],
         }
       })
       
@@ -1426,7 +1438,7 @@ export function DealsKanbanBoard({
     } finally {
       setLoading(false) // Always set loading to false
     }
-  }, [selectedPipeline, showError])
+  }, [selectedPipeline, showError, filters])
 
   useEffect(() => {
     loadPipelines()
@@ -1500,6 +1512,15 @@ export function DealsKanbanBoard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPipeline?.id])
+
+  // Reload deals when taskStatuses filter changes (requires server-side filtering)
+  useEffect(() => {
+    if (selectedPipeline) {
+      console.log('taskStatuses filter changed, reloading deals:', filters.taskStatuses)
+      loadDeals()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.taskStatuses])
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -1714,6 +1735,84 @@ export function DealsKanbanBoard({
           return false
         }
         return true
+      })
+    }
+
+    // Apply task status filtering (client-side backup for Kanban view)
+    if (filters.taskStatuses && filters.taskStatuses.length > 0) {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      filtered = filtered.filter(d => {
+        const tasks = d.tasks || []
+        const activeTasks = tasks.filter(t => t.status !== 'DONE')
+
+        return filters.taskStatuses!.some(taskStatus => {
+          switch (taskStatus) {
+            case 'noTasks':
+              return activeTasks.length === 0
+            case 'overdue':
+              return activeTasks.some(t => t.deadline && new Date(t.deadline) < today)
+            case 'today':
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= today && deadline < tomorrow
+              })
+            case 'tomorrow': {
+              const dayAfterTomorrow = new Date(tomorrow)
+              dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= tomorrow && deadline < dayAfterTomorrow
+              })
+            }
+            case 'dayAfterTomorrow': {
+              const dayAfterTomorrow = new Date(tomorrow)
+              dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+              const endOfDayAfterTomorrow = new Date(dayAfterTomorrow)
+              endOfDayAfterTomorrow.setDate(endOfDayAfterTomorrow.getDate() + 1)
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= dayAfterTomorrow && deadline < endOfDayAfterTomorrow
+              })
+            }
+            case 'thisWeek': {
+              const endOfWeek = new Date(today)
+              const dayOfWeek = today.getDay()
+              const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
+              endOfWeek.setDate(endOfWeek.getDate() + daysUntilSunday + 1)
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= today && deadline < endOfWeek
+              })
+            }
+            case 'thisMonth': {
+              const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= today && deadline < endOfMonth
+              })
+            }
+            case 'thisQuarter': {
+              const currentQuarter = Math.floor(today.getMonth() / 3)
+              const endOfQuarter = new Date(today.getFullYear(), (currentQuarter + 1) * 3, 1)
+              return activeTasks.some(t => {
+                if (!t.deadline) return false
+                const deadline = new Date(t.deadline)
+                return deadline >= today && deadline < endOfQuarter
+              })
+            }
+            default:
+              return true
+          }
+        })
       })
     }
 

@@ -271,6 +271,18 @@
         "deselectAll": "Снять выделение",
         "selectAll": "Выделить все"
       },
+      "tasks": {
+        "title": "Задачи",
+        "allValues": "Все значения",
+        "today": "На сегодня",
+        "tomorrow": "На завтра",
+        "dayAfterTomorrow": "На послезавтра",
+        "thisWeek": "На этой неделе",
+        "thisMonth": "В этом месяце",
+        "thisQuarter": "В этом квартале",
+        "noTasks": "Нет задач",
+        "overdue": "Просрочены"
+      },
       "clear": "Очистить",
       "selectPipeline": "Выберите воронку для выбора этапов",
       "allValues": "Все значения",

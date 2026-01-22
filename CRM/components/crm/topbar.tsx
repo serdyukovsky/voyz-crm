@@ -174,6 +174,7 @@ export function Topbar() {
               onApplyFilters={(filters) => {
                 setDealFilters(filters)
                 console.log('Applied filters:', filters)
+                console.log('Applied filters.taskStatuses:', filters.taskStatuses)
               }}
             />
           )}

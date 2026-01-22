@@ -266,36 +266,31 @@ export class DealsService {
     contactSubscriberCountMin?: number;
     contactSubscriberCountMax?: number;
     contactDirections?: string[];
+    taskStatuses?: string[];
   }): Prisma.DealWhereInput {
     const where: Prisma.DealWhereInput = {};
     const andFilters: Prisma.DealWhereInput[] = [];
 
-    if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
-
+    // Build stage IDs filter
     const stageIds = new Set<string>();
     if (filters?.stageId) stageIds.add(filters.stageId);
     if (filters?.stageIds?.length) {
       filters.stageIds.forEach(id => stageIds.add(id));
     }
-    if (stageIds.size > 0) {
-      where.stageId = { in: Array.from(stageIds) };
-    }
 
+    // Add all direct filters to where object (these are simple equality/inclusion filters)
+    if (filters?.pipelineId) where.pipelineId = filters.pipelineId;
+    if (stageIds.size > 0) where.stageId = { in: Array.from(stageIds) };
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
     if (filters?.contactId) where.contactId = filters.contactId;
     if (filters?.companyId) where.companyId = filters.companyId;
     if (filters?.createdById) where.createdById = filters.createdById;
+    if (filters?.tags?.length) where.tags = { hasSome: filters.tags };
+    if (filters?.rejectionReasons?.length) where.rejectionReasons = { hasSome: filters.rejectionReasons };
 
+    // Add complex filters to andFilters (these need special handling)
     if (filters?.activeStagesOnly) {
-      where.stage = { isClosed: false };
-    }
-
-    if (filters?.tags?.length) {
-      where.tags = { hasSome: filters.tags };
-    }
-
-    if (filters?.rejectionReasons?.length) {
-      where.rejectionReasons = { hasSome: filters.rejectionReasons };
+      andFilters.push({ stage: { isClosed: false } });
     }
 
     const contactFilter: Prisma.ContactWhereInput = {};
@@ -313,7 +308,7 @@ export class DealsService {
       contactFilter.subscriberCount = range;
     }
     if (Object.keys(contactFilter).length > 0) {
-      where.contact = contactFilter;
+      andFilters.push({ contact: contactFilter });
     }
 
     if (filters?.title) {
@@ -371,8 +366,159 @@ export class DealsService {
       andFilters.push({ expectedCloseAt: range });
     }
 
+    // Task status filtering
+    if (filters?.taskStatuses?.length) {
+      const now = new Date();
+      // Use UTC dates to match database dates (which are stored in UTC)
+      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const tomorrow = new Date(today);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setUTCDate(dayAfterTomorrow.getUTCDate() + 2);
+      const endOfDayAfterTomorrow = new Date(dayAfterTomorrow);
+      endOfDayAfterTomorrow.setUTCDate(endOfDayAfterTomorrow.getUTCDate() + 1);
+
+      // End of week (Sunday)
+      const endOfWeek = new Date(today);
+      const dayOfWeek = today.getUTCDay();
+      const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+      endOfWeek.setUTCDate(endOfWeek.getUTCDate() + daysUntilSunday + 1);
+
+      // End of month
+      const endOfMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
+
+      // End of quarter
+      const currentQuarter = Math.floor(today.getUTCMonth() / 3);
+      const endOfQuarter = new Date(Date.UTC(today.getUTCFullYear(), (currentQuarter + 1) * 3, 1));
+
+      const taskConditions: Prisma.DealWhereInput[] = [];
+
+      for (const status of filters.taskStatuses) {
+        switch (status) {
+          case 'today':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: today, lt: tomorrow } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'tomorrow':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: tomorrow, lt: dayAfterTomorrow } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'dayAfterTomorrow':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: dayAfterTomorrow, lt: endOfDayAfterTomorrow } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'thisWeek':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: today, lt: endOfWeek } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'thisMonth':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: today, lt: endOfMonth } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'thisQuarter':
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { gte: today, lt: endOfQuarter } },
+                  ],
+                },
+              },
+            });
+            break;
+          case 'noTasks':
+            // Deals with no active (non-DONE) tasks - must not have any TODO, IN_PROGRESS, or OVERDUE tasks
+            taskConditions.push({
+              tasks: {
+                none: {
+                  status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] },
+                },
+              },
+            });
+            break;
+          case 'overdue':
+            // Deals with tasks that are overdue (deadline in the past and status not DONE)
+            taskConditions.push({
+              tasks: {
+                some: {
+                  AND: [
+                    { status: { in: ['TODO', 'IN_PROGRESS', 'OVERDUE'] } },
+                    { deadline: { not: null } },
+                    { deadline: { lt: today } },
+                  ],
+                },
+              },
+            });
+            break;
+        }
+      }
+
+      if (taskConditions.length > 0) {
+        andFilters.push({ OR: taskConditions });
+      }
+    }
+
+    // Combine all filters
     if (andFilters.length > 0) {
-      where.AND = andFilters;
+      // If there are already direct filters in where, merge them with andFilters
+      if (Object.keys(where).length > 0) {
+        // Convert direct where conditions to andFilters format
+        const directFilters: Prisma.DealWhereInput = { ...where };
+        where.AND = [...andFilters, directFilters];
+        // Remove direct properties to avoid duplication
+        Object.keys(where).forEach(key => {
+          if (key !== 'AND') delete where[key];
+        });
+      } else {
+        where.AND = andFilters;
+      }
     }
 
     return where;
@@ -405,10 +551,21 @@ export class DealsService {
     contactSubscriberCountMin?: number;
     contactSubscriberCountMax?: number;
     contactDirections?: string[];
+    taskStatuses?: string[];
     limit?: number;
     cursor?: string; // base64 encoded cursor
   }): Promise<PaginatedResponse<any>> {
+    // Debug logging for task status filtering
+    if (filters?.taskStatuses?.length) {
+      console.log('📋 Filtering by taskStatuses:', filters.taskStatuses);
+    }
+
     const where = this.buildWhere(filters);
+
+    // Debug: Log the where condition when filtering by tasks
+    if (filters?.taskStatuses?.length) {
+      console.log('📋 WHERE condition:', JSON.stringify(where, null, 2));
+    }
 
     // Managers can see all deals (no filtering by user)
 
@@ -434,8 +591,10 @@ export class DealsService {
         ],
       };
 
-      if (where.AND) {
+      if (where.AND && Array.isArray(where.AND)) {
         where.AND.push(cursorCondition);
+      } else if (where.AND) {
+        where.AND = [where.AND as Prisma.DealWhereInput, cursorCondition];
       } else {
         where.AND = [cursorCondition];
       }
@@ -506,6 +665,13 @@ export class DealsService {
             industry: true,
           },
         },
+        tasks: {
+          select: {
+            id: true,
+            status: true,
+            deadline: true,
+          },
+        },
       },
       orderBy: [
         { updatedAt: 'desc' },
@@ -526,8 +692,16 @@ export class DealsService {
       }
     }
 
+    // Debug logging for task filtering
+    if (filters?.taskStatuses?.length) {
+      console.log('📋 Query returned', deals.length, 'deals with taskStatuses filter');
+    }
+
     // Always return paginated response format (even if empty)
     if (deals.length === 0) {
+      if (filters?.taskStatuses?.length) {
+        console.log('📋 No deals found matching taskStatuses filter');
+      }
       return { data: [], nextCursor: undefined, hasMore: false, total };
     }
 

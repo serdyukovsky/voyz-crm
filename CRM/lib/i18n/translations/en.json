@@ -71,7 +71,19 @@
     "dealsShown": "Shown",
     "dealsOf": "of",
     "search": {
-      "apply": "Apply"
+      "apply": "Apply",
+      "tasks": {
+        "title": "Tasks",
+        "allValues": "All values",
+        "today": "For today",
+        "tomorrow": "For tomorrow",
+        "dayAfterTomorrow": "For day after tomorrow",
+        "thisWeek": "For this week",
+        "thisMonth": "For this month",
+        "thisQuarter": "For this quarter",
+        "noTasks": "No tasks",
+        "overdue": "Overdue"
+      }
     },
     "newDeal": "New Deal",
     "createDeal": "Create Deal",
