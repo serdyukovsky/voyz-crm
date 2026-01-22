@@ -25,6 +25,11 @@ export interface Deal {
     subscriberCount?: string
     directions?: string[]
   }
+  tasks?: Array<{
+    id: string
+    status: string
+    deadline: string | null
+  }>
 }
 
 export interface Stage {

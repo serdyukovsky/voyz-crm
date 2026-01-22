@@ -936,6 +936,11 @@ export class DealsService {
       closedAt: deal.closedAt || null,
       createdAt: deal.createdAt,
       updatedAt: deal.updatedAt,
+      tasks: deal.tasks ? deal.tasks.map((task: any) => ({
+        id: task.id,
+        status: task.status || 'TODO',
+        deadline: task.deadline || null,
+      })) : [],
       stage: deal.stage ? {
         id: deal.stage.id,
         name: deal.stage.name || 'Unknown Stage',

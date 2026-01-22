@@ -4,6 +4,7 @@ import { useState, memo, useCallback } from "react"
 import { Link } from 'react-router-dom'
 import { GripVertical } from 'lucide-react'
 import type { Deal, Stage } from "./kanban-board"
+import { TaskIndicator } from "./task-indicator"
 
 interface DealCardProps {
   deal: Deal
@@ -101,7 +102,7 @@ export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDra
           </span>
         </div>
 
-        {/* Footer: Avatar + Updated Time */}
+        {/* Footer: Avatar + Updated Time + Task Indicator */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50">
           <div className="flex items-center gap-2">
             <div
@@ -114,20 +115,32 @@ export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDra
               {deal.assignedTo.name.split(' ')[0]}
             </span>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {formatRelativeTime(deal.updatedAt)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {formatRelativeTime(deal.updatedAt)}
+            </span>
+            <TaskIndicator tasks={deal.tasks} />
+          </div>
         </div>
       </div>
     </Link>
   )
 }, (prevProps, nextProps) => {
   // Custom comparison function for memo
+  const tasksEqual =
+    (prevProps.deal.tasks?.length || 0) === (nextProps.deal.tasks?.length || 0) &&
+    (prevProps.deal.tasks?.every((t, i) =>
+      t.id === nextProps.deal.tasks?.[i]?.id &&
+      t.status === nextProps.deal.tasks?.[i]?.status &&
+      t.deadline === nextProps.deal.tasks?.[i]?.deadline
+    ) ?? true)
+
   return (
     prevProps.deal.id === nextProps.deal.id &&
     prevProps.deal.amount === nextProps.deal.amount &&
     prevProps.deal.updatedAt === nextProps.deal.updatedAt &&
     prevProps.stage.id === nextProps.stage.id &&
-    prevProps.stage.color === nextProps.stage.color
+    prevProps.stage.color === nextProps.stage.color &&
+    tasksEqual
   )
 })
