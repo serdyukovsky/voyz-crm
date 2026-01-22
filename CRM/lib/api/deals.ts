@@ -72,6 +72,7 @@ export async function getDeals(params?: {
   contactSubscriberCountMin?: number
   contactSubscriberCountMax?: number
   contactDirections?: string[]
+  taskStatuses?: string[]
   limit?: number
   cursor?: string
 }): Promise<PaginatedDealsResponse> {
@@ -120,12 +121,19 @@ export async function getDeals(params?: {
   if (params?.contactSubscriberCountMin !== undefined) queryParams.append('contactSubscriberCountMin', String(params.contactSubscriberCountMin))
   if (params?.contactSubscriberCountMax !== undefined) queryParams.append('contactSubscriberCountMax', String(params.contactSubscriberCountMax))
   if (params?.contactDirections?.length) queryParams.append('contactDirections', params.contactDirections.join(','))
+  if (params?.taskStatuses?.length) queryParams.append('taskStatuses', params.taskStatuses.join(','))
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.cursor) queryParams.append('cursor', params.cursor)
 
   try {
     const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
+
+    // Debug logging
+    if (params?.taskStatuses?.length) {
+      console.log('🔵 API: Sending request with taskStatuses:', params.taskStatuses, 'URL:', url)
+    }
+
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -151,7 +159,12 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
-    
+
+    // Debug logging
+    if (params?.taskStatuses?.length) {
+      console.log('🔵 API Response: Got', data?.data?.length || 0, 'deals with taskStatuses filter')
+    }
+
     // API always returns paginated response now
     if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
       return data as PaginatedDealsResponse

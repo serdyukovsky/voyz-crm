@@ -88,6 +88,7 @@ export class DealsController {
     @Query('contactSubscriberCountMin') contactSubscriberCountMin?: string,
     @Query('contactSubscriberCountMax') contactSubscriberCountMax?: string,
     @Query('contactDirections') contactDirections?: string | string[],
+    @Query('taskStatuses') taskStatuses?: string | string[],
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
@@ -97,6 +98,12 @@ export class DealsController {
     const limitNum = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
     const parsedStageIds = this.parseList(stageIds);
     const combinedStageIds = stageId ? [stageId, ...(parsedStageIds || [])] : parsedStageIds;
+
+    // Debug logging for taskStatuses
+    if (taskStatuses) {
+      console.log('🔵 Controller received taskStatuses param:', taskStatuses, 'type:', typeof taskStatuses);
+      console.log('🔵 Parsed taskStatuses:', this.parseList(taskStatuses));
+    }
 
     return this.dealsService.findAll({
       pipelineId,
@@ -124,6 +131,7 @@ export class DealsController {
       contactSubscriberCountMin: this.parseNumber(contactSubscriberCountMin),
       contactSubscriberCountMax: this.parseNumber(contactSubscriberCountMax),
       contactDirections: this.parseList(contactDirections),
+      taskStatuses: this.parseList(taskStatuses),
       limit: limitNum,
       cursor,
     });
