@@ -1,5 +1,7 @@
 "use client"
 
+console.log('🔴🔴🔴 DEALS PAGE MODULE LOADED - TIMESTAMP:', new Date().toISOString())
+
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"

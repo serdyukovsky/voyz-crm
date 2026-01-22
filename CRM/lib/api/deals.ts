@@ -129,11 +129,6 @@ export async function getDeals(params?: {
     const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
 
-    // Debug logging
-    if (params?.taskStatuses?.length) {
-      console.log('🔵 API: Sending request with taskStatuses:', params.taskStatuses, 'URL:', url)
-    }
-
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -159,11 +154,6 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
-
-    // Debug logging
-    if (params?.taskStatuses?.length) {
-      console.log('🔵 API Response: Got', data?.data?.length || 0, 'deals with taskStatuses filter')
-    }
 
     // API always returns paginated response now
     if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
