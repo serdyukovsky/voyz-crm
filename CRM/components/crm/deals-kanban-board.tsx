@@ -1370,7 +1370,6 @@ export function DealsKanbanBoard({
 
     try {
       setLoading(true)
-      console.log('🟡 Kanban: Loading deals for pipeline:', selectedPipeline.id, 'with taskStatuses:', filters.taskStatuses, 'full filters:', filters)
       // For kanban, we need ALL deals (no pagination limit)
       // Use a large limit to get all deals for the kanban board
       // Pass all filters to backend including taskStatuses
@@ -1379,9 +1378,7 @@ export function DealsKanbanBoard({
         pipelineId: selectedPipeline.id,
         limit: 10000, // Large limit for kanban to show all deals
       }
-      console.log('🟡 Kanban: API params being sent:', apiParams)
       const dealsData = await getDeals(apiParams)
-      console.log('🟡 Kanban: Got', dealsData.data?.length || 0, 'deals from API')
       
       // API now returns paginated response, extract data array
       const safeDealsData = dealsData.data || []

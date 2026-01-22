@@ -829,30 +829,35 @@ function DealsPageContent() {
     updatedBefore?: string
     title?: string
     stageIds?: string[]
+    taskStatuses?: string[]
   }>({})
-  const [sort, setSort] = useState<{ field: 'amount' | 'updatedAt'; direction: 'asc' | 'desc' }>({ 
-    field: 'updatedAt', 
-    direction: 'desc' 
+  const [sort, setSort] = useState<{ field: 'amount' | 'updatedAt'; direction: 'asc' | 'desc' }>({
+    field: 'updatedAt',
+    direction: 'desc'
   })
 
   const effectiveStageIds = dealFilters?.stageIds ?? filters.stageIds
   const effectiveStageId = effectiveStageIds?.length === 1 ? effectiveStageIds[0] : undefined
-  
+
   // Обновляем фильтры при изменении поиска или панели
   useEffect(() => {
     const newTitle = searchValue.trim() || dealFilters?.title?.trim() || undefined
-    setFilters(prev => ({
-      ...prev,
-      title: newTitle,
-      stageIds: dealFilters?.stageIds,
-      companyId: dealFilters?.companyId,
-      contactId: dealFilters?.contactId,
-      assignedUserId: dealFilters?.assignedToId,
-      amountMin: dealFilters?.amountMin,
-      amountMax: dealFilters?.amountMax,
-      updatedAfter: dealFilters?.dateFrom,
-      updatedBefore: dealFilters?.dateTo,
-    }))
+    setFilters(prev => {
+      const newFilters = {
+        ...prev,
+        title: newTitle,
+        stageIds: dealFilters?.stageIds,
+        companyId: dealFilters?.companyId,
+        contactId: dealFilters?.contactId,
+        assignedUserId: dealFilters?.assignedToId,
+        amountMin: dealFilters?.amountMin,
+        amountMax: dealFilters?.amountMax,
+        updatedAfter: dealFilters?.dateFrom,
+        updatedBefore: dealFilters?.dateTo,
+        taskStatuses: dealFilters?.taskStatuses,
+      }
+      return newFilters
+    })
   }, [searchValue, dealFilters])
 
   // Sync selectedPipelineForList with currentFunnelId when switching to list view
