@@ -15,7 +15,7 @@ import { CreateTaskModal } from './create-task-modal'
 import { ActivityTimeline } from '@/components/shared/activity-timeline'
 import { useActivity } from '@/hooks/use-activity'
 import { DealCommentsPanel } from './deal/deal-comments-panel'
-import { useDeal } from '@/hooks/use-deals'
+import { useDealDetail } from '@/hooks/use-deals'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
@@ -145,7 +145,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const contactInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Use hooks
-  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField, refetch: refetchDeal } = useDeal({ dealId })
+  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField, refetch: refetchDeal } = useDealDetail({ dealId })
   
   // Sync local state with deal.contact when deal changes
   useEffect(() => {

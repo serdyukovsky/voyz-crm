@@ -13,7 +13,7 @@ import { DealTasksList } from './deal-tasks-list'
 import { DealFilesPanel } from './deal-files-panel'
 import { DealActivityTimeline } from './deal-activity-timeline'
 import { DealCommentsPanel } from './deal-comments-panel'
-import { useDeal } from '@/hooks/use-deals'
+import { useDealDetail } from '@/hooks/use-deals'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
@@ -48,7 +48,7 @@ export function DealDetail({ dealId }: DealDetailProps) {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
 
   // Use hooks
-  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField } = useDeal({ dealId })
+  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField } = useDealDetail({ dealId })
   const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
   const { activities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
