@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { Input } from "@/components/ui/input"
 import { DynamicFieldRenderer } from './dynamic-field-renderer'
-import type { Deal, CustomField } from '@/hooks/use-deal'
+import type { Deal } from '@/lib/api/deals'
+import type { CustomField } from '@/lib/api/custom-fields'
 
 interface DealFieldsPanelProps {
   deal: Deal | null
