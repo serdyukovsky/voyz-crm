@@ -91,6 +91,45 @@ export function useDeal(id: string) {
   })
 }
 
+// Расширенный хук для детальной страницы сделки с методами обновления
+export function useDealDetail({ dealId }: { dealId: string }) {
+  const queryClient = useQueryClient()
+
+  // Получить сделку
+  const query = useQuery({
+    queryKey: dealKeys.detail(dealId),
+    queryFn: () => getDeal(dealId),
+    enabled: !!dealId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // Мутация для обновления
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => updateDeal(dealId, data),
+    onSuccess: (updatedDeal) => {
+      // Обновить кэш с новыми данными
+      queryClient.setQueryData(dealKeys.detail(dealId), updatedDeal)
+    },
+  })
+
+  return {
+    deal: query.data,
+    loading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+    updateDeal: (data: any) => updateMutation.mutateAsync(data),
+    updateField: (fieldId: string, value: any) => {
+      // Оптимистичное обновление локального состояния
+      queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
+        ...old,
+        [fieldId]: value,
+      }))
+      // Отправить на сервер
+      return updateMutation.mutateAsync({ [fieldId]: value })
+    },
+  }
+}
+
 // Хук для создания сделки
 export function useCreateDeal() {
   const queryClient = useQueryClient()
