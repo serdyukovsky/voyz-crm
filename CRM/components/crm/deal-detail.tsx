@@ -136,7 +136,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [openDirections, setOpenDirections] = useState(false)
   const [openMethods, setOpenMethods] = useState(false)
   const [openReasons, setOpenReasons] = useState(false)
-  
+
+  // Search state for multi-select dropdowns
+  const [searchDirections, setSearchDirections] = useState('')
+  const [searchMethods, setSearchMethods] = useState('')
+  const [searchReasons, setSearchReasons] = useState('')
+
   // Local state for contact fields to prevent losing input on refetch
   const [contactLink, setContactLink] = useState('')
   const [contactSubscriberCount, setContactSubscriberCount] = useState('')
@@ -316,12 +321,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       }
       if (!target.closest('.directions-dropdown-container')) {
         setOpenDirections(false)
+        setSearchDirections('')
       }
       if (!target.closest('.methods-dropdown-container')) {
         setOpenMethods(false)
       }
       if (!target.closest('.reasons-dropdown-container')) {
         setOpenReasons(false)
+        setSearchReasons('')
       }
     }
 
@@ -886,6 +893,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     onClick={() => {
                       console.log('[DEAL DETAIL] Directions dropdown clicked, current options:', directionsOptions)
                       setOpenDirections(!openDirections)
+                      if (openDirections) {
+                        setSearchDirections('')
+                      }
                     }}
                     className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
                   >
@@ -902,9 +912,25 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   </button>
 
                   {openDirections && (
-                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
-                      {directionsOptions.length > 0 ? (
-                        directionsOptions.map((direction) => (
+                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50">
+                      {directionsOptions.length > 10 && (
+                        <Input
+                          type="text"
+                          placeholder="Поиск..."
+                          value={searchDirections}
+                          onChange={(e) => setSearchDirections(e.target.value)}
+                          className="mb-2 h-7 text-xs border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                        />
+                      )}
+                      <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                        {directionsOptions.length > 0 ? (
+                          directionsOptions
+                            .filter((direction) =>
+                              getDirectionLabel(direction)
+                                .toLowerCase()
+                                .includes(searchDirections.toLowerCase())
+                            )
+                            .map((direction) => (
                           <div key={direction} className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -961,6 +987,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       ) : (
                         <p className="text-xs text-muted-foreground py-1">No options available</p>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1134,9 +1161,25 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               </button>
 
               {openReasons && (
-                <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
-                  {rejectionReasonsOptions.length > 0 ? (
-                    rejectionReasonsOptions.map((reason) => (
+                <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50">
+                  {rejectionReasonsOptions.length > 10 && (
+                    <Input
+                      type="text"
+                      placeholder="Поиск..."
+                      value={searchReasons}
+                      onChange={(e) => setSearchReasons(e.target.value)}
+                      className="mb-2 h-7 text-xs border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                    />
+                  )}
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    {rejectionReasonsOptions.length > 0 ? (
+                      rejectionReasonsOptions
+                        .filter((reason) =>
+                          getRejectionReasonLabel(reason)
+                            .toLowerCase()
+                            .includes(searchReasons.toLowerCase())
+                        )
+                        .map((reason) => (
                       <div key={reason} className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -1206,6 +1249,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       ))}
                     </>
                   )}
+                  </div>
                 </div>
               )}
             </div>
