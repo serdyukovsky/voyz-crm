@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DealColumnSkeleton } from "./deal-card-skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -51,6 +52,9 @@ import { getContacts, type Contact } from "@/lib/api/contacts"
 import { CompanyBadge } from "@/components/shared/company-badge"
 import { DealDetail } from './deal-detail'
 import { useToastNotification } from "@/hooks/use-toast-notification"
+import { useDeals, dealKeys } from "@/hooks/use-deals"
+import { useDebouncedValue } from "@/lib/utils/debounce"
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from "@/lib/utils"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
@@ -1219,6 +1223,7 @@ export function DealsKanbanBoard({
   const { t } = useTranslation()
   const { isCollapsed } = useSidebar()
   const { showSuccess, showError } = useToastNotification()
+  const queryClient = useQueryClient()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
   const [deals, setDeals] = useState<DealCardData[]>([])
@@ -1362,35 +1367,22 @@ export function DealsKanbanBoard({
     }
   }
 
-  const loadDeals = useCallback(async () => {
-    if (!selectedPipeline) {
-      console.log('No pipeline selected, skipping deals load')
-      setDeals([])
-      setLoading(false) // Ensure loading is false even if no pipeline
-      return
-    }
+  // Дебаунс для фильтров (500ms задержка перед запросом)
+  // Это предотвращает множественные запросы при быстром изменении фильтров
+  const debouncedFilters = useDebouncedValue(filters, 500)
 
-    try {
-      setLoading(true)
-      // For kanban, we need ALL deals (no pagination limit)
-      // Use a large limit to get all deals for the kanban board
-      // Pass all filters to backend including taskStatuses
-      const apiParams = {
-        ...filters, // Spread all filters from props
-        pipelineId: selectedPipeline.id,
-        limit: 10000, // Large limit for kanban to show all deals
-      }
-      const dealsData = await getDeals(apiParams)
-      console.log('📦 Deals loaded from API:', dealsData)
+  // Используем React Query hook для загрузки deals с автоматическим кэшированием
+  const { data: dealsResponse, isLoading, error: dealsError } = useDeals({
+    ...debouncedFilters,
+    pipelineId: selectedPipeline?.id,
+    limit: 1000, // Оптимизировано: вместо 10000
+    enabled: !!selectedPipeline, // Запрос только если выбран pipeline
+  })
 
-      // API now returns paginated response, extract data array
-      const safeDealsData = dealsData.data || []
-      console.log('📋 Safe deals data length:', safeDealsData.length)
-      if (safeDealsData.length > 0) {
-        console.log('📌 First deal tasks:', safeDealsData[0].tasks)
-      }
-
-      const transformedDeals: DealCardData[] = safeDealsData.map((deal, index) => {
+  // Синхронизируем React Query данные с локальным state
+  useEffect(() => {
+    if (dealsResponse?.data) {
+      const transformedDeals: DealCardData[] = dealsResponse.data.map((deal) => {
         return {
           id: deal.id,
           number: deal.number ?? null,
@@ -1428,21 +1420,28 @@ export function DealsKanbanBoard({
           tasks: (deal as any).tasks || [],
         }
       })
-      
       setDeals(transformedDeals)
-    } catch (error) {
-      // Only show error if it's not a network/empty response issue
-      if (error instanceof Error && !error.message.includes('Network error') && !error.message.includes('Unauthorized')) {
-        showError('Failed to load deals', error.message)
-      } else {
-        console.warn('Deals not available:', error instanceof Error ? error.message : 'Unknown error')
-      }
-      // Always set empty array on error to show empty state instead of loading
+      console.log('📦 Deals loaded:', transformedDeals.length, 'deals')
+    } else {
       setDeals([])
-    } finally {
-      setLoading(false) // Always set loading to false
     }
-  }, [selectedPipeline, showError, filters])
+  }, [dealsResponse])
+
+  // Обработка ошибок загрузки deals
+  useEffect(() => {
+    if (dealsError) {
+      if (dealsError instanceof Error && !dealsError.message.includes('Network error') && !dealsError.message.includes('Unauthorized')) {
+        showError('Failed to load deals', dealsError.message)
+      } else {
+        console.warn('Deals not available:', dealsError instanceof Error ? dealsError.message : 'Unknown error')
+      }
+    }
+  }, [dealsError, showError])
+
+  // Синхронизируем loading state
+  useEffect(() => {
+    setLoading(isLoading)
+  }, [isLoading])
 
   useEffect(() => {
     loadPipelines()
@@ -1506,25 +1505,8 @@ export function DealsKanbanBoard({
     console.log('selectedPipeline changed:', selectedPipeline?.id, selectedPipeline?.name)
   }, [selectedPipeline])
 
-  useEffect(() => {
-    console.log('useEffect triggered - selectedPipeline:', selectedPipeline?.id)
-    if (selectedPipeline) {
-      console.log('Calling loadDeals for pipeline:', selectedPipeline.id)
-      loadDeals()
-    } else {
-      console.log('No pipeline selected, not loading deals')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPipeline?.id])
-
-  // Reload deals when taskStatuses filter changes (requires server-side filtering)
-  useEffect(() => {
-    if (selectedPipeline) {
-      console.log('taskStatuses filter changed, reloading deals:', filters.taskStatuses)
-      loadDeals()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.taskStatuses])
+  // Note: useDeals hook уже реагирует на изменения selectedPipeline и фильтров
+  // loadDeals больше не нужен - React Query сам справляется с кэшированием и переинициализацией
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -1558,7 +1540,7 @@ export function DealsKanbanBoard({
             return updated
           }
           // If deal not found, reload all deals
-          loadDeals()
+          queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
           return prevDeals
         })
       }
@@ -1577,7 +1559,7 @@ export function DealsKanbanBoard({
             }
             return updated
           }
-          loadDeals()
+          queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
           return prevDeals
         })
       }
@@ -1596,7 +1578,7 @@ export function DealsKanbanBoard({
     return () => {
       socket.disconnect()
     }
-  }, [selectedPipeline, loadDeals])
+  }, [selectedPipeline, queryClient])
 
   // Filter and sort deals
   const filteredAndSortedDeals = useMemo(() => {
@@ -1859,7 +1841,7 @@ export function DealsKanbanBoard({
       ))
     } catch (error) {
       showError(t('deals.failedToMoveDeal'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
-      loadDeals()
+      queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
     } finally {
       setDraggedDeal(null)
     }
@@ -1872,7 +1854,7 @@ export function DealsKanbanBoard({
       if (closedWonStage) {
         await updateDeal(dealId, { stageId: closedWonStage.id, status: 'closed' })
         showSuccess(t('deals.dealMarkedAsWon'))
-        loadDeals()
+        queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
       } else {
         showError(t('deals.closedWonStageNotFound'), t('deals.configurePipeline'))
       }
@@ -1888,7 +1870,7 @@ export function DealsKanbanBoard({
       if (closedLostStage) {
         await updateDeal(dealId, { stageId: closedLostStage.id, status: 'closed' })
         showSuccess(t('deals.dealMarkedAsLost'))
-        loadDeals()
+        queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
       } else {
         showError(t('deals.closedLostStageNotFound'), t('deals.configurePipeline'))
       }
@@ -1912,7 +1894,7 @@ export function DealsKanbanBoard({
     } catch (error) {
       console.error('Failed to delete deal:', error)
       // Reload deals on error
-      await loadDeals()
+      await queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
       throw error
     }
   }
@@ -2443,14 +2425,7 @@ export function DealsKanbanBoard({
     return (
       <div className="flex gap-4 overflow-x-auto pb-4 animate-in fade-in-50 duration-300">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex-shrink-0 w-72">
-            <Skeleton className="h-7 w-40 mb-4 rounded-lg" />
-            <div className="space-y-3 p-3 bg-card rounded-lg border shadow-sm min-h-[calc(100vh-300px)]">
-              {[1, 2, 3].map((j) => (
-                <Skeleton key={j} className="h-24 w-full rounded-md" />
-              ))}
-            </div>
-          </div>
+          <DealColumnSkeleton key={i} />
         ))}
       </div>
     )
@@ -2641,7 +2616,7 @@ export function DealsKanbanBoard({
       setSelectedStageId(null)
       
       // Reload deals to show the new one
-      await loadDeals()
+      await queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
     } catch (error) {
       // Log error without circular references
       const errorMessage = error instanceof Error ? error.message : String(error)

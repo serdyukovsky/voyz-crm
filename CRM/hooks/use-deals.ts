@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDeals, getDeal, createDeal, updateDeal, deleteDeal, type Deal } from '@/lib/api/deals'
 
 // Query keys для кэширования
@@ -6,6 +6,8 @@ export const dealKeys = {
   all: ['deals'] as const,
   lists: () => [...dealKeys.all, 'list'] as const,
   list: (filters?: Record<string, unknown>) => [...dealKeys.lists(), filters] as const,
+  infiniteLists: () => [...dealKeys.all, 'infinite'] as const,
+  infiniteList: (filters?: Record<string, unknown>) => [...dealKeys.infiniteLists(), filters] as const,
   details: () => [...dealKeys.all, 'detail'] as const,
   detail: (id: string) => [...dealKeys.details(), id] as const,
 }
@@ -15,14 +17,67 @@ export function useDeals(params?: {
   search?: string
   pipelineId?: string
   stageId?: string
+  stageIds?: string[]
   assignedToId?: string
   contactId?: string
   companyId?: string
+  createdById?: string
+  title?: string
+  number?: string
+  description?: string
+  amountMin?: number
+  amountMax?: number
+  budgetMin?: number
+  budgetMax?: number
+  dateFrom?: string
+  dateTo?: string
+  dateType?: 'created' | 'closed' | 'expectedClose'
+  expectedCloseFrom?: string
+  expectedCloseTo?: string
+  tags?: string[]
+  rejectionReasons?: string[]
+  activeStagesOnly?: boolean
+  contactSubscriberCountMin?: number
+  contactSubscriberCountMax?: number
+  contactDirections?: string[]
+  taskStatuses?: string[]
+  limit?: number
+  cursor?: string
+  enabled?: boolean
 }) {
+  const { enabled = true, ...queryParams } = params || {}
+
   return useQuery({
-    queryKey: dealKeys.list(params),
-    queryFn: () => getDeals(params),
-    staleTime: 1 * 60 * 1000, // 1 минута - сделки часто обновляются
+    queryKey: dealKeys.list(queryParams),
+    queryFn: () => getDeals(queryParams),
+    // Кэширование на 5 минут (как в query-client default)
+    staleTime: 5 * 60 * 1000,
+    // Можно отключить запрос условно (например, если нет выбранного pipeline)
+    enabled,
+  })
+}
+
+/**
+ * Хук для infinite scroll загрузки сделок (incremental loading)
+ * Загружает deals порциями с поддержкой cursor-based pagination
+ *
+ * Полезно для больших списков (500+ deals)
+ */
+export function useInfiniteDeals(params?: Omit<Parameters<typeof useDeals>[0], 'enabled'> & { enabled?: boolean; pageSize?: number }) {
+  const { enabled = true, pageSize = 100, ...filterParams } = params || {}
+
+  return useInfiniteQuery({
+    queryKey: dealKeys.infiniteList(filterParams),
+    queryFn: ({ pageParam = undefined }) =>
+      getDeals({
+        ...filterParams,
+        cursor: pageParam as string | undefined,
+        limit: pageSize,
+      }),
+    getNextPageParam: (lastPage) => (lastPage as any)?.nextCursor,
+    initialPageParam: undefined,
+    enabled,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

@@ -150,7 +150,7 @@ export function LogsTable({ searchQuery, actionFilter, userFilter, entityFilter,
       <div className="border border-border rounded-lg bg-card overflow-hidden">
         <div className="p-4 space-y-3">
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={i} className="h-12 w-full animate-pulse-subtle" style={{ animationDelay: `${i * 100}ms` }} />
           ))}
         </div>
       </div>

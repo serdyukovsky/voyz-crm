@@ -35,6 +35,7 @@ export async function getTasks(params?: {
   contactId?: string
   assignedToId?: string
   status?: string
+  search?: string
   limit?: number
   cursor?: string
 }): Promise<Task[] | PaginatedTasksResponse> {
@@ -56,6 +57,7 @@ export async function getTasks(params?: {
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.assignedToId) queryParams.append('assignedToId', params.assignedToId)
   if (params?.status) queryParams.append('status', params.status)
+  if (params?.search) queryParams.append('search', params.search)
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.cursor) queryParams.append('cursor', params.cursor)
 
