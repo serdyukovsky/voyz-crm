@@ -37,62 +37,49 @@ const useRouter = () => {
     }
   }
 }
-import { getContacts, getCompanies, deleteContact } from '@/lib/api/contacts'
+import { deleteContact } from '@/lib/api/contacts'
 import { Contact, Company } from '@/types/contact'
 import { CreateContactModal } from '@/components/crm/create-contact-modal'
 import { FilterBar } from '@/components/shared/filter-bar'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
+import { useContacts } from '@/hooks/use-contacts'
+import { useCompanies } from '@/hooks/use-companies'
+import { useQueryClient } from '@tanstack/react-query'
+import { contactKeys } from '@/hooks/use-contacts'
 
 export default function ContactsPage() {
   useAuthGuard()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const { showSuccess, showError } = useToastNotification()
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [companies, setCompanies] = useState<Company[]>([])
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
 
   // Get filters from URL
   const searchQuery = searchParams.get('search') || ''
   const selectedCompanies = searchParams.get('companies')?.split(',').filter(Boolean) || []
   const selectedTags = searchParams.get('tags')?.split(',').filter(Boolean) || []
 
-  useEffect(() => {
-    loadData()
-  }, [searchQuery, selectedCompanies, selectedTags])
+  // React Query hooks for data fetching
+  // Contacts are fetched with debounced search (from FilterBar component)
+  const { data: contactsData, isLoading: contactsLoading, error: contactsError } = useContacts({
+    search: searchQuery || undefined,
+    companyId: selectedCompanies.length === 1 ? selectedCompanies[0] : undefined,
+  })
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [contactsData, companiesData] = await Promise.all([
-        getContacts({
-          search: searchQuery || undefined,
-          companyId: selectedCompanies.length === 1 ? selectedCompanies[0] : undefined,
-        }),
-        getCompanies(),
-      ])
-      
-      // Filter by tags if selected
-      let filteredContacts = contactsData
-      if (selectedTags.length > 0) {
-        filteredContacts = contactsData.filter((contact) =>
-          selectedTags.some((tag) => contact.tags.includes(tag))
-        )
-      }
-      
-      setContacts(filteredContacts)
-      setCompanies(companiesData)
-    } catch (error) {
-      console.error('Failed to load contacts:', error)
-      showError('Failed to load contacts', 'Please try again later')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Companies list is cached for 5 minutes (reused across pages)
+  const { data: companiesData, isLoading: companiesLoading } = useCompanies()
+
+  // Filter contacts by tags if selected (client-side filter after API returns data)
+  const contacts = (contactsData || []).filter((contact) =>
+    selectedTags.length === 0 || selectedTags.some((tag) => contact.tags?.includes(tag))
+  )
+
+  const companies = companiesData || []
+  const loading = contactsLoading || companiesLoading
 
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedContacts.length} contact(s)?`)) return
@@ -101,7 +88,8 @@ export default function ContactsPage() {
       await Promise.all(selectedContacts.map((id) => deleteContact(id)))
       setSelectedContacts([])
       showSuccess(`Deleted ${selectedContacts.length} contact(s)`)
-      loadData()
+      // Invalidate contacts cache to refresh list
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() })
     } catch (error) {
       console.error('Failed to delete contacts:', error)
       showError('Failed to delete contacts', 'Please try again')
@@ -115,7 +103,8 @@ export default function ContactsPage() {
   const handleContactCreated = async () => {
     setIsCreateModalOpen(false)
     showSuccess('Contact created successfully')
-    await loadData()
+    // Invalidate contacts cache to refresh list
+    queryClient.invalidateQueries({ queryKey: contactKeys.lists() })
   }
 
   // Extract unique tags from contacts
