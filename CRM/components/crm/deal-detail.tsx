@@ -161,7 +161,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       setContactInfo('')
     }
   }, [deal?.contact?.id, deal?.contact?.link, deal?.contact?.subscriberCount, deal?.contact?.websiteOrTgChannel, deal?.contact?.contactInfo])
-  const { tasks, createTask, updateTask, deleteTask, refetch: refetchTasks } = useDealTasks({ dealId })
+  const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
   const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useActivity({ entityType: 'deal', entityId: dealId })
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
@@ -390,9 +390,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       
       // Reload activities to show the task creation activity (created by backend)
       await refetchActivities()
-      
-      // Reload tasks to show the newly created task
-      await refetchTasks()
+
+      // Tasks are automatically refreshed by React Query mutation cache invalidation
       
       showSuccess(t('tasks.taskCreated') || 'Task created successfully')
     } catch (error) {
@@ -467,9 +466,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       
       // Reload activities to show the task deletion activity (created by backend)
       await refetchActivities()
-      
-      // Reload tasks to remove the deleted task
-      await refetchTasks()
+
+      // Tasks are automatically refreshed by React Query mutation cache invalidation
       
       showSuccess(t('tasks.taskDeleted'))
     } catch (error) {
@@ -871,22 +869,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       console.error('Failed to update directions:', error)
                     }
                   }}
-                  modal={true}
                 >
-                  <SelectTrigger 
+                  <SelectTrigger
                     className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <SelectValue placeholder={t('contacts.selectDirection') || 'Выберите направление'} />
                   </SelectTrigger>
-                  <SelectContent 
-                    onInteractOutside={(e) => {
-                      e.preventDefault()
-                    }}
-                    onEscapeKeyDown={(e) => {
-                      e.preventDefault()
-                    }}
-                  >
+                  <SelectContent>
                     {directionsOptions.length > 0 ? (
                       directionsOptions.map((direction) => (
                         <SelectItem key={direction} value={direction}>
@@ -965,22 +955,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       console.error('Failed to update contact methods:', error)
                     }
                   }}
-                  modal={true}
                 >
-                  <SelectTrigger 
+                  <SelectTrigger
                     className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <SelectValue placeholder={t('contacts.selectContactMethod') || 'Выберите способ связи'} />
                   </SelectTrigger>
-                  <SelectContent 
-                    onInteractOutside={(e) => {
-                      e.preventDefault()
-                    }}
-                    onEscapeKeyDown={(e) => {
-                      e.preventDefault()
-                    }}
-                  >
+                  <SelectContent>
                     <SelectItem value="Whatsapp">
                       {t('contacts.contactMethod.whatsapp') || 'Whatsapp'}
                     </SelectItem>
@@ -1106,9 +1088,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     await refetchActivities()
                   }
                 }}
-                modal={true}
               >
-                <SelectTrigger 
+                <SelectTrigger
                   className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -1117,14 +1098,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 >
                   <SelectValue placeholder={t('deals.selectRejectionReason') || 'Выберите причину отказа'} />
                 </SelectTrigger>
-                <SelectContent 
-                  onInteractOutside={(e) => {
-                    e.preventDefault()
-                  }}
-                  onEscapeKeyDown={(e) => {
-                    e.preventDefault()
-                  }}
-                >
+                <SelectContent>
                   {rejectionReasonsOptions.length > 0 ? (
                     rejectionReasonsOptions.map((option) => (
                       <SelectItem key={option} value={option}>
@@ -1258,10 +1232,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               <div className="space-y-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="flex gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                    <Skeleton className="h-10 w-10 rounded-full flex-shrink-0 animate-pulse-subtle" style={{ animationDelay: `${i * 100}ms` }} />
                     <div className="flex-1 space-y-2.5">
-                      <Skeleton className="h-4 w-3/4 rounded-sm" />
-                      <Skeleton className="h-3 w-1/2 rounded-sm" />
+                      <Skeleton className="h-4 w-3/4 rounded-sm animate-pulse-subtle" style={{ animationDelay: `${i * 100 + 50}ms` }} />
+                      <Skeleton className="h-3 w-1/2 rounded-sm animate-pulse-subtle" style={{ animationDelay: `${i * 100 + 100}ms` }} />
                     </div>
                   </div>
                 ))}

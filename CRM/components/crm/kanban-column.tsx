@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { DealCard } from "./deal-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -97,6 +97,7 @@ export function KanbanColumn({
     onTriggerAdd?.(trigger)
     setIsAddTriggerModalOpen(false)
   }
+
 
   return (
     <div 
@@ -227,11 +228,12 @@ export function KanbanColumn({
                 {isDraggingOver ? 'Drop here' : 'No deals'}
               </div>
             )}
-            
+
+            {/* Deal Cards */}
             {deals.map((deal) => (
-              <DealCard 
+              <DealCard
                 key={deal.id}
-                deal={deal} 
+                deal={deal}
                 stage={stage}
                 onDragStart={onDragStart}
                 onDragEnd={onDragEnd}

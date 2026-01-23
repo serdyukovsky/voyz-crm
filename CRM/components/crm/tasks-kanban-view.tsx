@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { TaskCard } from "@/components/crm/task-card"
-import { getTasks, deleteTask, updateTask } from '@/lib/api/tasks'
+import { deleteTask, updateTask } from '@/lib/api/tasks'
+import { useInfiniteTasks } from '@/hooks/use-tasks'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { startOfDay, startOfWeek, endOfWeek, addWeeks, endOfMonth, isSameDay, isWithinInterval, isBefore, isAfter } from 'date-fns'
@@ -132,27 +133,28 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refreshKey, setRefreshKey] = useState(0)
 
-  // Load tasks from API
-  const loadTasks = async () => {
+  // Use infinite scroll for tasks (100 per page instead of loading all 10000 at once)
+  const { data, isLoading: loading, error: tasksError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteTasks({
+    status: statusFilter || undefined,
+    pageSize: 100,
+    enabled: true,
+  })
+
+  // Transform and flatten all pages of tasks
+  useEffect(() => {
     try {
-      setLoading(true)
-      // For kanban, we need ALL tasks (no pagination limit)
-      // Use a large limit to get all tasks for the kanban board
-      const tasksResponse = await getTasks({
-        status: statusFilter || undefined,
-        limit: 10000, // Large limit for kanban to show all tasks
-      })
-      
-      // Handle both array and paginated response
-      const tasksData = Array.isArray(tasksResponse) 
-        ? tasksResponse 
-        : (tasksResponse as any).data || []
-      
+      const allTasksData: any[] = []
+
+      if (data?.pages) {
+        data.pages.forEach(page => {
+          const pageData = Array.isArray(page) ? page : (page as any)?.data || []
+          allTasksData.push(...pageData)
+        })
+      }
+
       // Transform API tasks to component format
-      const transformedTasks: Task[] = tasksData.map((task: any) => {
+      const transformedTasks: Task[] = allTasksData.map((task: any) => {
         // Map API status to component status
         let status = 'todo'
         if (task.status === 'BACKLOG') status = 'backlog'
@@ -160,12 +162,12 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
         else if (task.status === 'IN_PROGRESS') status = 'in_progress'
         else if (task.status === 'DONE') status = 'done'
         else if (task.status) status = task.status.toLowerCase()
-        
+
         const completed = task.status === 'DONE'
         if (completed) {
           console.log('Found completed task:', task.id, task.title, 'Status:', task.status)
         }
-        
+
         return {
           id: task.id,
           title: task.title,
@@ -183,24 +185,16 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
           result: task.result,
         }
       })
-      
-      console.log('Tasks loaded:', transformedTasks.length, 'Completed:', transformedTasks.filter(t => t.completed).length)
+
+      console.log('Tasks loaded:', transformedTasks.length, 'Completed:', transformedTasks.filter(t => t.completed).length, 'Has more:', hasNextPage)
       setTasks(transformedTasks)
     } catch (error) {
-      console.error('Failed to load tasks:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      // If unauthorized, redirect will be handled by API function
-      if (errorMessage !== 'UNAUTHORIZED') {
+      console.error('Failed to transform tasks:', error)
+      if (!tasksError || !tasksError.message?.includes('UNAUTHORIZED')) {
         setTasks([])
       }
-    } finally {
-      setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadTasks()
-  }, [statusFilter, refreshKey, t])
+  }, [data, t, tasksError, hasNextPage])
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -328,13 +322,9 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
         console.log('TasksKanbanView: Local state updated, updated task:', updatedTasks.find(t => t.id === finalUpdatedTask.id))
         return updatedTasks
       })
-      
-      // Also reload tasks from API after a short delay to ensure consistency
-      // This is especially important when status changes to DONE
-      setTimeout(() => {
-        console.log('TasksKanbanView: Refreshing tasks from API after update...')
-        setRefreshKey(prev => prev + 1)
-      }, 500)
+
+      // React Query cache is automatically invalidated by the mutation in the parent component
+      // No need for manual refetch
       
       // Only show success message if not silent (i.e., not auto-save)
       if (!silent) {
@@ -365,15 +355,15 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
       <div className="flex gap-4 overflow-x-auto pb-4">
         {visibleCategories.map((category) => {
           const categoryTasks = tasksByCategory[category.id] || []
-          
+
           return (
             <div key={category.id} className="flex-shrink-0 w-[280px]">
               <div className="rounded-md border border-border bg-card">
                 {/* Column Header */}
                 <div className="flex items-center justify-between p-3 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full" 
+                    <div
+                      className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
                     <h3 className="text-xs font-medium text-foreground">{category.name}</h3>
@@ -386,9 +376,9 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
                 {/* Tasks */}
                 <div className="p-3 space-y-2 min-h-[200px]">
                   {categoryTasks.map((task) => (
-                    <TaskCard 
-                      key={task.id} 
-                      task={task} 
+                    <TaskCard
+                      key={task.id}
+                      task={task}
                       onTaskUpdate={handleTaskUpdate}
                       onTaskDelete={handleTaskDelete}
                       selectedTaskId={selectedTaskId}
@@ -401,6 +391,19 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
           )
         })}
       </div>
+
+      {/* Load More Button for Infinite Pagination */}
+      {hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage || loading}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2"
+          >
+            {isFetchingNextPage ? 'Loading...' : 'Load More Tasks'}
+          </button>
+        </div>
+      )}
     </>
   )
 }

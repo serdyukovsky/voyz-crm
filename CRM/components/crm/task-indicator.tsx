@@ -74,20 +74,20 @@ export const TaskIndicator = memo(function TaskIndicator({ tasks }: TaskIndicato
   const maxDaysOverdue = hasOverdue ? getMaxDaysOverdue(tasks) : 0
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1 -m-1 p-1">
       {/* Days overdue text (only if overdue) */}
       {hasOverdue && maxDaysOverdue > 0 && (
-        <span className="text-xs font-medium text-red-600">
-          {maxDaysOverdue} дн.
+        <span className="text-[10px] font-medium text-red-600">
+          {maxDaysOverdue}дн
         </span>
       )}
 
       {/* Indicator circle */}
       <div
-        className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+        className={`h-2 w-2 rounded-full flex-shrink-0 ${
           hasOverdue
-            ? 'bg-red-500 shadow-sm shadow-red-500/50'
-            : 'bg-yellow-400 shadow-sm shadow-yellow-400/50'
+            ? 'bg-red-500'
+            : 'bg-yellow-400'
         }`}
         title={hasOverdue ? `Задача просрочена на ${maxDaysOverdue} дн.` : 'Есть активная задача'}
         aria-label={hasOverdue ? `Задача просрочена на ${maxDaysOverdue} дней` : 'Есть активная задача'}

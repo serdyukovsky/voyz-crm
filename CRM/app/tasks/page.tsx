@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getContacts } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
 import { CreateTaskModal } from '@/components/crm/create-task-modal'
-import { createTask } from '@/lib/api/tasks'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
+import { useTasks, useCreateTask } from '@/hooks/use-tasks'
+import { useDebouncedValue } from '@/lib/utils/debounce'
+
 // Custom hooks to replace next/navigation
 let globalSetParams: ((params: URLSearchParams) => void) | null = null
 
@@ -27,11 +29,11 @@ const useSearchParams = () => {
     }
     return new URLSearchParams()
   })
-  
+
   useEffect(() => {
     globalSetParams = setParams
     if (typeof window === 'undefined') return
-    
+
     const handlePopState = () => {
       const newParams = new URLSearchParams(window.location.search)
       console.log('useSearchParams: PopState event, new params:', window.location.search, 'task param:', newParams.get('task'))
@@ -45,7 +47,7 @@ const useSearchParams = () => {
       }
     }
   }, [])
-  
+
   return params
 }
 
@@ -92,6 +94,23 @@ export default function TasksPage() {
   })
   const { showSuccess, showError } = useToastNotification()
 
+  // Debounce search query to reduce API calls (300ms delay)
+  const debouncedSearch = useDebouncedValue(searchQuery, 300)
+
+  // React Query hooks for data fetching
+  const { data: tasksResponse, isLoading, error: tasksError } = useTasks({
+    search: debouncedSearch,
+    status: statusFilter || undefined,
+    assignedToId: userFilter || undefined,
+    dealId: dealFilter || undefined,
+    contactId: contactFilter || undefined,
+    limit: 100,
+    enabled: true,
+  })
+
+  // Create task mutation with automatic cache invalidation
+  const { mutate: createTaskMutation, isPending: isCreating } = useCreateTask()
+
   // Read task ID from URL on mount and when URL changes
   useEffect(() => {
     const taskId = searchParams.get('task')
@@ -102,7 +121,7 @@ export default function TasksPage() {
       searchParamsString: searchParams.toString(),
       fullUrl: currentUrl
     })
-    
+
     // Always update if URL has task parameter to ensure modal opens on page load
     if (taskId) {
       console.log('TasksPage: Found task in URL, setting selectedTaskId to:', taskId)
@@ -117,15 +136,15 @@ export default function TasksPage() {
   const handleTaskSelect = useCallback((taskId: string | null) => {
     console.log('TasksPage: handleTaskSelect called with taskId:', taskId)
     console.log('TasksPage: Current URL before update:', window.location.href)
-    
+
     // Update state first
     setSelectedTaskId(taskId)
-    
+
     if (typeof window === 'undefined') {
       console.warn('TasksPage: window is undefined, cannot update URL')
       return
     }
-    
+
     const params = new URLSearchParams(window.location.search)
     if (taskId) {
       params.set('task', taskId)
@@ -136,14 +155,14 @@ export default function TasksPage() {
     const newUrl = `/tasks${queryString ? `?${queryString}` : ''}`
     console.log('TasksPage: New URL to push:', newUrl)
     console.log('TasksPage: Full URL will be:', window.location.origin + newUrl)
-    
+
     // Update URL using pushState - ensure it updates the address bar
     try {
       window.history.pushState({ path: newUrl }, '', newUrl)
       console.log('TasksPage: URL immediately after pushState:', window.location.href)
       console.log('TasksPage: window.location.search:', window.location.search)
       console.log('TasksPage: window.location.pathname:', window.location.pathname)
-      
+
       // Update search params state
       if (globalSetParams) {
         console.log('TasksPage: Updating globalSetParams')
@@ -151,10 +170,10 @@ export default function TasksPage() {
       } else {
         console.warn('TasksPage: globalSetParams is not available')
       }
-      
+
       // Force update by dispatching popstate
       window.dispatchEvent(new PopStateEvent('popstate'))
-      
+
       // Double check after a delay
       setTimeout(() => {
         console.log('TasksPage: URL after pushState (delayed):', window.location.href)
@@ -178,6 +197,7 @@ export default function TasksPage() {
   const dateOptions = ["All Dates", "Today", "This Week", "Overdue", "Upcoming"]
   const statusOptions = ["All Status", "Completed", "Incomplete"]
 
+  // Replaced manual handleCreateTask with React Query mutation
   const handleCreateTask = async (taskData: {
     title: string
     description?: string
@@ -188,24 +208,28 @@ export default function TasksPage() {
     contactId?: string
     assignedToId: string
   }) => {
-    try {
-      await createTask(taskData)
-      showSuccess('Task created successfully')
-      setIsCreateTaskModalOpen(false)
-      // Reload page to refresh tasks list
-      window.location.reload()
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      if (errorMessage === 'UNAUTHORIZED') {
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+    createTaskMutation(taskData, {
+      onSuccess: () => {
+        console.log('Task created successfully')
+        showSuccess('Task created successfully')
+        setIsCreateTaskModalOpen(false)
+        // React Query automatically invalidates cache through mutation onSuccess
+      },
+      onError: (error) => {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Error creating task:', errorMessage)
+        if (errorMessage === 'UNAUTHORIZED') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+          return
         }
-        return
-      }
-      showError('Failed to create task', errorMessage)
-    }
+        showError('Failed to create task', errorMessage)
+      },
+    })
   }
 
+  // Load contacts for contact filter dropdown
   useEffect(() => {
     const loadContacts = async () => {
       try {
@@ -231,21 +255,17 @@ export default function TasksPage() {
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              alert('Button clicked!') // Simple test
               console.log('Add Task button clicked, opening modal')
-              console.log('Current isCreateTaskModalOpen state:', isCreateTaskModalOpen)
               const token = localStorage.getItem('access_token')
-              console.log('Token exists:', !!token)
               if (!token) {
                 console.warn('No token found, redirecting to login')
                 window.location.href = '/login'
                 return
               }
-              console.log('Token found, setting isCreateTaskModalOpen to true')
               setIsCreateTaskModalOpen(true)
-              console.log('After setState, isCreateTaskModalOpen should be true')
             }}
             type="button"
+            disabled={isCreating}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2"
             style={{ zIndex: 1000, position: 'relative' }}
           >
@@ -352,8 +372,8 @@ export default function TasksPage() {
 
         {/* Content */}
         {view === "kanban" ? (
-          <TasksKanbanView 
-            searchQuery={searchQuery}
+          <TasksKanbanView
+            searchQuery={debouncedSearch}
             userFilter={userFilter}
             dealFilter={dealFilter}
             contactFilter={contactFilter}
@@ -363,8 +383,8 @@ export default function TasksPage() {
             onTaskSelect={handleTaskSelect}
           />
         ) : view === "list" ? (
-          <TasksListView 
-            searchQuery={searchQuery}
+          <TasksListView
+            searchQuery={debouncedSearch}
             userFilter={userFilter}
             dealFilter={dealFilter}
             contactFilter={contactFilter}

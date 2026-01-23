@@ -10,7 +10,8 @@ import { DealDetailModal } from "./deal-detail-modal"
 import { ContactBadge } from "./contact-badge"
 import { getContacts } from '@/lib/api/contacts'
 import type { Contact } from '@/lib/api/contacts'
-import { getTasks, deleteTask, updateTask } from '@/lib/api/tasks'
+import { deleteTask, updateTask } from '@/lib/api/tasks'
+import { useTasks } from '@/hooks/use-tasks'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 
@@ -47,72 +48,60 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
   const [contacts, setContacts] = useState<Contact[]>([])
-  
 
-  // Load tasks from API
+  // React Query hook to fetch tasks with caching
+  const { data: tasksResponse, isLoading: loading, error: tasksError } = useTasks({
+    status: statusFilter || undefined,
+    limit: 100,
+  })
+
+  // Transform API response to component format
   useEffect(() => {
-    const loadTasks = async () => {
-      try {
-        setLoading(true)
-        console.log('📋 TasksListView: Loading tasks, statusFilter:', statusFilter)
-        const tasksResponse = await getTasks({
-          status: statusFilter || undefined,
-        })
-        
-        // Handle both array and paginated response
-        const tasksData = Array.isArray(tasksResponse) 
-          ? tasksResponse 
-          : (tasksResponse as any).data || []
-        
-        console.log('📋 TasksListView: Loaded tasks from API:', tasksData.length)
-        
-        // Transform API tasks to component format
-        const transformedTasks: Task[] = tasksData.map((task: any) => {
-          try {
-            return {
-              id: task.id,
-              title: task.title || 'Untitled',
-              dealId: task.deal?.id || null,
-              dealName: task.deal?.title || null,
-              contactId: task.contact?.id || null,
-              contactName: task.contact?.fullName || null,
-              dueDate: task.deadline || '',
-              assignee: task.assignedTo?.name || t('tasks.unassigned'),
-              assigneeId: task.assignedTo?.id || undefined,
-              completed: task.status === 'DONE',
-              status: task.status?.toLowerCase() || 'todo',
-              description: task.description,
-              createdAt: task.createdAt,
-              result: task.result,
-            }
-          } catch (error) {
-            console.error('Error transforming task:', task, error)
-            return null
+    try {
+      const tasksData = Array.isArray(tasksResponse)
+        ? tasksResponse
+        : (tasksResponse as any)?.data || []
+
+      console.log('📋 TasksListView: Loaded tasks from React Query:', tasksData.length)
+
+      const transformedTasks: Task[] = tasksData.map((task: any) => {
+        try {
+          return {
+            id: task.id,
+            title: task.title || 'Untitled',
+            dealId: task.deal?.id || null,
+            dealName: task.deal?.title || null,
+            contactId: task.contact?.id || null,
+            contactName: task.contact?.fullName || null,
+            dueDate: task.deadline || '',
+            assignee: task.assignedTo?.name || t('tasks.unassigned'),
+            assigneeId: task.assignedTo?.id || undefined,
+            completed: task.status === 'DONE',
+            status: task.status?.toLowerCase() || 'todo',
+            description: task.description,
+            createdAt: task.createdAt,
+            result: task.result,
           }
-        }).filter((task): task is Task => task !== null)
-        
-        console.log('📋 TasksListView: Transformed tasks:', transformedTasks.length)
-        setTasks(transformedTasks)
-      } catch (error) {
-        console.error('Failed to load tasks:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        // If unauthorized, redirect will be handled by API function
-        if (errorMessage !== 'UNAUTHORIZED') {
-          setTasks([])
+        } catch (error) {
+          console.error('Error transforming task:', task, error)
+          return null
         }
-      } finally {
-        setLoading(false)
+      }).filter((task): task is Task => task !== null)
+
+      console.log('📋 TasksListView: Transformed tasks:', transformedTasks.length)
+      setTasks(transformedTasks)
+    } catch (error) {
+      console.error('Failed to transform tasks:', error)
+      if (!tasksError || !tasksError.message.includes('UNAUTHORIZED')) {
+        setTasks([])
       }
     }
-    
-    loadTasks()
-  }, [statusFilter, t])
+  }, [tasksResponse, t, tasksError])
 
   useEffect(() => {
     const loadContacts = async () => {
@@ -259,48 +248,12 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
       })
       
       // Update selected task if it's the one being updated
-      setSelectedTask(prev => 
+      setSelectedTask(prev =>
         prev && prev.id === finalUpdatedTask.id ? finalUpdatedTask : prev
       )
-      
-      // Also reload tasks from API after a short delay to ensure consistency
-      setTimeout(async () => {
-        try {
-          const tasksResponse = await getTasks({
-            status: statusFilter || undefined,
-          })
-          
-          // Handle both array and paginated response
-          const tasksData = Array.isArray(tasksResponse) 
-            ? tasksResponse 
-            : (tasksResponse as any).data || []
-          
-          const transformedTasks: Task[] = tasksData.map((task: any) => ({
-            id: task.id,
-            title: task.title,
-            dealId: task.deal?.id || null,
-            dealName: task.deal?.title || null,
-            contactId: task.contact?.id || null,
-            contactName: task.contact?.fullName || null,
-            dueDate: task.deadline || '',
-            assignee: task.assignedTo?.name || t('tasks.unassigned'),
-            assigneeId: task.assignedTo?.id || undefined,
-            completed: task.status === 'DONE',
-            status: task.status?.toLowerCase() || 'todo',
-            description: task.description,
-            createdAt: task.createdAt,
-            result: task.result,
-          }))
-          
-          setTasks(transformedTasks)
-          const updated = transformedTasks.find(t => t.id === updatedTask.id)
-          if (updated) {
-            setSelectedTask(updated)
-          }
-        } catch (error) {
-          console.error('Failed to reload tasks:', error)
-        }
-      }, 500)
+
+      // React Query cache is automatically invalidated by the mutation in the parent component
+      // No need for manual refetch
       
       // Only show success message if not silent (i.e., not auto-save)
       if (!silent) {

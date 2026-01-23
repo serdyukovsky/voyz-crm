@@ -15,6 +15,12 @@ export interface Deal {
   pipeline?: {
     id: string
     name: string
+    description?: string
+    isDefault?: boolean
+    isActive?: boolean
+    order?: number
+    createdAt?: string
+    updatedAt?: string
     stages?: Array<{
       id: string
       name: string
@@ -37,6 +43,17 @@ export interface Deal {
     phone?: string
     position?: string
     companyName?: string
+    company?: {
+      id: string
+      name: string
+      industry?: string
+      stats?: {
+        activeDeals: number
+        closedDeals: number
+        totalDeals: number
+        totalDealVolume?: number
+      }
+    }
     social?: {
       instagram?: string
       telegram?: string
@@ -50,6 +67,17 @@ export interface Deal {
     contactMethods?: string[]
     websiteOrTgChannel?: string
     contactInfo?: string
+    stats?: {
+      activeDeals: number
+      closedDeals: number
+      totalDeals: number
+      totalDealVolume?: number
+    }
+  }
+  company?: {
+    id: string
+    name: string
+    industry?: string
     stats?: {
       activeDeals: number
       closedDeals: number
@@ -168,6 +196,7 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
           phone: data.contact.phone,
           position: data.contact.position,
           companyName: data.contact.companyName,
+          company: data.contact.company,
           social: data.contact.social,
           stats: data.contact.stats,
           // Contact fields
@@ -178,6 +207,7 @@ export function useDeal({ dealId, realtime = false }: UseDealOptions) {
           websiteOrTgChannel: data.contact.websiteOrTgChannel,
           contactInfo: data.contact.contactInfo,
         } : undefined,
+        company: data.company,
         createdAt: data.createdAt || new Date().toISOString(),
         expectedClose: data.expectedCloseAt,
         tags: data.tags || [],
