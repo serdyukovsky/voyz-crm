@@ -263,8 +263,76 @@ export function DetailSkeleton() {
   )
 }
 
+export function DealsPageSkeleton() {
+  return (
+    <div className="flex flex-col h-[calc(100vh-3rem)] px-6 py-6 animate-in fade-in-50 duration-300">
+      {/* Header Skeleton */}
+      <div className="flex-shrink-0 pb-2 pt-2 mb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 space-y-2">
+            {/* Pipeline Title */}
+            <div className="h-8 w-48 bg-gradient-to-r from-muted via-muted to-transparent rounded-lg animate-pulse" style={{ animationDelay: '0ms' }}></div>
+            {/* Subtitle */}
+            <div className="h-4 w-72 bg-gradient-to-r from-muted/60 to-transparent rounded-md animate-pulse" style={{ animationDelay: '100ms' }}></div>
+          </div>
 
+          {/* Right Controls Skeleton */}
+          <div className="flex gap-2">
+            {/* View Mode Buttons */}
+            <div className="h-9 w-24 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: '150ms' }}></div>
 
+            {/* Settings Button */}
+            <div className="h-9 w-24 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: '200ms' }}></div>
 
+            {/* Filter Button */}
+            <div className="h-9 w-20 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: '250ms' }}></div>
+
+            {/* Create Button */}
+            <div className="h-9 w-24 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Kanban Board Skeleton */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+        <div className="flex gap-3 pb-4 animate-in fade-in-50 duration-300" style={{ minWidth: 'max-content' }}>
+          {[1, 2, 3, 4].map((colIndex) => (
+            <div key={colIndex} className="flex-shrink-0 w-96 bg-card rounded-lg border border-border/40 p-3 space-y-2" style={{ animationDelay: `${colIndex * 50}ms` }}>
+              {/* Column Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-5 w-32 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse"></div>
+                <div className="h-5 w-8 bg-gradient-to-r from-muted to-transparent rounded-md animate-pulse"></div>
+              </div>
+
+              {/* Deal Cards */}
+              {[1, 2, 3].map((cardIndex) => (
+                <div
+                  key={cardIndex}
+                  className="bg-white dark:bg-slate-900 rounded-lg border border-border/30 p-3 space-y-2.5"
+                  style={{ animationDelay: `${colIndex * 50 + cardIndex * 75}ms` }}
+                >
+                  {/* Card Title */}
+                  <div className="h-4 w-full bg-gradient-to-r from-muted via-muted to-transparent rounded-sm animate-pulse"></div>
+
+                  {/* Avatar + Name */}
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-full bg-gradient-to-r from-muted to-transparent animate-pulse"></div>
+                    <div className="flex-1 h-3 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+                  </div>
+
+                  {/* Company Badge */}
+                  <div className="h-6 w-24 bg-gradient-to-r from-muted/40 to-transparent rounded-md animate-pulse"></div>
+
+                  {/* Amount */}
+                  <div className="h-4 w-20 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 

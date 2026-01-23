@@ -65,7 +65,7 @@ const useRouter = () => {
     }
   }
 }
-import { PageSkeleton } from "@/components/shared/loading-skeleton"
+import { PageSkeleton, DealsPageSkeleton } from "@/components/shared/loading-skeleton"
 import { createDeal, getDeals, deleteDeal, updateDeal, type Deal as APIDeal } from "@/lib/api/deals"
 import { getPipelines, createPipeline, createStage, type Pipeline, type Stage as PipelineStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
@@ -776,6 +776,15 @@ export default function DealsPage() {
     }
   }
 
+  // Show unified skeleton while pipelines are loading
+  if (pipelinesLoading && funnels.length === 0) {
+    return (
+      <CRMLayout>
+        <DealsPageSkeleton />
+      </CRMLayout>
+    )
+  }
+
   return (
     <CRMLayout>
       <div className="h-[calc(100vh-3rem)] flex flex-col px-6 py-6">
@@ -798,7 +807,7 @@ export default function DealsPage() {
                   className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={pipelinesLoading}
                 >
-                  {pipelinesLoading ? 'Loading...' : (currentFunnel?.name || 'No pipeline')}
+                  {currentFunnel?.name || 'No pipeline'}
                   <ChevronDown className="h-5 w-5" />
                 </button>
                 
@@ -862,7 +871,7 @@ export default function DealsPage() {
                   className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={pipelinesLoading}
                 >
-                  {pipelinesLoading ? 'Loading...' : (currentFunnel?.name || 'No pipeline')}
+                  {currentFunnel?.name || 'No pipeline'}
                   <ChevronDown className="h-5 w-5" />
                 </button>
               
