@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { DollarSign, ChevronDown, Check, Plus, XCircle, Link as LinkIcon, Users, Hash, MessageCircle, Globe } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealHeader } from './deal/deal-header'
 import { DealTasksList } from './deal/deal-tasks-list'
@@ -15,7 +15,8 @@ import { CreateTaskModal } from './create-task-modal'
 import { ActivityTimeline } from '@/components/shared/activity-timeline'
 import { useActivity } from '@/hooks/use-activity'
 import { DealCommentsPanel } from './deal/deal-comments-panel'
-import { useDealDetail } from '@/hooks/use-deals'
+import { useDealDetail, dealKeys } from '@/hooks/use-deals'
+import { contactKeys } from '@/hooks/use-contacts'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
 import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
@@ -45,6 +46,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { showSuccess, showError } = useToastNotification()
+  const queryClient = useQueryClient()
   
   // Validate dealId - use a safe default if invalid
   const safeDealId = (dealId && typeof dealId === 'string' && dealId.trim() !== '') ? dealId : ''
@@ -131,6 +133,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [openDirections, setOpenDirections] = useState(false)
+  const [openMethods, setOpenMethods] = useState(false)
+  const [openReasons, setOpenReasons] = useState(false)
   
   // Local state for contact fields to prevent losing input on refetch
   const [contactLink, setContactLink] = useState('')
@@ -219,12 +224,15 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   useEffect(() => {
     const loadRejectionReasonsOptions = async () => {
       try {
+        console.log('[DEAL DETAIL] Loading rejection reasons options...')
         const options = await getSystemFieldOptions('deal', 'rejectionReasons')
+        console.log('[DEAL DETAIL] Loaded rejection reasons options:', options)
         setRejectionReasonsOptions(options)
       } catch (error) {
         console.error('[DEAL DETAIL] Failed to load rejection reasons options:', error)
         // Fallback to default options if API fails
-        setRejectionReasonsOptions(['Price', 'Competitor', 'Timing', 'Budget', 'Requirements', 'Other'])
+        console.log('[DEAL DETAIL] Using fallback rejection reasons options')
+        setRejectionReasonsOptions(['price', 'competitor', 'timing', 'budget', 'requirements', 'other'])
       }
     }
     loadRejectionReasonsOptions()
@@ -234,7 +242,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   useEffect(() => {
     const loadDirectionsOptions = async () => {
       try {
+        console.log('[DEAL DETAIL] Loading directions options...')
         const options = await getSystemFieldOptions('contact', 'directions')
+        console.log('[DEAL DETAIL] Loaded directions options:', options)
         setDirectionsOptions(options)
       } catch (error) {
         console.error('[DEAL DETAIL] Failed to load directions options:', error)
@@ -303,6 +313,15 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       }
       if (!target.closest('.user-dropdown-container')) {
         setShowUserDropdown(false)
+      }
+      if (!target.closest('.directions-dropdown-container')) {
+        setOpenDirections(false)
+      }
+      if (!target.closest('.methods-dropdown-container')) {
+        setOpenMethods(false)
+      }
+      if (!target.closest('.reasons-dropdown-container')) {
+        setOpenReasons(false)
       }
     }
 
@@ -624,7 +643,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   return (
     <div className={`flex flex-col md:flex-row ${onClose ? 'h-full w-full' : 'h-[calc(100vh-3rem)]'} overflow-hidden`}>
       {/* LEFT COLUMN: Deal Info - Show immediately when deal is loaded */}
-      <div className="w-full md:w-80 flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth animate-in fade-in-0 duration-200">
+      <div className="w-full md:w-[420px] flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth animate-in fade-in-0 duration-200">
         <DealHeader
           deal={deal}
           onTitleUpdate={handleTitleUpdate}
@@ -645,8 +664,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
         <div className="px-6 py-4 space-y-4">
           {/* Stage */}
-          <div>
-            <label className="text-xs font-semibold text-foreground mb-2 block">{t('deals.stage')}</label>
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">{t('deals.stage')}</label>
+            <div className="flex-1">
             {pipelineLoading ? (
               <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.loadingStages')}</span>
@@ -661,7 +681,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   onClick={() => setShowStageDropdown(!showStageDropdown)}
                   className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <div 
                       className="h-2 w-2 rounded-full" 
                       style={{ backgroundColor: currentStage.color }}
@@ -693,11 +713,13 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* Responsible */}
-          <div>
-            <label className="text-xs font-semibold text-foreground mb-2 block">Ответственный</label>
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">Ответственный</label>
+            <div className="flex-1">
             {usersLoading ? (
               <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">Loading users...</span>
@@ -712,7 +734,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
                   className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <Avatar className="h-5 w-5">
                       <AvatarImage src={currentUser.avatar} />
                       <AvatarFallback className="text-[10px]">
@@ -758,7 +780,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         }}
                         className="w-full flex items-center justify-between gap-2 px-3 h-9 hover:bg-accent/50 first:rounded-t-md last:rounded-b-md transition-colors"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <Avatar className="h-5 w-5">
                             <AvatarImage src={user.avatar} />
                             <AvatarFallback className="text-[10px]">
@@ -776,15 +798,17 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* Contact Fields - Always show, even if contact doesn't exist */}
           <div className="space-y-3 pt-4 border-t border-border/50">
               {/* Link */}
-              <div>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
                   {t('contacts.link') || 'Ссылка'}
                 </label>
+                <div className="flex-1">
                 <Input
                   value={contactLink}
                   onChange={(e) => {
@@ -813,13 +837,15 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   placeholder={t('contacts.linkPlaceholder') || 'Вставьте ссылку'}
                   className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
+                </div>
               </div>
 
               {/* Subscriber Count */}
-              <div>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
                   {t('contacts.subscriberCount') || 'Кол-во подписчиков'}
                 </label>
+                <div className="flex-1">
                 <Input
                   value={contactSubscriberCount}
                   onChange={(e) => {
@@ -847,168 +873,174 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   placeholder={t('contacts.subscriberCountPlaceholder') || 'Введите количество'}
                   className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
+                </div>
               </div>
 
-              {/* Directions - Multi-select */}
-              <div onClick={(e) => e.stopPropagation()}>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              {/* Directions - Multi-select with Checkboxes */}
+              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 directions-dropdown-container">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.directions') || 'Направление'}
                 </label>
-                <Select
-                  value=""
-                  onValueChange={async (value) => {
-                    try {
-                      const contactId = await ensureContact()
-                      const currentDirections = deal?.contact?.directions || []
-                      if (!currentDirections.includes(value)) {
-                        await updateContact(contactId, { directions: [...currentDirections, value] })
-                        await refetchDeal()
-                        await refetchActivities()
-                      }
-                    } catch (error) {
-                      console.error('Failed to update directions:', error)
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
-                    onClick={(e) => e.stopPropagation()}
+                <div className="flex-1 relative">
+                  <button
+                    onClick={() => {
+                      console.log('[DEAL DETAIL] Directions dropdown clicked, current options:', directionsOptions)
+                      setOpenDirections(!openDirections)
+                    }}
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
                   >
-                    <SelectValue placeholder={t('contacts.selectDirection') || 'Выберите направление'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {directionsOptions.length > 0 ? (
-                      directionsOptions.map((direction) => (
-                        <SelectItem key={direction} value={direction}>
-                          {getDirectionLabel(direction)}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      // Fallback to default options if API hasn't loaded yet
-                      <>
-                        <SelectItem value="marketing">
-                          {t('contacts.direction.marketing') || 'Маркетинг'}
-                        </SelectItem>
-                        <SelectItem value="sales">
-                          {t('contacts.direction.sales') || 'Продажи'}
-                        </SelectItem>
-                        <SelectItem value="support">
-                          {t('contacts.direction.support') || 'Поддержка'}
-                        </SelectItem>
-                        <SelectItem value="development">
-                          {t('contacts.direction.development') || 'Разработка'}
-                        </SelectItem>
-                        <SelectItem value="other">
-                          {t('contacts.direction.other') || 'Другое'}
-                        </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                {deal?.contact?.directions && deal.contact.directions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {deal.contact.directions.map((direction, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
-                      >
-                        <span>{getDirectionLabel(direction)}</span>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const contactId = await ensureContact()
-                              const updatedDirections = deal?.contact?.directions?.filter((d) => d !== direction) || []
-                              await updateContact(contactId, { directions: updatedDirections })
-                              await refetchDeal()
-                              await refetchActivities()
-                            } catch (error) {
-                              console.error('Failed to remove direction:', error)
-                            }
-                          }}
-                          className="ml-1 hover:text-destructive transition-colors"
-                        >
-                          <XCircle className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                    <div className="text-foreground text-left">
+                      {deal?.contact?.directions && deal.contact.directions.length > 0
+                        ? deal.contact.directions.map((d, idx) => (
+                            <div key={idx} className="text-xs">
+                              {getDirectionLabel(d)}
+                            </div>
+                          ))
+                        : 'Выберите направление'}
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openDirections ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {openDirections && (
+                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
+                      {directionsOptions.length > 0 ? (
+                        directionsOptions.map((direction) => (
+                          <div key={direction} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`direction-${direction}`}
+                              checked={deal?.contact?.directions?.includes(direction) || false}
+                              onChange={async (e) => {
+                                try {
+                                  // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
+                                  const isChecked = e.target.checked
+
+                                  console.log('[Directions] === START ===')
+                                  console.log('[Directions] isChecked (saved immediately):', isChecked)
+                                  console.log('[Directions] direction:', direction)
+                                  console.log('[Directions] deal?.contact?.directions:', deal?.contact?.directions)
+
+                                  const contactId = await ensureContact()
+                                  console.log('[Directions] Contact ID:', contactId)
+
+                                  const currentDirections = Array.isArray(deal?.contact?.directions)
+                                    ? deal.contact.directions
+                                    : []
+                                  console.log('[Directions] currentDirections after check:', currentDirections)
+
+                                  let newDirections
+                                  if (isChecked) {
+                                    newDirections = [...new Set([...currentDirections, direction])]
+                                    console.log('[Directions] Adding, newDirections:', newDirections)
+                                  } else {
+                                    newDirections = currentDirections.filter((d) => d !== direction)
+                                    console.log('[Directions] Removing, newDirections:', newDirections)
+                                  }
+
+                                  console.log('[Directions] Sending to API:', { directions: newDirections })
+                                  const result = await updateContact(contactId, { directions: newDirections })
+                                  console.log('[Directions] Update result:', result)
+
+                                  // Invalidate both contact and deal caches
+                                  console.log('[Directions] Invalidating contact cache...')
+                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                  console.log('[Directions] Refetching deal...')
+                                  await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                  console.log('[Directions] Refetch complete')
+                                } catch (error) {
+                                  console.error('Failed to update directions:', error)
+                                }
+                              }}
+                              className="h-4 w-4 rounded border border-border/60 cursor-pointer"
+                            />
+                            <label htmlFor={`direction-${direction}`} className="text-xs cursor-pointer">
+                              {getDirectionLabel(direction)}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground py-1">No options available</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Contact Methods - Multi-select */}
-              <div onClick={(e) => e.stopPropagation()}>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              {/* Contact Methods - Multi-select with Checkboxes */}
+              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 methods-dropdown-container">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.contactMethods') || 'Способ связи'}
                 </label>
-                <Select
-                  value=""
-                  onValueChange={async (value) => {
-                    try {
-                      const contactId = await ensureContact()
-                      const currentMethods = deal?.contact?.contactMethods || []
-                      if (!currentMethods.includes(value)) {
-                        await updateContact(contactId, { contactMethods: [...currentMethods, value] })
-                        await refetchDeal()
-                        await refetchActivities()
-                      }
-                    } catch (error) {
-                      console.error('Failed to update contact methods:', error)
-                    }
-                  }}
-                >
-                  <SelectTrigger
-                    className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
-                    onClick={(e) => e.stopPropagation()}
+                <div className="flex-1 relative">
+                  <button
+                    onClick={() => setOpenMethods(!openMethods)}
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
                   >
-                    <SelectValue placeholder={t('contacts.selectContactMethod') || 'Выберите способ связи'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Whatsapp">
-                      {t('contacts.contactMethod.whatsapp') || 'Whatsapp'}
-                    </SelectItem>
-                    <SelectItem value="Telegram">
-                      {t('contacts.contactMethod.telegram') || 'Telegram'}
-                    </SelectItem>
-                    <SelectItem value="Direct">
-                      {t('contacts.contactMethod.direct') || 'Direct'}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {deal.contact.contactMethods.map((method, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
-                      >
-                        <span>{getContactMethodLabel(method)}</span>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const contactId = await ensureContact()
-                              const updatedMethods = deal?.contact?.contactMethods?.filter((m) => m !== method) || []
-                              await updateContact(contactId, { contactMethods: updatedMethods })
-                              await refetchDeal()
-                              await refetchActivities()
-                            } catch (error) {
-                              console.error('Failed to remove contact method:', error)
-                            }
-                          }}
-                          className="ml-1 hover:text-destructive transition-colors"
-                        >
-                          <XCircle className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                    <div className="text-foreground text-left">
+                      {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0
+                        ? deal.contact.contactMethods.map((m, idx) => (
+                            <div key={idx} className="text-xs">
+                              {getContactMethodLabel(m)}
+                            </div>
+                          ))
+                        : 'Выберите способ'}
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openMethods ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {openMethods && (
+                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
+                      {['Whatsapp', 'Telegram', 'Direct'].map((method) => (
+                        <div key={method} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`method-${method}`}
+                            checked={deal?.contact?.contactMethods?.includes(method) || false}
+                            onChange={async (e) => {
+                              try {
+                                // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
+                                const isChecked = e.target.checked
+
+                                console.log('[ContactMethods] Checkbox changed:', { method, checked: isChecked })
+                                const contactId = await ensureContact()
+                                const currentMethods = deal?.contact?.contactMethods || []
+                                const newMethods = isChecked
+                                  ? [...currentMethods, method]
+                                  : currentMethods.filter((m) => m !== method)
+
+                                console.log('[ContactMethods] Updating with:', { currentMethods, newMethods })
+                                await updateContact(contactId, { contactMethods: newMethods })
+                                console.log('[ContactMethods] Update complete, refetching...')
+
+                                // Invalidate both contact and deal caches
+                                console.log('[ContactMethods] Invalidating contact cache...')
+                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                console.log('[ContactMethods] Refetching deal...')
+                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                await refetchActivities()
+                                console.log('[ContactMethods] Refetch complete')
+                              } catch (error) {
+                                console.error('Failed to update contact methods:', error)
+                              }
+                            }}
+                            className="h-4 w-4 rounded border border-border/60 cursor-pointer"
+                          />
+                          <label htmlFor={`method-${method}`} className="text-xs cursor-pointer">
+                            {getContactMethodLabel(method)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Website or TG Channel */}
-              <div>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
                   {t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
                 </label>
+                <div className="flex-1">
                 <Input
                   value={contactWebsite}
                   onChange={(e) => {
@@ -1036,13 +1068,15 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   placeholder={t('contacts.websiteOrTgChannelPlaceholder') || 'Введите ссылку на сайт или тг канал'}
                   className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
+                </div>
               </div>
 
               {/* Contact Info */}
-              <div>
-                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
                   {t('contacts.contactInfo') || 'Контакт'}
                 </label>
+                <div className="flex-1">
                 <Input
                   value={contactInfo}
                   onChange={(e) => {
@@ -1070,86 +1104,108 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   placeholder={t('contacts.contactInfoPlaceholder') || 'Номер телефона или никнейм в телеграме'}
                   className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
+                </div>
               </div>
             </div>
 
-          {/* Rejection Reasons */}
-          <div className="pt-4 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
-            <label className="text-xs font-semibold text-foreground mb-2 block">
+          {/* Rejection Reasons - Multi-select with Checkboxes */}
+          <div className="pt-4 border-t border-border/50 flex items-start gap-3 reasons-dropdown-container" onClick={(e) => e.stopPropagation()}>
+            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
               {t('deals.rejectionReasons') || 'Причина отказа'}
             </label>
-            <div className="space-y-2">
-              <Select
-                value=""
-                onValueChange={async (value) => {
-                  const currentReasons = deal.rejectionReasons || []
-                  if (!currentReasons.includes(value)) {
-                    await updateDeal({ rejectionReasons: [...currentReasons, value] })
-                    await refetchActivities()
-                  }
+            <div className="flex-1 relative">
+              <button
+                onClick={() => {
+                  console.log('[DEAL DETAIL] Rejection Reasons dropdown clicked, current options:', rejectionReasonsOptions)
+                  setOpenReasons(!openReasons)
                 }}
+                className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
               >
-                <SelectTrigger
-                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                  }}
-                >
-                  <SelectValue placeholder={t('deals.selectRejectionReason') || 'Выберите причину отказа'} />
-                </SelectTrigger>
-                <SelectContent>
+                <div className="text-foreground text-left">
+                  {deal.rejectionReasons && deal.rejectionReasons.length > 0
+                    ? deal.rejectionReasons.map((r, idx) => (
+                        <div key={idx} className="text-xs">
+                          {getRejectionReasonLabel(r)}
+                        </div>
+                      ))
+                    : 'Выберите причину'}
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openReasons ? 'rotate-180' : ''}`} />
+              </button>
+
+              {openReasons && (
+                <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
                   {rejectionReasonsOptions.length > 0 ? (
-                    rejectionReasonsOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {getRejectionReasonLabel(option)}
-                      </SelectItem>
+                    rejectionReasonsOptions.map((reason) => (
+                      <div key={reason} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`reason-${reason}`}
+                          checked={deal.rejectionReasons?.includes(reason) || false}
+                          onChange={async (e) => {
+                            try {
+                              console.log('[RejectionReasons] Checkbox changed:', { reason, checked: e.target.checked })
+                              const currentReasons = deal.rejectionReasons || []
+                              const newReasons = e.target.checked
+                                ? [...currentReasons, reason]
+                                : currentReasons.filter((r) => r !== reason)
+
+                              console.log('[RejectionReasons] Updating with:', { currentReasons, newReasons })
+                              await updateDeal({ rejectionReasons: newReasons })
+                              console.log('[RejectionReasons] Update complete, refetching...')
+
+                              // Force an immediate refetch of the deal
+                              await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                              await refetchActivities()
+                              console.log('[RejectionReasons] Refetch complete')
+                            } catch (error) {
+                              console.error('Failed to update rejection reasons:', error)
+                            }
+                          }}
+                          className="h-4 w-4 rounded border border-border/60 cursor-pointer"
+                        />
+                        <label htmlFor={`reason-${reason}`} className="text-xs cursor-pointer">
+                          {getRejectionReasonLabel(reason)}
+                        </label>
+                      </div>
                     ))
                   ) : (
-                    // Fallback to default options while loading
                     <>
-                      <SelectItem value="price">
-                        {t('deals.rejectionReason.price') || 'Цена'}
-                      </SelectItem>
-                      <SelectItem value="competitor">
-                        {t('deals.rejectionReason.competitor') || 'Конкурент'}
-                      </SelectItem>
-                      <SelectItem value="timing">
-                        {t('deals.rejectionReason.timing') || 'Сроки'}
-                      </SelectItem>
-                      <SelectItem value="budget">
-                        {t('deals.rejectionReason.budget') || 'Бюджет'}
-                      </SelectItem>
-                      <SelectItem value="requirements">
-                        {t('deals.rejectionReason.requirements') || 'Требования'}
-                      </SelectItem>
-                      <SelectItem value="other">
-                        {t('deals.rejectionReason.other') || 'Другое'}
-                      </SelectItem>
+                      {['price', 'competitor', 'timing', 'budget', 'requirements', 'other'].map((reason) => (
+                        <div key={reason} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`reason-${reason}`}
+                            checked={deal.rejectionReasons?.includes(reason) || false}
+                            onChange={async (e) => {
+                              try {
+                                console.log('[RejectionReasons-Fallback] Checkbox changed:', { reason, checked: e.target.checked })
+                                const currentReasons = deal.rejectionReasons || []
+                                const newReasons = e.target.checked
+                                  ? [...currentReasons, reason]
+                                  : currentReasons.filter((r) => r !== reason)
+
+                                console.log('[RejectionReasons-Fallback] Updating with:', { currentReasons, newReasons })
+                                await updateDeal({ rejectionReasons: newReasons })
+                                console.log('[RejectionReasons-Fallback] Update complete, refetching...')
+
+                                // Force an immediate refetch of the deal
+                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                await refetchActivities()
+                                console.log('[RejectionReasons-Fallback] Refetch complete')
+                              } catch (error) {
+                                console.error('Failed to update rejection reasons:', error)
+                              }
+                            }}
+                            className="h-4 w-4 rounded border border-border/60 cursor-pointer"
+                          />
+                          <label htmlFor={`reason-${reason}`} className="text-xs cursor-pointer">
+                            {getRejectionReasonLabel(reason)}
+                          </label>
+                        </div>
+                      ))}
                     </>
                   )}
-                </SelectContent>
-              </Select>
-              {deal.rejectionReasons && deal.rejectionReasons.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {deal.rejectionReasons.map((reason, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md text-xs border border-border/20"
-                    >
-                      <span>{getRejectionReasonLabel(reason)}</span>
-                      <button
-                        onClick={async () => {
-                          const updatedReasons = deal.rejectionReasons?.filter((r) => r !== reason) || []
-                          await updateDeal({ rejectionReasons: updatedReasons })
-                          await refetchActivities()
-                        }}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <XCircle className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>
