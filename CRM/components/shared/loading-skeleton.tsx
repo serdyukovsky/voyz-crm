@@ -162,55 +162,103 @@ export function StatsSkeleton() {
 
 export function DetailSkeleton() {
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300">
-      <div className="flex items-center justify-between">
-        <div className="space-y-3">
-          <Skeleton className="h-9 w-72 rounded-lg animate-pulse-subtle" />
-          <Skeleton className="h-4 w-56 rounded-md animate-pulse-subtle" style={{ animationDelay: '100ms' }} />
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex items-center justify-between gap-4 pb-4 border-b">
+        <div className="flex-1 space-y-2.5">
+          <div className="h-9 bg-gradient-to-r from-muted via-muted to-transparent rounded-lg animate-pulse"></div>
+          <div className="h-4 w-2/3 bg-gradient-to-r from-muted/50 via-muted/30 to-transparent rounded-md animate-pulse" style={{ animationDelay: '100ms' }}></div>
         </div>
-        <div className="flex gap-3">
-          <Skeleton className="h-10 w-28 rounded-lg animate-pulse-subtle" style={{ animationDelay: '200ms' }} />
-          <Skeleton className="h-10 w-28 rounded-lg animate-pulse-subtle" style={{ animationDelay: '300ms' }} />
+        <div className="flex gap-2 flex-shrink-0">
+          <div className="h-10 w-24 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse"></div>
+          <div className="h-10 w-24 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: '100ms' }}></div>
         </div>
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border shadow-sm">
-          <CardHeader className="space-y-2">
-            <Skeleton className="h-6 w-40 rounded-md animate-pulse-subtle" style={{ animationDelay: '400ms' }} />
-            <Skeleton className="h-3 w-24 rounded-sm animate-pulse-subtle" style={{ animationDelay: '500ms' }} />
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2.5">
-              <Skeleton className="h-3.5 w-24 rounded-sm animate-pulse-subtle" style={{ animationDelay: '600ms' }} />
-              <Skeleton className="h-7 w-full rounded-md animate-pulse-subtle" style={{ animationDelay: '700ms' }} />
-            </div>
-            <div className="space-y-2.5">
-              <Skeleton className="h-3.5 w-24 rounded-sm animate-pulse-subtle" style={{ animationDelay: '800ms' }} />
-              <Skeleton className="h-7 w-full rounded-md animate-pulse-subtle" style={{ animationDelay: '900ms' }} />
-            </div>
-            <div className="space-y-2.5">
-              <Skeleton className="h-3.5 w-24 rounded-sm animate-pulse-subtle" style={{ animationDelay: '1000ms' }} />
-              <Skeleton className="h-7 w-3/4 rounded-md animate-pulse-subtle" style={{ animationDelay: '1100ms' }} />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border shadow-sm">
-          <CardHeader className="space-y-2">
-            <Skeleton className="h-6 w-40 rounded-md animate-pulse-subtle" style={{ animationDelay: '400ms' }} />
-            <Skeleton className="h-3 w-24 rounded-sm animate-pulse-subtle" style={{ animationDelay: '500ms' }} />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-32 rounded-sm animate-pulse-subtle" style={{ animationDelay: `${600 + i * 150}ms` }} />
-                  <Skeleton className="h-16 w-full rounded-md animate-pulse-subtle" style={{ animationDelay: `${700 + i * 150}ms` }} />
+
+      {/* Main Content Grid */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Left Column - Main Info (2/3 width) */}
+        <div className="md:col-span-2 space-y-6">
+          {/* Basic Information Card */}
+          <Card className="border shadow-sm overflow-hidden">
+            <CardHeader className="pb-4 bg-gradient-to-r from-muted/20 to-transparent">
+              <div className="h-6 w-48 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse"></div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2.5">
+                  <div className="h-4 w-32 bg-gradient-to-r from-muted/40 to-transparent rounded-sm animate-pulse"></div>
+                  <div className="h-8 w-full bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: `${50 + i * 100}ms` }}></div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Contact Information Card */}
+          <Card className="border shadow-sm overflow-hidden">
+            <CardHeader className="pb-4 bg-gradient-to-r from-muted/20 to-transparent">
+              <div className="h-6 w-40 bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse"></div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex gap-4">
+                <div className="h-14 w-14 rounded-full bg-gradient-to-r from-muted via-muted to-transparent animate-pulse flex-shrink-0"></div>
+                <div className="flex-1 space-y-2.5">
+                  <div className="h-4 w-40 bg-gradient-to-r from-muted via-muted to-transparent rounded-sm animate-pulse"></div>
+                  <div className="h-3 w-32 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Metadata (1/3 width) */}
+        <div className="space-y-6">
+          {/* Stage Card */}
+          <Card className="border shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 bg-gradient-to-r from-muted/20 to-transparent">
+              <div className="h-5 w-20 bg-gradient-to-r from-muted to-transparent rounded-sm animate-pulse"></div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              <div className="h-9 w-full bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse"></div>
+              <div className="h-4 w-full bg-gradient-to-r from-muted/40 to-transparent rounded-sm animate-pulse"></div>
+            </CardContent>
+          </Card>
+
+          {/* Properties Card */}
+          <Card className="border shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 bg-gradient-to-r from-muted/20 to-transparent">
+              <div className="h-5 w-24 bg-gradient-to-r from-muted to-transparent rounded-sm animate-pulse"></div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="h-3 w-16 bg-gradient-to-r from-muted/40 to-transparent rounded-sm animate-pulse"></div>
+                  <div className="h-5 w-full bg-gradient-to-r from-muted via-muted to-transparent rounded-sm animate-pulse" style={{ animationDelay: `${50 + i * 100}ms` }}></div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Bottom Section - Activity/Timeline */}
+      <Card className="border shadow-sm overflow-hidden">
+        <CardHeader className="pb-4 border-b bg-gradient-to-r from-muted/20 to-transparent">
+          <div className="flex gap-6">
+            <div className="h-5 w-20 bg-gradient-to-r from-muted via-muted to-transparent rounded-sm animate-pulse"></div>
+            <div className="h-5 w-24 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+            <div className="h-5 w-20 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="space-y-3 pb-6 border-b last:border-b-0">
+              <div className="h-4 w-40 bg-gradient-to-r from-muted/50 to-transparent rounded-sm animate-pulse"></div>
+              <div className="h-20 w-full bg-gradient-to-r from-muted via-muted to-transparent rounded-md animate-pulse" style={{ animationDelay: `${100 + i * 200}ms` }}></div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   )
 }
