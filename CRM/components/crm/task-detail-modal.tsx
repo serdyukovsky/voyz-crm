@@ -58,6 +58,7 @@ import { getDeals, type Deal as DealType } from '@/lib/api/deals'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useUserRole } from '@/hooks/use-user-role'
+import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 interface Task {
@@ -87,6 +88,7 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: TaskDetailModalProps) {
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const { isAdmin, role } = useUserRole()
@@ -481,12 +483,12 @@ export function TaskDetailModal({ task, isOpen, onClose, onUpdate, onDelete }: T
             <div className="flex items-center gap-2 text-muted-foreground">
               {selectedDeal ? (
                 <>
-                  <button 
+                  <button
                     className="flex items-center gap-1.5 text-xs hover:text-foreground transition-colors"
                     onClick={() => {
                       // Click on attached deal - navigate to deals page with deal ID in URL
                       if (selectedDeal) {
-                        window.location.href = `/deals?deal=${selectedDeal.id}`
+                        navigate(`/deals/${selectedDeal.id}`)
                       }
                     }}
                   >
