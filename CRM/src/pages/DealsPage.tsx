@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2, ArrowUpDown, X, Building2, User, Trash2, Loader2 } from 'lucide-react'
 import { PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeleton"
+import { RedirectOldDealUrl } from "@/components/shared/redirect-old-deal-url"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { usePipelines, useCreatePipeline } from "@/hooks/use-pipelines"
 import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
@@ -1847,6 +1848,7 @@ function DealsPageContent() {
 export default function DealsPage() {
   return (
     <CRMLayout>
+      <RedirectOldDealUrl />
       <DealsPageContent />
     </CRMLayout>
   )
