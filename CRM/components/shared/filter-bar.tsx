@@ -8,6 +8,7 @@ import { Search, X, Filter } from "lucide-react"
 import { MultiSelectFilter, MultiSelectOption } from "./multi-select-filter"
 import { useState, useEffect } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useDebouncedValue } from '@/lib/utils/debounce'
 
 interface FilterBarProps {
   searchPlaceholder?: string
@@ -45,23 +46,26 @@ export function FilterBar({
     searchParams.get('companies')?.split(',').filter(Boolean) || []
   )
 
+  // Debounce search input (500ms) to reduce API calls while typing
+  const debouncedSearch = useDebouncedValue(search, 500)
+
   useEffect(() => {
     const params = new URLSearchParams()
-    
-    if (search) params.set('search', search)
+
+    if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','))
     if (selectedStatuses.length > 0) params.set('statuses', selectedStatuses.join(','))
     if (selectedCompanies.length > 0) params.set('companies', selectedCompanies.join(','))
 
     navigate(`${pathname}?${params.toString()}`, { replace: true })
-    
+
     onFiltersChange?.({
-      search: search ? [search] : [],
+      search: debouncedSearch ? [debouncedSearch] : [],
       tags: selectedTags,
       statuses: selectedStatuses,
       companies: selectedCompanies,
     })
-  }, [search, selectedTags, selectedStatuses, selectedCompanies, navigate, pathname, onFiltersChange])
+  }, [debouncedSearch, selectedTags, selectedStatuses, selectedCompanies, navigate, pathname, onFiltersChange])
 
   const clearAll = () => {
     setSearch('')

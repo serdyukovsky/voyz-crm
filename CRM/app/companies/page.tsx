@@ -37,59 +37,45 @@ const useRouter = () => {
     }
   }
 }
-import { getCompanies, deleteCompany, type Company } from '@/lib/api/companies'
+import { deleteCompany, type Company } from '@/lib/api/companies'
 import { FilterBar } from '@/components/shared/filter-bar'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useRealtimeCompany } from '@/hooks/use-realtime-company'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
+import { useCompanies } from '@/hooks/use-companies'
+import { useQueryClient } from '@tanstack/react-query'
+import { companyKeys } from '@/hooks/use-companies'
 
 export default function CompaniesPage() {
   useAuthGuard()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const { showSuccess, showError } = useToastNotification()
-  const [companies, setCompanies] = useState<Company[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
 
   // Get filters from URL
   const searchQuery = searchParams.get('search') || ''
   const selectedIndustries = searchParams.get('industries')?.split(',').filter(Boolean) || []
   const hasDealsFilter = searchParams.get('hasDeals') || ''
 
-  useEffect(() => {
-    loadCompanies()
-  }, [searchQuery, selectedIndustries, hasDealsFilter])
+  // React Query hook for data fetching
+  // Companies are fetched with debounced search (from FilterBar)
+  const { data: companiesData, isLoading: loading, error: companiesError } = useCompanies({
+    search: searchQuery || undefined,
+    industry: selectedIndustries.length === 1 ? selectedIndustries[0] : undefined,
+  })
 
-  const loadCompanies = async () => {
-    setLoading(true)
-    try {
-      const companiesData = await getCompanies({
-        search: searchQuery || undefined,
-        industry: selectedIndustries.length === 1 ? selectedIndustries[0] : undefined,
-      })
-      
-      // Filter by hasDeals if selected
-      let filteredCompanies = companiesData
-      if (hasDealsFilter === 'true') {
-        filteredCompanies = companiesData.filter(
-          (company) => (company.stats?.totalDeals || 0) > 0
-        )
-      } else if (hasDealsFilter === 'false') {
-        filteredCompanies = companiesData.filter(
-          (company) => (company.stats?.totalDeals || 0) === 0
-        )
-      }
-      
-      setCompanies(filteredCompanies)
-    } catch (error) {
-      console.error('Failed to load companies:', error)
-      showError('Failed to load companies', 'Please try again later')
-    } finally {
-      setLoading(false)
+  // Filter by hasDeals (client-side filter after API returns data)
+  const companies = (companiesData || []).filter((company) => {
+    if (hasDealsFilter === 'true') {
+      return (company.stats?.totalDeals || 0) > 0
+    } else if (hasDealsFilter === 'false') {
+      return (company.stats?.totalDeals || 0) === 0
     }
-  }
+    return true
+  })
 
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedCompanies.length} company(ies)?`)) return
@@ -98,7 +84,8 @@ export default function CompaniesPage() {
       await Promise.all(selectedCompanies.map((id) => deleteCompany(id)))
       setSelectedCompanies([])
       showSuccess(`Deleted ${selectedCompanies.length} company(ies)`)
-      loadCompanies()
+      // Invalidate companies cache to refresh list
+      queryClient.invalidateQueries({ queryKey: companyKeys.lists() })
     } catch (error) {
       console.error('Failed to delete companies:', error)
       showError('Failed to delete companies', 'Please try again')
