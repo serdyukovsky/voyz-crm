@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/popover"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
-import type { CustomField } from '@/hooks/use-deal'
+import type { CustomField } from '@/lib/api/custom-fields'
 
 interface DynamicFieldRendererProps {
   field: CustomField

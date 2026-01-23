@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { RoleGuard } from '@/components/shared/role-guard'
 import { useTranslation } from '@/lib/i18n/i18n-context'
-import type { Deal } from '@/hooks/use-deal'
+import type { Deal } from '@/lib/api/deals'
 
 interface DealHeaderProps {
   deal: Deal | null
