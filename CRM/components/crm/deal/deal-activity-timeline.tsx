@@ -9,7 +9,7 @@ interface DealActivityTimelineProps {
   groupByDate?: boolean
 }
 
-const activityIcons: Record<ActivityType, typeof CheckCircle2> = {
+const activityIcons: Record<string, typeof CheckCircle2> = {
   deal_created: UserPlus,
   field_updated: Edit,
   task_created: CheckCircle2,
@@ -17,6 +17,7 @@ const activityIcons: Record<ActivityType, typeof CheckCircle2> = {
   task_completed: CheckCircle2,
   file_uploaded: FileText,
   stage_changed: Tag,
+  stage_change: Tag,
   comment: MessageSquare,
   internal_note: MessageSquare,
   client_message: MessageSquare
@@ -119,7 +120,7 @@ function ActivityItem({ activity, isLast }: { activity: Activity; isLast: boolea
               )}
             </>
           )}
-          {activity.type === 'stage_changed' && activity.message && (
+          {(activity.type === 'stage_changed' || activity.type === 'stage_change') && activity.message && (
             <span className="text-muted-foreground">{activity.message}</span>
           )}
           {activity.type === 'comment' && activity.message && (
