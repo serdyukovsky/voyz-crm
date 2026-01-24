@@ -672,7 +672,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         <div className="px-6 py-4 space-y-4">
           {/* Stage */}
           <div className="flex items-center gap-3">
-            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">{t('deals.stage')}</label>
+            <label className="text-sm text-foreground flex-shrink-0 w-32">{t('deals.stage')}</label>
             <div className="flex-1">
             {pipelineLoading ? (
               <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
@@ -725,7 +725,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
           {/* Responsible */}
           <div className="flex items-center gap-3">
-            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">Ответственный</label>
+            <label className="text-sm text-foreground flex-shrink-0 w-32">Ответственный</label>
             <div className="flex-1">
             {usersLoading ? (
               <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
@@ -812,7 +812,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
           <div className="space-y-3 pt-4 border-t border-border/50">
               {/* Link */}
               <div className="flex items-center gap-3">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
+                <label className="text-sm text-foreground flex-shrink-0 w-32">
                   {t('contacts.link') || 'Ссылка'}
                 </label>
                 <div className="flex-1">
@@ -849,7 +849,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {/* Subscriber Count */}
               <div className="flex items-center gap-3">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
+                <label className="text-sm text-foreground flex-shrink-0 w-32">
                   {t('contacts.subscriberCount') || 'Кол-во подписчиков'}
                 </label>
                 <div className="flex-1">
@@ -885,7 +885,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {/* Directions - Multi-select with Checkboxes */}
               <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 directions-dropdown-container">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
+                <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.directions') || 'Направление'}
                 </label>
                 <div className="flex-1 relative">
@@ -995,7 +995,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {/* Contact Methods - Multi-select with Checkboxes */}
               <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 methods-dropdown-container">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
+                <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.contactMethods') || 'Способ связи'}
                 </label>
                 <div className="flex-1 relative">
@@ -1064,7 +1064,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {/* Website or TG Channel */}
               <div className="flex items-center gap-3">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
+                <label className="text-sm text-foreground flex-shrink-0 w-32">
                   {t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
                 </label>
                 <div className="flex-1">
@@ -1100,7 +1100,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {/* Contact Info */}
               <div className="flex items-center gap-3">
-                <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32">
+                <label className="text-sm text-foreground flex-shrink-0 w-32">
                   {t('contacts.contactInfo') || 'Контакт'}
                 </label>
                 <div className="flex-1">
@@ -1137,7 +1137,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
           {/* Rejection Reasons - Multi-select with Checkboxes */}
           <div className="pt-4 border-t border-border/50 flex items-start gap-3 reasons-dropdown-container" onClick={(e) => e.stopPropagation()}>
-            <label className="text-xs font-semibold text-foreground flex-shrink-0 w-32 pt-2">
+            <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
               {t('deals.rejectionReasons') || 'Причина отказа'}
             </label>
             <div className="flex-1 relative">
