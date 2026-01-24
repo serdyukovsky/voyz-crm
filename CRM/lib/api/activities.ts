@@ -56,6 +56,11 @@ export interface Activity {
     id: string
     title: string
   }
+  // Parsed from payload for display
+  fieldName?: string
+  oldValue?: any
+  newValue?: any
+  message?: string
 }
 
 export interface ActivityFilters {
@@ -95,6 +100,30 @@ export async function getActivities(filters?: ActivityFilters): Promise<Activity
 
   const data = await response.json()
   console.log('Activities fetched successfully:', data.length, 'activities', data)
-  return data
+
+  // Transform activities to extract payload data for display
+  const transformedActivities = data.map((activity: Activity) => {
+    const transformed = { ...activity }
+
+    // Parse payload for field update activities
+    if (activity.payload && typeof activity.payload === 'object') {
+      if ((activity as any).payload.field) {
+        transformed.fieldName = (activity as any).payload.field
+      }
+      if ((activity as any).payload.oldValue !== undefined) {
+        transformed.oldValue = (activity as any).payload.oldValue
+      }
+      if ((activity as any).payload.newValue !== undefined) {
+        transformed.newValue = (activity as any).payload.newValue
+      }
+      if ((activity as any).payload.message) {
+        transformed.message = (activity as any).payload.message
+      }
+    }
+
+    return transformed
+  })
+
+  return transformedActivities
 }
 
