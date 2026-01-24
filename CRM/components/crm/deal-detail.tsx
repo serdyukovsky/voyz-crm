@@ -842,7 +842,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.linkPlaceholder') || 'Вставьте ссылку'}
-                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm bg-transparent"
                 />
                 </div>
               </div>
@@ -878,7 +878,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.subscriberCountPlaceholder') || 'Введите количество'}
-                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm bg-transparent"
                 />
                 </div>
               </div>
@@ -897,7 +897,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         setSearchDirections('')
                       }
                     }}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left">
                       {deal?.contact?.directions && deal.contact.directions.length > 0
@@ -912,14 +912,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   </button>
 
                   {openDirections && (
-                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50">
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50">
                       {directionsOptions.length > 10 && (
                         <Input
                           type="text"
                           placeholder="Поиск..."
                           value={searchDirections}
                           onChange={(e) => setSearchDirections(e.target.value)}
-                          className="mb-2 h-7 text-xs border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                          className="mb-2 h-7 text-xs bg-transparent"
                         />
                       )}
                       <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -1001,7 +1001,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 <div className="flex-1 relative">
                   <button
                     onClick={() => setOpenMethods(!openMethods)}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left">
                       {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0
@@ -1016,7 +1016,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   </button>
 
                   {openMethods && (
-                    <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
                       {['Whatsapp', 'Telegram', 'Direct'].map((method) => (
                         <div key={method} className="flex items-center gap-2">
                           <input
@@ -1073,12 +1073,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   onChange={(e) => {
                     const value = e.target.value
                     setContactWebsite(value) // Update local state immediately
-                    
+
                     // Clear previous timeout
                     if (websiteTimeoutRef.current) {
                       clearTimeout(websiteTimeoutRef.current)
                     }
-                    
+
                     // Debounce API call
                     websiteTimeoutRef.current = setTimeout(async () => {
                       try {
@@ -1093,7 +1093,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.websiteOrTgChannelPlaceholder') || 'Введите ссылку на сайт или тг канал'}
-                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm bg-transparent"
                 />
                 </div>
               </div>
@@ -1109,12 +1109,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   onChange={(e) => {
                     const value = e.target.value
                     setContactInfo(value) // Update local state immediately
-                    
+
                     // Clear previous timeout
                     if (contactInfoTimeoutRef.current) {
                       clearTimeout(contactInfoTimeoutRef.current)
                     }
-                    
+
                     // Debounce API call
                     contactInfoTimeoutRef.current = setTimeout(async () => {
                       try {
@@ -1129,7 +1129,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.contactInfoPlaceholder') || 'Номер телефона или никнейм в телеграме'}
-                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm bg-transparent"
                 />
                 </div>
               </div>
@@ -1146,7 +1146,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   console.log('[DEAL DETAIL] Rejection Reasons dropdown clicked, current options:', rejectionReasonsOptions)
                   setOpenReasons(!openReasons)
                 }}
-                className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
+                className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
               >
                 <div className="text-foreground text-left">
                   {deal.rejectionReasons && deal.rejectionReasons.length > 0
@@ -1161,14 +1161,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               </button>
 
               {openReasons && (
-                <div className="absolute top-full left-0 right-0 mt-1 border border-border/30 rounded-md p-2 bg-card shadow-md z-50">
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50">
                   {rejectionReasonsOptions.length > 10 && (
                     <Input
                       type="text"
                       placeholder="Поиск..."
                       value={searchReasons}
                       onChange={(e) => setSearchReasons(e.target.value)}
-                      className="mb-2 h-7 text-xs border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                      className="mb-2 h-7 text-xs bg-transparent"
                     />
                   )}
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
