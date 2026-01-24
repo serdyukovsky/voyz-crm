@@ -675,18 +675,18 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             <label className="text-sm text-foreground flex-shrink-0 w-32">{t('deals.stage')}</label>
             <div className="flex-1">
             {pipelineLoading ? (
-              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
+              <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.loadingStages')}</span>
               </div>
             ) : stages.length === 0 ? (
-              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
+              <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.noStagesAvailable')}</span>
               </div>
             ) : (
               <div className="relative stage-dropdown-container">
                 <button
                   onClick={() => setShowStageDropdown(!showStageDropdown)}
-                  className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
+                  className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent"
                 >
                   <div className="flex items-center gap-3">
                     <div 
@@ -699,7 +699,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 </button>
 
                 {showStageDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-card rounded-md shadow-lg max-h-60 overflow-y-auto">
                     {stages.map((stage) => (
                       <button
                         key={stage.value}
@@ -728,18 +728,18 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             <label className="text-sm text-foreground flex-shrink-0 w-32">Ответственный</label>
             <div className="flex-1">
             {usersLoading ? (
-              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
+              <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">Loading users...</span>
               </div>
             ) : usersForDropdown.length === 0 ? (
-              <div className="w-full px-3 h-9 rounded-md border border-border/30 flex items-center bg-transparent">
+              <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">No users available</span>
               </div>
             ) : (
               <div className="relative user-dropdown-container">
                 <button
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
-                  className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent"
+                  className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent"
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-5 w-5">
@@ -754,7 +754,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 </button>
 
                 {showUserDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-card rounded-md shadow-lg max-h-60 overflow-y-auto">
                     {usersForDropdown.map((user) => (
                       <button
                         key={user.id}
