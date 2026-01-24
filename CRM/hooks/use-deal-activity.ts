@@ -110,6 +110,8 @@ export function useDealActivity({ dealId }: UseDealActivityOptions) {
       const data = await response.json()
       const activities = Array.isArray(data) ? data : data.data || []
 
+      console.log('[useDealActivity] Raw activities from API:', activities)
+
       // Transform backend activities to frontend Activity interface
       const transformedActivities: Activity[] = activities
         .map((activity: any) => {
@@ -128,6 +130,13 @@ export function useDealActivity({ dealId }: UseDealActivityOptions) {
 
           // Parse payload for field updates
           if (activity.payload && typeof activity.payload === 'object') {
+            console.log('[useDealActivity] Activity with payload:', {
+              type: activity.type,
+              payload: activity.payload,
+              field: activity.payload.field,
+              oldValue: activity.payload.oldValue,
+              newValue: activity.payload.newValue,
+            })
             return {
               ...baseActivity,
               fieldName: activity.payload.field,
@@ -141,6 +150,7 @@ export function useDealActivity({ dealId }: UseDealActivityOptions) {
         })
         .sort((a, b) => a.dateSort.getTime() - b.dateSort.getTime())
 
+      console.log('[useDealActivity] Transformed activities:', transformedActivities)
       setActivities(transformedActivities)
     } catch (err) {
       console.error('Failed to load activity:', err)
