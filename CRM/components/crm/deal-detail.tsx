@@ -850,7 +850,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     linkTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { link: value || undefined })
+                        await updateContact(contactId, { link: value || undefined }, dealId)
                         await refetchDeal()
                         await refetchActivities()
                       } catch (error) {
@@ -887,7 +887,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     subscriberCountTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { subscriberCount: value || undefined })
+                        await updateContact(contactId, { subscriberCount: value || undefined }, dealId)
                         await refetchDeal()
                         await refetchActivities()
                       } catch (error) {
@@ -976,10 +976,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                   setLocalDirections(newDirections)
                                   console.timeEnd('[Directions] Total time') // This should be < 5ms
 
-                                  // Then send to server in background
+                                  // Then send to server in background (backend logs activity)
                                   console.time('[Directions] Server update')
                                   const contactId = deal?.contact?.id || await ensureContact()
-                                  await updateContact(contactId, { directions: newDirections })
+                                  await updateContact(contactId, { directions: newDirections }, dealId)
                                   console.timeEnd('[Directions] Server update')
 
                                   // Invalidate caches after successful update
@@ -1059,10 +1059,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                 setLocalContactMethods(newMethods)
                                 console.timeEnd('[ContactMethods] Total time') // This should be < 5ms
 
-                                // Then send to server in background
+                                // Then send to server in background (backend logs activity)
                                 console.time('[ContactMethods] Server update')
                                 const contactId = deal?.contact?.id || await ensureContact()
-                                await updateContact(contactId, { contactMethods: newMethods })
+                                await updateContact(contactId, { contactMethods: newMethods }, dealId)
                                 console.timeEnd('[ContactMethods] Server update')
 
                                 // Invalidate caches after successful update
@@ -1111,7 +1111,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     websiteTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { websiteOrTgChannel: value || undefined })
+                        await updateContact(contactId, { websiteOrTgChannel: value || undefined }, dealId)
                         await refetchDeal()
                         await refetchActivities()
                       } catch (error) {
@@ -1147,7 +1147,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     contactInfoTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { contactInfo: value || undefined })
+                        await updateContact(contactId, { contactInfo: value || undefined }, dealId)
                         await refetchDeal()
                         await refetchActivities()
                       } catch (error) {
@@ -1231,7 +1231,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               setLocalRejectionReasons(newReasons)
                               console.timeEnd('[RejectionReasons] Total time') // This should be < 5ms
 
-                              // Then send to server in background
+                              // Then send to server in background (backend logs activity)
                               console.time('[RejectionReasons] Server update')
                               await updateDeal({ rejectionReasons: newReasons })
                               console.timeEnd('[RejectionReasons] Server update')
@@ -1281,7 +1281,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                 setLocalRejectionReasons(newReasons)
                                 console.timeEnd('[RejectionReasons-Fallback] Total time') // This should be < 5ms
 
-                                // Then send to server in background
+                                // Then send to server in background (backend logs activity)
                                 console.time('[RejectionReasons-Fallback] Server update')
                                 await updateDeal({ rejectionReasons: newReasons })
                                 console.timeEnd('[RejectionReasons-Fallback] Server update')

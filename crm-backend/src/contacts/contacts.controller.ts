@@ -149,9 +149,14 @@ export class ContactsController {
   })
   update(
     @Param('id') id: string,
-    @Body() updateContactDto: UpdateContactDto,
+    @Body() updateContactDto: any,
     @CurrentUser() user: any,
   ) {
+    console.log('[ContactsController.update] Received:', {
+      contactId: id,
+      dealId: updateContactDto?.dealId,
+      fields: Object.keys(updateContactDto),
+    });
     return this.contactsService.update(id, updateContactDto, user.userId || user.id);
   }
 

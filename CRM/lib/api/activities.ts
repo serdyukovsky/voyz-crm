@@ -94,7 +94,7 @@ export async function getActivities(filters?: ActivityFilters): Promise<Activity
   }
 
   const data = await response.json()
-  console.log('Activities fetched successfully:', data.length, 'activities')
+  console.log('Activities fetched successfully:', data.length, 'activities', data)
   return data
 }
 

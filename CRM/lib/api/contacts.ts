@@ -327,7 +327,7 @@ export async function createContact(data: CreateContactDto): Promise<Contact> {
   return response.json()
 }
 
-export async function updateContact(id: string, data: UpdateContactDto): Promise<Contact> {
+export async function updateContact(id: string, data: UpdateContactDto, dealId?: string): Promise<Contact> {
   const backendAvailable = await checkBackendAvailable()
 
   if (!backendAvailable) {
@@ -350,13 +350,15 @@ export async function updateContact(id: string, data: UpdateContactDto): Promise
   }
 
   const API_BASE_URL = getApiBaseUrl()
+  const updateData = dealId ? { ...data, dealId } : data
+  console.log('[updateContact] Sending update data:', { id, updateData, dealId })
   const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(updateData),
   })
 
   if (!response.ok) {
