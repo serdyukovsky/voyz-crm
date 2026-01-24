@@ -131,9 +131,10 @@ function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: 
     case 'DEAL_DELETED':
       return translate('deals.deletedThisDeal')
     case 'FIELD_UPDATED':
-      const fieldName = payload.fieldName || translate('deals.fields')
-      const oldValue = payload.oldValue
-      const newValue = payload.newValue
+      // Use parsed fields from activity if available, otherwise fallback to payload
+      const fieldName = (activity as any).fieldName || payload.fieldName || translate('deals.fields')
+      const oldValue = (activity as any).oldValue !== undefined ? (activity as any).oldValue : payload.oldValue
+      const newValue = (activity as any).newValue !== undefined ? (activity as any).newValue : payload.newValue
       if (oldValue !== undefined && newValue !== undefined) {
         return `${translate('deals.updatedThisDeal')} ${fieldName} ${translate('common.from')} "${oldValue}" ${translate('common.to')} "${newValue}"`
       }
@@ -171,6 +172,15 @@ function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: 
       return activity.contact
         ? `${translate('deals.unlinkedContact')} "${activity.contact.fullName}"`
         : translate('deals.unlinkedContact')
+    case 'CONTACT_UPDATED_IN_DEAL':
+      // Updated contact field in deal - show field change details
+      const contactFieldName = (activity as any).fieldName || payload.fieldName || translate('deals.fields')
+      const contactOldValue = (activity as any).oldValue !== undefined ? (activity as any).oldValue : payload.oldValue
+      const contactNewValue = (activity as any).newValue !== undefined ? (activity as any).newValue : payload.newValue
+      if (contactOldValue !== undefined && contactNewValue !== undefined) {
+        return `${translate('deals.updatedThisDeal')} ${contactFieldName} ${translate('common.from')} "${contactOldValue}" ${translate('common.to')} "${contactNewValue}"`
+      }
+      return `${translate('deals.updatedThisDeal')} ${contactFieldName}`
     case 'COMPANY_CREATED':
       return translate('companies.createdThisCompany')
     case 'COMPANY_UPDATED':
