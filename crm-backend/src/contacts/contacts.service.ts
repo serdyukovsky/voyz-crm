@@ -254,24 +254,31 @@ export class ContactsService {
 
   async update(
     id: string,
-    updateContactDto: UpdateContactDto,
+    updateContactDto: any,
     userId: string,
   ): Promise<ContactResponseDto> {
+    // Extract dealId if provided (for logging activity in deal context)
+    const dealId = updateContactDto.dealId;
+    console.log('[ContactsService.update] Received update with dealId:', { contactId: id, dealId, updateData: Object.keys(updateContactDto) });
+
+    // Remove dealId from update data (it's metadata, not a contact field)
+    const { dealId: _, ...updateData } = updateContactDto;
+
     const existing = await this.prisma.contact.findUnique({
       where: { id },
     });
-    
+
     if (!existing) {
       throw new NotFoundException(`Contact with ID ${id} not found`);
     }
 
     // Normalize email if provided
     let normalizedEmail: string | undefined;
-    if (updateContactDto.email !== undefined) {
-      if (updateContactDto.email === null || updateContactDto.email === '') {
+    if (updateData.email !== undefined) {
+      if (updateData.email === null || updateData.email === '') {
         normalizedEmail = undefined;
       } else {
-        const normalized = normalizeEmail(updateContactDto.email);
+        const normalized = normalizeEmail(updateData.email);
         if (!normalized) {
           throw new BadRequestException('Invalid email format');
         }
@@ -281,11 +288,11 @@ export class ContactsService {
 
     // Normalize phone if provided
     let normalizedPhone: string | undefined;
-    if (updateContactDto.phone !== undefined) {
-      if (updateContactDto.phone === null || updateContactDto.phone === '') {
+    if (updateData.phone !== undefined) {
+      if (updateData.phone === null || updateData.phone === '') {
         normalizedPhone = undefined;
       } else {
-        const normalized = normalizePhone(updateContactDto.phone);
+        const normalized = normalizePhone(updateData.phone);
         if (!normalized) {
           throw new BadRequestException('Invalid phone format');
         }
@@ -295,11 +302,11 @@ export class ContactsService {
 
     // Normalize social links if provided
     let normalizedSocial: any = undefined;
-    if (updateContactDto.social !== undefined) {
-      if (updateContactDto.social === null) {
+    if (updateData.social !== undefined) {
+      if (updateData.social === null) {
         normalizedSocial = {};
       } else {
-        const normalized = normalizeSocialLinks(updateContactDto.social);
+        const normalized = normalizeSocialLinks(updateData.social);
         if (!normalized) {
           throw new BadRequestException('Invalid social links format');
         }
@@ -320,8 +327,8 @@ export class ContactsService {
     // Track field changes for activity log
     const changes: Record<string, { old: any; new: any }> = {};
 
-    if (updateContactDto.fullName !== undefined) {
-      const normalizedFullName = sanitizeTextFields(updateContactDto.fullName);
+    if (updateData.fullName !== undefined) {
+      const normalizedFullName = sanitizeTextFields(updateData.fullName);
       if (normalizedFullName && normalizedFullName !== existing.fullName) {
         changes.fullName = { old: existing.fullName, new: normalizedFullName };
       }
@@ -336,99 +343,127 @@ export class ContactsService {
     }
 
     // Build update data object with only provided fields
-    const updateData: any = {};
+    const dbUpdateData: any = {};
 
     // Handle companyId changes
-    if (updateContactDto.companyId !== undefined && updateContactDto.companyId !== existing.companyId) {
+    if (updateData.companyId !== undefined && updateData.companyId !== existing.companyId) {
       // Sync companyName from companyId
       let companyName: string | undefined;
-      if (updateContactDto.companyId) {
+      if (updateData.companyId) {
         const company = await this.prisma.company.findUnique({
-          where: { id: updateContactDto.companyId },
+          where: { id: updateData.companyId },
           select: { name: true },
         });
         if (!company) {
-          throw new BadRequestException(`Company with ID ${updateContactDto.companyId} not found`);
+          throw new BadRequestException(`Company with ID ${updateData.companyId} not found`);
         }
         companyName = company.name;
       }
-      changes.company = { old: existing.companyId, new: updateContactDto.companyId };
-      updateData.companyId = updateContactDto.companyId;
-      updateData.companyName = companyName;
+      changes.company = { old: existing.companyId, new: updateData.companyId };
+      dbUpdateData.companyId = updateData.companyId;
+      dbUpdateData.companyName = companyName;
     }
 
-    if (updateContactDto.fullName !== undefined) {
-      const normalizedFullName = sanitizeTextFields(updateContactDto.fullName);
-      updateData.fullName = normalizedFullName || undefined;
+    if (updateData.fullName !== undefined) {
+      const normalizedFullName = sanitizeTextFields(updateData.fullName);
+      dbUpdateData.fullName = normalizedFullName || undefined;
     }
-    if (normalizedEmail !== undefined) updateData.email = normalizedEmail;
-    if (normalizedPhone !== undefined) updateData.phone = normalizedPhone;
-    if (updateContactDto.position !== undefined) {
-      updateData.position = sanitizeOptionalTextFields(updateContactDto.position);
+    if (normalizedEmail !== undefined) dbUpdateData.email = normalizedEmail;
+    if (normalizedPhone !== undefined) dbUpdateData.phone = normalizedPhone;
+    if (updateData.position !== undefined) {
+      dbUpdateData.position = sanitizeOptionalTextFields(updateData.position);
     }
-    if (updateContactDto.tags !== undefined) updateData.tags = updateContactDto.tags;
-    if (updateContactDto.notes !== undefined) {
-      updateData.notes = sanitizeOptionalTextFields(updateContactDto.notes);
+    if (updateData.tags !== undefined) dbUpdateData.tags = updateData.tags;
+    if (updateData.notes !== undefined) {
+      dbUpdateData.notes = sanitizeOptionalTextFields(updateData.notes);
     }
     if (normalizedSocial !== undefined) {
-      updateData.social = normalizedSocial;
+      dbUpdateData.social = normalizedSocial;
       if (JSON.stringify(normalizedSocial) !== JSON.stringify(existing.social)) {
         changes.social = { old: existing.social, new: normalizedSocial };
       }
     }
 
     // Handle new fields
-    if (updateContactDto.link !== undefined) {
-      updateData.link = sanitizeOptionalTextFields(updateContactDto.link);
-      if (updateData.link !== existing.link) {
-        changes.link = { old: existing.link, new: updateData.link };
+    if (updateData.link !== undefined) {
+      dbUpdateData.link = sanitizeOptionalTextFields(updateData.link);
+      if (dbUpdateData.link !== existing.link) {
+        changes.link = { old: existing.link, new: dbUpdateData.link };
       }
     }
-    if (updateContactDto.subscriberCount !== undefined) {
-      updateData.subscriberCount = sanitizeOptionalTextFields(updateContactDto.subscriberCount);
-      if (updateData.subscriberCount !== existing.subscriberCount) {
-        changes.subscriberCount = { old: existing.subscriberCount, new: updateData.subscriberCount };
+    if (updateData.subscriberCount !== undefined) {
+      dbUpdateData.subscriberCount = sanitizeOptionalTextFields(updateData.subscriberCount);
+      if (dbUpdateData.subscriberCount !== existing.subscriberCount) {
+        changes.subscriberCount = { old: existing.subscriberCount, new: dbUpdateData.subscriberCount };
       }
     }
-    if (updateContactDto.directions !== undefined) {
-      updateData.directions = updateContactDto.directions;
-      if (JSON.stringify(updateData.directions) !== JSON.stringify(existing.directions)) {
-        changes.directions = { old: existing.directions, new: updateData.directions };
+    if (updateData.directions !== undefined) {
+      dbUpdateData.directions = updateData.directions;
+      console.log('[ContactsService.update] Checking directions:', {
+        newValue: dbUpdateData.directions,
+        oldValue: existing.directions,
+        isSame: JSON.stringify(dbUpdateData.directions) === JSON.stringify(existing.directions),
+      });
+      if (JSON.stringify(dbUpdateData.directions) !== JSON.stringify(existing.directions)) {
+        changes.directions = { old: existing.directions, new: dbUpdateData.directions };
       }
     }
-    if (updateContactDto.contactMethods !== undefined) {
-      updateData.contactMethods = updateContactDto.contactMethods;
-      if (JSON.stringify(updateData.contactMethods) !== JSON.stringify(existing.contactMethods)) {
-        changes.contactMethods = { old: existing.contactMethods, new: updateData.contactMethods };
+    if (updateData.contactMethods !== undefined) {
+      dbUpdateData.contactMethods = updateData.contactMethods;
+      if (JSON.stringify(dbUpdateData.contactMethods) !== JSON.stringify(existing.contactMethods)) {
+        changes.contactMethods = { old: existing.contactMethods, new: dbUpdateData.contactMethods };
       }
     }
-    if (updateContactDto.websiteOrTgChannel !== undefined) {
-      updateData.websiteOrTgChannel = sanitizeOptionalTextFields(updateContactDto.websiteOrTgChannel);
-      if (updateData.websiteOrTgChannel !== existing.websiteOrTgChannel) {
-        changes.websiteOrTgChannel = { old: existing.websiteOrTgChannel, new: updateData.websiteOrTgChannel };
+    if (updateData.websiteOrTgChannel !== undefined) {
+      dbUpdateData.websiteOrTgChannel = sanitizeOptionalTextFields(updateData.websiteOrTgChannel);
+      if (dbUpdateData.websiteOrTgChannel !== existing.websiteOrTgChannel) {
+        changes.websiteOrTgChannel = { old: existing.websiteOrTgChannel, new: dbUpdateData.websiteOrTgChannel };
       }
     }
-    if (updateContactDto.contactInfo !== undefined) {
-      updateData.contactInfo = sanitizeOptionalTextFields(updateContactDto.contactInfo);
-      if (updateData.contactInfo !== existing.contactInfo) {
-        changes.contactInfo = { old: existing.contactInfo, new: updateData.contactInfo };
+    if (updateData.contactInfo !== undefined) {
+      dbUpdateData.contactInfo = sanitizeOptionalTextFields(updateData.contactInfo);
+      if (dbUpdateData.contactInfo !== existing.contactInfo) {
+        changes.contactInfo = { old: existing.contactInfo, new: dbUpdateData.contactInfo };
       }
     }
 
     const contact = await this.prisma.contact.update({
       where: { id },
-      data: updateData,
+      data: dbUpdateData,
       include: {
         company: true,
       },
     });
 
     // Log activity for each changed field
+    console.log('[ContactsService.update] Changes detected:', {
+      changesCount: Object.keys(changes).length,
+      changeFields: Object.keys(changes),
+      dealId: dealId || 'undefined',
+    });
+
+    if (Object.keys(changes).length === 0) {
+      console.log('[ContactsService.update] ⚠️ No changes detected, skipping activity log');
+    }
+
     for (const [field, change] of Object.entries(changes)) {
+      // If dealId provided, log as CONTACT_UPDATED_IN_DEAL, otherwise as CONTACT_UPDATED
+      const activityType = dealId ? ActivityType.CONTACT_UPDATED_IN_DEAL : ActivityType.CONTACT_UPDATED;
+
+      console.log('[ContactsService.update] ✅ Creating activity:', {
+        type: activityType,
+        contactId: id,
+        dealId: dealId || 'undefined',
+        field,
+        oldValue: change.old,
+        newValue: change.new,
+      });
+
       await this.activityService.create({
-        type: ActivityType.CONTACT_UPDATED,
+        type: activityType,
         userId,
         contactId: id,
+        dealId: dealId || undefined,
         payload: {
           field,
           oldValue: change.old,
@@ -445,19 +480,21 @@ export class ContactsService {
         where: { id: contact.companyId },
         select: { name: true },
       }) : null;
-      
+
+      const contextInfo = dealId ? ` (in deal context)` : '';
       await this.loggingService.create({
         level: 'info',
         action: 'update',
         entity: 'contact',
         entityId: contact.id,
         userId,
-        message: `Contact "${contact.fullName}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}`,
+        message: `Contact "${contact.fullName}" updated${changeFields.length > 0 ? `: ${changeFields.join(', ')}` : ''}${contextInfo}`,
         metadata: {
           contactName: contact.fullName,
           changes,
           companyId: contact.companyId,
           companyName: company?.name,
+          dealId,
         },
       });
     } catch (logError) {
