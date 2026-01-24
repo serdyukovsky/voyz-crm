@@ -884,7 +884,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               </div>
 
               {/* Directions - Multi-select with Checkboxes */}
-              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 directions-dropdown-container">
+              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 directions-dropdown-container mb-3">
                 <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.directions') || 'Направление'}
                 </label>
@@ -897,9 +897,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         setSearchDirections('')
                       }
                     }}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
+                    className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
                   >
-                    <div className="text-foreground text-left">
+                    <div className="text-foreground text-left flex-1">
                       {deal?.contact?.directions && deal.contact.directions.length > 0
                         ? deal.contact.directions.map((d, idx) => (
                             <div key={idx} className="text-sm">
@@ -908,7 +908,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           ))
                         : 'Выберите направление'}
                     </div>
-                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openDirections ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${openDirections ? 'rotate-180' : ''}`} />
                   </button>
 
                   {openDirections && (
@@ -994,16 +994,16 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
               </div>
 
               {/* Contact Methods - Multi-select with Checkboxes */}
-              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 methods-dropdown-container">
+              <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 methods-dropdown-container mb-3">
                 <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
                   {t('contacts.contactMethods') || 'Способ связи'}
                 </label>
                 <div className="flex-1 relative">
                   <button
                     onClick={() => setOpenMethods(!openMethods)}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
+                    className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
                   >
-                    <div className="text-foreground text-left">
+                    <div className="text-foreground text-left flex-1">
                       {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0
                         ? deal.contact.contactMethods.map((m, idx) => (
                             <div key={idx} className="text-sm">
@@ -1012,7 +1012,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           ))
                         : 'Выберите способ'}
                     </div>
-                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openMethods ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${openMethods ? 'rotate-180' : ''}`} />
                   </button>
 
                   {openMethods && (
@@ -1136,7 +1136,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             </div>
 
           {/* Rejection Reasons - Multi-select with Checkboxes */}
-          <div className="pt-4 border-t border-border/50 flex items-start gap-3 reasons-dropdown-container" onClick={(e) => e.stopPropagation()}>
+          <div className="pt-4 border-t border-border/50 flex items-start gap-3 reasons-dropdown-container mb-3" onClick={(e) => e.stopPropagation()}>
             <label className="text-sm text-foreground flex-shrink-0 w-32 pt-2">
               {t('deals.rejectionReasons') || 'Причина отказа'}
             </label>
@@ -1146,9 +1146,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   console.log('[DEAL DETAIL] Rejection Reasons dropdown clicked, current options:', rejectionReasonsOptions)
                   setOpenReasons(!openReasons)
                 }}
-                className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent text-sm text-left"
+                className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
               >
-                <div className="text-foreground text-left">
+                <div className="text-foreground text-left flex-1">
                   {deal.rejectionReasons && deal.rejectionReasons.length > 0
                     ? deal.rejectionReasons.map((r, idx) => (
                         <div key={idx} className="text-sm">
@@ -1157,7 +1157,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       ))
                     : 'Выберите причину'}
                 </div>
-                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${openReasons ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${openReasons ? 'rotate-180' : ''}`} />
               </button>
 
               {openReasons && (
