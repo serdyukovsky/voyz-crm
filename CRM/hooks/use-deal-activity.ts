@@ -97,7 +97,7 @@ export function useDealActivity({ dealId }: UseDealActivityOptions) {
         (process.env.REACT_APP_API_URL || process.env.VITE_API_URL || 'http://localhost:3001/api') :
         'http://localhost:3001/api'
 
-      const response = await fetch(`${API_BASE_URL}/activities?dealId=${dealId}`, {
+      const response = await fetch(`${API_BASE_URL}/activities?entityType=deal&entityId=${dealId}`, {
         headers: {
           'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('access_token') : ''}`,
         },
