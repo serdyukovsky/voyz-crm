@@ -939,55 +939,56 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               onChange={async (e) => {
                                 try {
                                   console.time('[Directions] Total time')
-                                  // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
                                   const isChecked = e.target.checked
 
-                                  console.log('[Directions] === START ===')
-                                  console.log('[Directions] isChecked (saved immediately):', isChecked)
-                                  console.log('[Directions] direction:', direction)
-                                  console.log('[Directions] deal?.contact?.directions:', deal?.contact?.directions)
+                                  console.log('[Directions] === START (OPTIMISTIC) ===')
+                                  console.log('[Directions] isChecked:', isChecked)
 
-                                  console.time('[Directions] ensureContact')
-                                  const contactId = await ensureContact()
-                                  console.timeEnd('[Directions] ensureContact')
-                                  console.log('[Directions] Contact ID:', contactId)
-
+                                  // Calculate new directions immediately
                                   const currentDirections = Array.isArray(deal?.contact?.directions)
                                     ? deal.contact.directions
                                     : []
-                                  console.log('[Directions] currentDirections after check:', currentDirections)
 
                                   let newDirections
                                   if (isChecked) {
                                     newDirections = [...new Set([...currentDirections, direction])]
-                                    console.log('[Directions] Adding, newDirections:', newDirections)
                                   } else {
                                     newDirections = currentDirections.filter((d) => d !== direction)
-                                    console.log('[Directions] Removing, newDirections:', newDirections)
                                   }
 
-                                  console.log('[Directions] Sending to API:', { directions: newDirections })
+                                  console.log('[Directions] New directions:', newDirections)
+
+                                  // OPTIMISTIC: Update UI immediately
+                                  const contactId = deal?.contact?.id
+                                  if (contactId) {
+                                    queryClient.setQueryData(contactKeys.detail(contactId), (old: any) => ({
+                                      ...old,
+                                      directions: newDirections
+                                    }))
+                                    queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
+                                      ...old,
+                                      contact: { ...old?.contact, directions: newDirections }
+                                    }))
+                                    console.log('[Directions] UI updated optimistically (instant)')
+                                  }
+
+                                  // Then send to server in background
                                   console.time('[Directions] updateContact')
-                                  const result = await updateContact(contactId, { directions: newDirections })
+                                  const contactIdForAPI = contactId || await ensureContact()
+                                  await updateContact(contactIdForAPI, { directions: newDirections })
                                   console.timeEnd('[Directions] updateContact')
-                                  console.log('[Directions] Update result:', result)
 
-                                  // Invalidate both contact and deal caches
-                                  console.log('[Directions] Invalidating contact cache...')
-                                  console.time('[Directions] invalidateQueries')
-                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                  console.timeEnd('[Directions] invalidateQueries')
-
-                                  console.log('[Directions] Refetching deal...')
-                                  console.time('[Directions] refetchQueries')
+                                  // Invalidate after successful update
+                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactIdForAPI) })
                                   await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                                  console.timeEnd('[Directions] refetchQueries')
-
                                   await refetchActivities()
-                                  console.log('[Directions] Refetch complete')
+
+                                  console.log('[Directions] Server sync complete')
                                   console.timeEnd('[Directions] Total time')
                                 } catch (error) {
                                   console.error('Failed to update directions:', error)
+                                  // Revert optimistic update
+                                  await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                                 }
                               }}
                               className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1039,40 +1040,50 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             onChange={async (e) => {
                               try {
                                 console.time('[ContactMethods] Total time')
-                                // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
                                 const isChecked = e.target.checked
 
-                                console.log('[ContactMethods] Checkbox changed:', { method, checked: isChecked })
-                                console.time('[ContactMethods] ensureContact')
-                                const contactId = await ensureContact()
-                                console.timeEnd('[ContactMethods] ensureContact')
+                                console.log('[ContactMethods] === START (OPTIMISTIC) ===')
+                                console.log('[ContactMethods] method:', method, 'checked:', isChecked)
+
+                                // Calculate new methods immediately
                                 const currentMethods = deal?.contact?.contactMethods || []
                                 const newMethods = isChecked
                                   ? [...currentMethods, method]
                                   : currentMethods.filter((m) => m !== method)
 
-                                console.log('[ContactMethods] Updating with:', { currentMethods, newMethods })
+                                console.log('[ContactMethods] New methods:', newMethods)
+
+                                // OPTIMISTIC: Update UI immediately
+                                const contactId = deal?.contact?.id
+                                if (contactId) {
+                                  queryClient.setQueryData(contactKeys.detail(contactId), (old: any) => ({
+                                    ...old,
+                                    contactMethods: newMethods
+                                  }))
+                                  queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
+                                    ...old,
+                                    contact: { ...old?.contact, contactMethods: newMethods }
+                                  }))
+                                  console.log('[ContactMethods] UI updated optimistically (instant)')
+                                }
+
+                                // Then send to server in background
                                 console.time('[ContactMethods] updateContact')
-                                await updateContact(contactId, { contactMethods: newMethods })
+                                const contactIdForAPI = contactId || await ensureContact()
+                                await updateContact(contactIdForAPI, { contactMethods: newMethods })
                                 console.timeEnd('[ContactMethods] updateContact')
-                                console.log('[ContactMethods] Update complete, refetching...')
 
-                                // Invalidate both contact and deal caches
-                                console.log('[ContactMethods] Invalidating contact cache...')
-                                console.time('[ContactMethods] invalidateQueries')
-                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                console.timeEnd('[ContactMethods] invalidateQueries')
-
-                                console.log('[ContactMethods] Refetching deal...')
-                                console.time('[ContactMethods] refetchQueries')
+                                // Invalidate after successful update
+                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactIdForAPI) })
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                                console.timeEnd('[ContactMethods] refetchQueries')
-
                                 await refetchActivities()
-                                console.log('[ContactMethods] Refetch complete')
+
+                                console.log('[ContactMethods] Server sync complete')
                                 console.timeEnd('[ContactMethods] Total time')
                               } catch (error) {
                                 console.error('Failed to update contact methods:', error)
+                                // Revert optimistic update
+                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                               }
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1214,27 +1225,40 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             try {
                               console.time('[RejectionReasons] Total time')
                               const isChecked = e.target.checked
-                              console.log('[RejectionReasons] Checkbox changed:', { reason, checked: isChecked })
+
+                              console.log('[RejectionReasons] === START (OPTIMISTIC) ===')
+                              console.log('[RejectionReasons] reason:', reason, 'checked:', isChecked)
+
+                              // Calculate new reasons immediately
                               const currentReasons = deal.rejectionReasons || []
                               const newReasons = isChecked
                                 ? [...currentReasons, reason]
                                 : currentReasons.filter((r) => r !== reason)
 
-                              console.log('[RejectionReasons] Updating with:', { currentReasons, newReasons })
+                              console.log('[RejectionReasons] New reasons:', newReasons)
+
+                              // OPTIMISTIC: Update UI immediately
+                              queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
+                                ...old,
+                                rejectionReasons: newReasons
+                              }))
+                              console.log('[RejectionReasons] UI updated optimistically (instant)')
+
+                              // Then send to server in background
                               console.time('[RejectionReasons] updateDeal')
                               await updateDeal({ rejectionReasons: newReasons })
                               console.timeEnd('[RejectionReasons] updateDeal')
-                              console.log('[RejectionReasons] Update complete, refetching...')
 
-                              // Force an immediate refetch of the deal
-                              console.time('[RejectionReasons] refetchQueries')
-                              await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                              console.timeEnd('[RejectionReasons] refetchQueries')
+                              // Invalidate after successful update
+                              await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
                               await refetchActivities()
-                              console.log('[RejectionReasons] Refetch complete')
+
+                              console.log('[RejectionReasons] Server sync complete')
                               console.timeEnd('[RejectionReasons] Total time')
                             } catch (error) {
                               console.error('Failed to update rejection reasons:', error)
+                              // Revert optimistic update
+                              await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                             }
                           }}
                           className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1256,27 +1280,40 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               try {
                                 console.time('[RejectionReasons-Fallback] Total time')
                                 const isChecked = e.target.checked
-                                console.log('[RejectionReasons-Fallback] Checkbox changed:', { reason, checked: isChecked })
+
+                                console.log('[RejectionReasons-Fallback] === START (OPTIMISTIC) ===')
+                                console.log('[RejectionReasons-Fallback] reason:', reason, 'checked:', isChecked)
+
+                                // Calculate new reasons immediately
                                 const currentReasons = deal.rejectionReasons || []
                                 const newReasons = isChecked
                                   ? [...currentReasons, reason]
                                   : currentReasons.filter((r) => r !== reason)
 
-                                console.log('[RejectionReasons-Fallback] Updating with:', { currentReasons, newReasons })
+                                console.log('[RejectionReasons-Fallback] New reasons:', newReasons)
+
+                                // OPTIMISTIC: Update UI immediately
+                                queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
+                                  ...old,
+                                  rejectionReasons: newReasons
+                                }))
+                                console.log('[RejectionReasons-Fallback] UI updated optimistically (instant)')
+
+                                // Then send to server in background
                                 console.time('[RejectionReasons-Fallback] updateDeal')
                                 await updateDeal({ rejectionReasons: newReasons })
                                 console.timeEnd('[RejectionReasons-Fallback] updateDeal')
-                                console.log('[RejectionReasons-Fallback] Update complete, refetching...')
 
-                                // Force an immediate refetch of the deal
-                                console.time('[RejectionReasons-Fallback] refetchQueries')
-                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                                console.timeEnd('[RejectionReasons-Fallback] refetchQueries')
+                                // Invalidate after successful update
+                                await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
                                 await refetchActivities()
-                                console.log('[RejectionReasons-Fallback] Refetch complete')
+
+                                console.log('[RejectionReasons-Fallback] Server sync complete')
                                 console.timeEnd('[RejectionReasons-Fallback] Total time')
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
+                                // Revert optimistic update
+                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                               }
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
