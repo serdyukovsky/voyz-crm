@@ -147,7 +147,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [contactSubscriberCount, setContactSubscriberCount] = useState('')
   const [contactWebsite, setContactWebsite] = useState('')
   const [contactInfo, setContactInfo] = useState('')
-  
+
+  // Local state for multi-select fields - for instant UI updates (optimistic)
+  const [localDirections, setLocalDirections] = useState<string[]>([])
+  const [localContactMethods, setLocalContactMethods] = useState<string[]>([])
+  const [localRejectionReasons, setLocalRejectionReasons] = useState<string[]>([])
+
   // Refs for debounce timers
   const linkTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const subscriberCountTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -164,13 +169,27 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       setContactSubscriberCount(deal.contact.subscriberCount || '')
       setContactWebsite(deal.contact.websiteOrTgChannel || '')
       setContactInfo(deal.contact.contactInfo || '')
+      // Initialize multi-select fields
+      setLocalDirections(deal.contact.directions || [])
+      setLocalContactMethods(deal.contact.contactMethods || [])
     } else {
       setContactLink('')
       setContactSubscriberCount('')
       setContactWebsite('')
       setContactInfo('')
+      setLocalDirections([])
+      setLocalContactMethods([])
     }
-  }, [deal?.contact?.id, deal?.contact?.link, deal?.contact?.subscriberCount, deal?.contact?.websiteOrTgChannel, deal?.contact?.contactInfo])
+  }, [deal?.contact?.id, deal?.contact?.link, deal?.contact?.subscriberCount, deal?.contact?.websiteOrTgChannel, deal?.contact?.contactInfo, deal?.contact?.directions, deal?.contact?.contactMethods])
+
+  // Sync rejection reasons local state
+  useEffect(() => {
+    if (deal?.rejectionReasons) {
+      setLocalRejectionReasons(deal.rejectionReasons)
+    } else {
+      setLocalRejectionReasons([])
+    }
+  }, [deal?.rejectionReasons])
   const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
   const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
   const { activities, loading: activitiesLoading, refetch: refetchActivities } = useActivity({ entityType: 'deal', entityId: dealId })
@@ -900,8 +919,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left flex-1">
-                      {deal?.contact?.directions && deal.contact.directions.length > 0
-                        ? deal.contact.directions.map((d, idx) => (
+                      {localDirections && localDirections.length > 0
+                        ? localDirections.map((d, idx) => (
                             <div key={idx} className="text-sm">
                               {getDirectionLabel(d)}
                             </div>
@@ -935,59 +954,44 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             <input
                               type="checkbox"
                               id={`direction-${direction}`}
-                              checked={deal?.contact?.directions?.includes(direction) || false}
+                              checked={localDirections.includes(direction)}
                               onChange={async (e) => {
                                 try {
                                   console.time('[Directions] Total time')
                                   const isChecked = e.target.checked
 
-                                  console.log('[Directions] === START (OPTIMISTIC) ===')
-                                  console.log('[Directions] isChecked:', isChecked)
+                                  console.log('[Directions] === START (INSTANT LOCAL UPDATE) ===')
 
-                                  // Calculate new directions immediately
-                                  const currentDirections = Array.isArray(deal?.contact?.directions)
-                                    ? deal.contact.directions
-                                    : []
-
+                                  // Calculate new directions
                                   let newDirections
                                   if (isChecked) {
-                                    newDirections = [...new Set([...currentDirections, direction])]
+                                    newDirections = [...new Set([...localDirections, direction])]
                                   } else {
-                                    newDirections = currentDirections.filter((d) => d !== direction)
+                                    newDirections = localDirections.filter((d) => d !== direction)
                                   }
 
                                   console.log('[Directions] New directions:', newDirections)
 
-                                  // OPTIMISTIC: Update UI immediately
-                                  const contactId = deal?.contact?.id
-                                  if (contactId) {
-                                    queryClient.setQueryData(contactKeys.detail(contactId), (old: any) => ({
-                                      ...old,
-                                      directions: newDirections
-                                    }))
-                                    queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
-                                      ...old,
-                                      contact: { ...old?.contact, directions: newDirections }
-                                    }))
-                                    console.log('[Directions] UI updated optimistically (instant)')
-                                  }
+                                  // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
+                                  setLocalDirections(newDirections)
+                                  console.timeEnd('[Directions] Total time') // This should be < 5ms
 
                                   // Then send to server in background
-                                  console.time('[Directions] updateContact')
-                                  const contactIdForAPI = contactId || await ensureContact()
-                                  await updateContact(contactIdForAPI, { directions: newDirections })
-                                  console.timeEnd('[Directions] updateContact')
+                                  console.time('[Directions] Server update')
+                                  const contactId = deal?.contact?.id || await ensureContact()
+                                  await updateContact(contactId, { directions: newDirections })
+                                  console.timeEnd('[Directions] Server update')
 
-                                  // Invalidate after successful update
-                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactIdForAPI) })
+                                  // Invalidate caches after successful update
+                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                                   await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                                   await refetchActivities()
 
                                   console.log('[Directions] Server sync complete')
-                                  console.timeEnd('[Directions] Total time')
                                 } catch (error) {
                                   console.error('Failed to update directions:', error)
-                                  // Revert optimistic update
+                                  // Revert to server state
+                                  setLocalDirections(deal?.contact?.directions || [])
                                   await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                                 }
                               }}
@@ -1018,8 +1022,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left flex-1">
-                      {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0
-                        ? deal.contact.contactMethods.map((m, idx) => (
+                      {localContactMethods && localContactMethods.length > 0
+                        ? localContactMethods.map((m, idx) => (
                             <div key={idx} className="text-sm">
                               {getContactMethodLabel(m)}
                             </div>
@@ -1036,53 +1040,41 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           <input
                             type="checkbox"
                             id={`method-${method}`}
-                            checked={deal?.contact?.contactMethods?.includes(method) || false}
+                            checked={localContactMethods.includes(method)}
                             onChange={async (e) => {
                               try {
                                 console.time('[ContactMethods] Total time')
                                 const isChecked = e.target.checked
 
-                                console.log('[ContactMethods] === START (OPTIMISTIC) ===')
-                                console.log('[ContactMethods] method:', method, 'checked:', isChecked)
+                                console.log('[ContactMethods] === START (INSTANT LOCAL UPDATE) ===')
 
-                                // Calculate new methods immediately
-                                const currentMethods = deal?.contact?.contactMethods || []
+                                // Calculate new methods
                                 const newMethods = isChecked
-                                  ? [...currentMethods, method]
-                                  : currentMethods.filter((m) => m !== method)
+                                  ? [...localContactMethods, method]
+                                  : localContactMethods.filter((m) => m !== method)
 
                                 console.log('[ContactMethods] New methods:', newMethods)
 
-                                // OPTIMISTIC: Update UI immediately
-                                const contactId = deal?.contact?.id
-                                if (contactId) {
-                                  queryClient.setQueryData(contactKeys.detail(contactId), (old: any) => ({
-                                    ...old,
-                                    contactMethods: newMethods
-                                  }))
-                                  queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
-                                    ...old,
-                                    contact: { ...old?.contact, contactMethods: newMethods }
-                                  }))
-                                  console.log('[ContactMethods] UI updated optimistically (instant)')
-                                }
+                                // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
+                                setLocalContactMethods(newMethods)
+                                console.timeEnd('[ContactMethods] Total time') // This should be < 5ms
 
                                 // Then send to server in background
-                                console.time('[ContactMethods] updateContact')
-                                const contactIdForAPI = contactId || await ensureContact()
-                                await updateContact(contactIdForAPI, { contactMethods: newMethods })
-                                console.timeEnd('[ContactMethods] updateContact')
+                                console.time('[ContactMethods] Server update')
+                                const contactId = deal?.contact?.id || await ensureContact()
+                                await updateContact(contactId, { contactMethods: newMethods })
+                                console.timeEnd('[ContactMethods] Server update')
 
-                                // Invalidate after successful update
-                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactIdForAPI) })
+                                // Invalidate caches after successful update
+                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                                 await refetchActivities()
 
                                 console.log('[ContactMethods] Server sync complete')
-                                console.timeEnd('[ContactMethods] Total time')
                               } catch (error) {
                                 console.error('Failed to update contact methods:', error)
-                                // Revert optimistic update
+                                // Revert to server state
+                                setLocalContactMethods(deal?.contact?.contactMethods || [])
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                               }
                             }}
@@ -1185,8 +1177,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
               >
                 <div className="text-foreground text-left flex-1">
-                  {deal.rejectionReasons && deal.rejectionReasons.length > 0
-                    ? deal.rejectionReasons.map((r, idx) => (
+                  {localRejectionReasons && localRejectionReasons.length > 0
+                    ? localRejectionReasons.map((r, idx) => (
                         <div key={idx} className="text-sm">
                           {getRejectionReasonLabel(r)}
                         </div>
@@ -1220,44 +1212,39 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         <input
                           type="checkbox"
                           id={`reason-${reason}`}
-                          checked={deal.rejectionReasons?.includes(reason) || false}
+                          checked={localRejectionReasons.includes(reason)}
                           onChange={async (e) => {
                             try {
                               console.time('[RejectionReasons] Total time')
                               const isChecked = e.target.checked
 
-                              console.log('[RejectionReasons] === START (OPTIMISTIC) ===')
-                              console.log('[RejectionReasons] reason:', reason, 'checked:', isChecked)
+                              console.log('[RejectionReasons] === START (INSTANT LOCAL UPDATE) ===')
 
-                              // Calculate new reasons immediately
-                              const currentReasons = deal.rejectionReasons || []
+                              // Calculate new reasons
                               const newReasons = isChecked
-                                ? [...currentReasons, reason]
-                                : currentReasons.filter((r) => r !== reason)
+                                ? [...localRejectionReasons, reason]
+                                : localRejectionReasons.filter((r) => r !== reason)
 
                               console.log('[RejectionReasons] New reasons:', newReasons)
 
-                              // OPTIMISTIC: Update UI immediately
-                              queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
-                                ...old,
-                                rejectionReasons: newReasons
-                              }))
-                              console.log('[RejectionReasons] UI updated optimistically (instant)')
+                              // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
+                              setLocalRejectionReasons(newReasons)
+                              console.timeEnd('[RejectionReasons] Total time') // This should be < 5ms
 
                               // Then send to server in background
-                              console.time('[RejectionReasons] updateDeal')
+                              console.time('[RejectionReasons] Server update')
                               await updateDeal({ rejectionReasons: newReasons })
-                              console.timeEnd('[RejectionReasons] updateDeal')
+                              console.timeEnd('[RejectionReasons] Server update')
 
                               // Invalidate after successful update
                               await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
                               await refetchActivities()
 
                               console.log('[RejectionReasons] Server sync complete')
-                              console.timeEnd('[RejectionReasons] Total time')
                             } catch (error) {
                               console.error('Failed to update rejection reasons:', error)
-                              // Revert optimistic update
+                              // Revert to server state
+                              setLocalRejectionReasons(deal?.rejectionReasons || [])
                               await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                             }
                           }}
@@ -1281,38 +1268,33 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                 console.time('[RejectionReasons-Fallback] Total time')
                                 const isChecked = e.target.checked
 
-                                console.log('[RejectionReasons-Fallback] === START (OPTIMISTIC) ===')
-                                console.log('[RejectionReasons-Fallback] reason:', reason, 'checked:', isChecked)
+                                console.log('[RejectionReasons-Fallback] === START (INSTANT LOCAL UPDATE) ===')
 
-                                // Calculate new reasons immediately
-                                const currentReasons = deal.rejectionReasons || []
+                                // Calculate new reasons
                                 const newReasons = isChecked
-                                  ? [...currentReasons, reason]
-                                  : currentReasons.filter((r) => r !== reason)
+                                  ? [...localRejectionReasons, reason]
+                                  : localRejectionReasons.filter((r) => r !== reason)
 
                                 console.log('[RejectionReasons-Fallback] New reasons:', newReasons)
 
-                                // OPTIMISTIC: Update UI immediately
-                                queryClient.setQueryData(dealKeys.detail(dealId), (old: any) => ({
-                                  ...old,
-                                  rejectionReasons: newReasons
-                                }))
-                                console.log('[RejectionReasons-Fallback] UI updated optimistically (instant)')
+                                // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
+                                setLocalRejectionReasons(newReasons)
+                                console.timeEnd('[RejectionReasons-Fallback] Total time') // This should be < 5ms
 
                                 // Then send to server in background
-                                console.time('[RejectionReasons-Fallback] updateDeal')
+                                console.time('[RejectionReasons-Fallback] Server update')
                                 await updateDeal({ rejectionReasons: newReasons })
-                                console.timeEnd('[RejectionReasons-Fallback] updateDeal')
+                                console.timeEnd('[RejectionReasons-Fallback] Server update')
 
                                 // Invalidate after successful update
                                 await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
                                 await refetchActivities()
 
                                 console.log('[RejectionReasons-Fallback] Server sync complete')
-                                console.timeEnd('[RejectionReasons-Fallback] Total time')
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
-                                // Revert optimistic update
+                                // Revert to server state
+                                setLocalRejectionReasons(deal?.rejectionReasons || [])
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
                               }
                             }}
