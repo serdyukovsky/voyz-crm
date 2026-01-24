@@ -842,7 +842,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.linkPlaceholder') || 'Вставьте ссылку'}
-                  className="h-9 text-sm bg-transparent !border-none"
+                  className="h-9 text-sm bg-transparent !border-none !shadow-none"
                 />
                 </div>
               </div>
@@ -878,7 +878,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.subscriberCountPlaceholder') || 'Введите количество'}
-                  className="h-9 text-sm bg-transparent !border-none"
+                  className="h-9 text-sm bg-transparent !border-none !shadow-none"
                 />
                 </div>
               </div>
@@ -919,7 +919,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           placeholder="Поиск..."
                           value={searchDirections}
                           onChange={(e) => setSearchDirections(e.target.value)}
-                          className="mb-2 h-7 text-xs bg-transparent !border-none"
+                          className="mb-2 h-7 text-xs bg-transparent !border-none !shadow-none"
                         />
                       )}
                       <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -1093,7 +1093,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.websiteOrTgChannelPlaceholder') || 'Введите ссылку на сайт или тг канал'}
-                  className="h-9 text-sm bg-transparent !border-none"
+                  className="h-9 text-sm bg-transparent !border-none !shadow-none"
                 />
                 </div>
               </div>
@@ -1129,7 +1129,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.contactInfoPlaceholder') || 'Номер телефона или никнейм в телеграме'}
-                  className="h-9 text-sm bg-transparent !border-none"
+                  className="h-9 text-sm bg-transparent !border-none !shadow-none"
                 />
                 </div>
               </div>
@@ -1168,7 +1168,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       placeholder="Поиск..."
                       value={searchReasons}
                       onChange={(e) => setSearchReasons(e.target.value)}
-                      className="mb-2 h-7 text-xs bg-transparent !border-none"
+                      className="mb-2 h-7 text-xs bg-transparent !border-none !shadow-none"
                     />
                   )}
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
