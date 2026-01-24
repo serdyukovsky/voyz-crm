@@ -1168,7 +1168,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       placeholder="Поиск..."
                       value={searchReasons}
                       onChange={(e) => setSearchReasons(e.target.value)}
-                      className="mb-2 h-7 text-xs bg-transparent"
+                      className="mb-2 h-7 text-xs bg-transparent !border-none"
                     />
                   )}
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
