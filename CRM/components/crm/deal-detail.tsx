@@ -938,6 +938,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               checked={deal?.contact?.directions?.includes(direction) || false}
                               onChange={async (e) => {
                                 try {
+                                  console.time('[Directions] Total time')
                                   // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
                                   const isChecked = e.target.checked
 
@@ -946,7 +947,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                   console.log('[Directions] direction:', direction)
                                   console.log('[Directions] deal?.contact?.directions:', deal?.contact?.directions)
 
+                                  console.time('[Directions] ensureContact')
                                   const contactId = await ensureContact()
+                                  console.timeEnd('[Directions] ensureContact')
                                   console.log('[Directions] Contact ID:', contactId)
 
                                   const currentDirections = Array.isArray(deal?.contact?.directions)
@@ -964,15 +967,25 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                   }
 
                                   console.log('[Directions] Sending to API:', { directions: newDirections })
+                                  console.time('[Directions] updateContact')
                                   const result = await updateContact(contactId, { directions: newDirections })
+                                  console.timeEnd('[Directions] updateContact')
                                   console.log('[Directions] Update result:', result)
 
                                   // Invalidate both contact and deal caches
                                   console.log('[Directions] Invalidating contact cache...')
+                                  console.time('[Directions] invalidateQueries')
                                   await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                  console.timeEnd('[Directions] invalidateQueries')
+
                                   console.log('[Directions] Refetching deal...')
+                                  console.time('[Directions] refetchQueries')
                                   await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                  console.timeEnd('[Directions] refetchQueries')
+
+                                  await refetchActivities()
                                   console.log('[Directions] Refetch complete')
+                                  console.timeEnd('[Directions] Total time')
                                 } catch (error) {
                                   console.error('Failed to update directions:', error)
                                 }
@@ -1025,27 +1038,39 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             checked={deal?.contact?.contactMethods?.includes(method) || false}
                             onChange={async (e) => {
                               try {
+                                console.time('[ContactMethods] Total time')
                                 // ВАЖНО: сохранить значение checked сразу, до асинхронных операций
                                 const isChecked = e.target.checked
 
                                 console.log('[ContactMethods] Checkbox changed:', { method, checked: isChecked })
+                                console.time('[ContactMethods] ensureContact')
                                 const contactId = await ensureContact()
+                                console.timeEnd('[ContactMethods] ensureContact')
                                 const currentMethods = deal?.contact?.contactMethods || []
                                 const newMethods = isChecked
                                   ? [...currentMethods, method]
                                   : currentMethods.filter((m) => m !== method)
 
                                 console.log('[ContactMethods] Updating with:', { currentMethods, newMethods })
+                                console.time('[ContactMethods] updateContact')
                                 await updateContact(contactId, { contactMethods: newMethods })
+                                console.timeEnd('[ContactMethods] updateContact')
                                 console.log('[ContactMethods] Update complete, refetching...')
 
                                 // Invalidate both contact and deal caches
                                 console.log('[ContactMethods] Invalidating contact cache...')
+                                console.time('[ContactMethods] invalidateQueries')
                                 await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                console.timeEnd('[ContactMethods] invalidateQueries')
+
                                 console.log('[ContactMethods] Refetching deal...')
+                                console.time('[ContactMethods] refetchQueries')
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                console.timeEnd('[ContactMethods] refetchQueries')
+
                                 await refetchActivities()
                                 console.log('[ContactMethods] Refetch complete')
+                                console.timeEnd('[ContactMethods] Total time')
                               } catch (error) {
                                 console.error('Failed to update contact methods:', error)
                               }
@@ -1187,20 +1212,27 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           checked={deal.rejectionReasons?.includes(reason) || false}
                           onChange={async (e) => {
                             try {
-                              console.log('[RejectionReasons] Checkbox changed:', { reason, checked: e.target.checked })
+                              console.time('[RejectionReasons] Total time')
+                              const isChecked = e.target.checked
+                              console.log('[RejectionReasons] Checkbox changed:', { reason, checked: isChecked })
                               const currentReasons = deal.rejectionReasons || []
-                              const newReasons = e.target.checked
+                              const newReasons = isChecked
                                 ? [...currentReasons, reason]
                                 : currentReasons.filter((r) => r !== reason)
 
                               console.log('[RejectionReasons] Updating with:', { currentReasons, newReasons })
+                              console.time('[RejectionReasons] updateDeal')
                               await updateDeal({ rejectionReasons: newReasons })
+                              console.timeEnd('[RejectionReasons] updateDeal')
                               console.log('[RejectionReasons] Update complete, refetching...')
 
                               // Force an immediate refetch of the deal
+                              console.time('[RejectionReasons] refetchQueries')
                               await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                              console.timeEnd('[RejectionReasons] refetchQueries')
                               await refetchActivities()
                               console.log('[RejectionReasons] Refetch complete')
+                              console.timeEnd('[RejectionReasons] Total time')
                             } catch (error) {
                               console.error('Failed to update rejection reasons:', error)
                             }
@@ -1222,20 +1254,27 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             checked={deal.rejectionReasons?.includes(reason) || false}
                             onChange={async (e) => {
                               try {
-                                console.log('[RejectionReasons-Fallback] Checkbox changed:', { reason, checked: e.target.checked })
+                                console.time('[RejectionReasons-Fallback] Total time')
+                                const isChecked = e.target.checked
+                                console.log('[RejectionReasons-Fallback] Checkbox changed:', { reason, checked: isChecked })
                                 const currentReasons = deal.rejectionReasons || []
-                                const newReasons = e.target.checked
+                                const newReasons = isChecked
                                   ? [...currentReasons, reason]
                                   : currentReasons.filter((r) => r !== reason)
 
                                 console.log('[RejectionReasons-Fallback] Updating with:', { currentReasons, newReasons })
+                                console.time('[RejectionReasons-Fallback] updateDeal')
                                 await updateDeal({ rejectionReasons: newReasons })
+                                console.timeEnd('[RejectionReasons-Fallback] updateDeal')
                                 console.log('[RejectionReasons-Fallback] Update complete, refetching...')
 
                                 // Force an immediate refetch of the deal
+                                console.time('[RejectionReasons-Fallback] refetchQueries')
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                console.timeEnd('[RejectionReasons-Fallback] refetchQueries')
                                 await refetchActivities()
                                 console.log('[RejectionReasons-Fallback] Refetch complete')
+                                console.timeEnd('[RejectionReasons-Fallback] Total time')
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
                               }
