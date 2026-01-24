@@ -842,7 +842,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.linkPlaceholder') || 'Вставьте ссылку'}
-                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
                 </div>
               </div>
@@ -858,12 +858,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   onChange={(e) => {
                     const value = e.target.value
                     setContactSubscriberCount(value) // Update local state immediately
-                    
+
                     // Clear previous timeout
                     if (subscriberCountTimeoutRef.current) {
                       clearTimeout(subscriberCountTimeoutRef.current)
                     }
-                    
+
                     // Debounce API call
                     subscriberCountTimeoutRef.current = setTimeout(async () => {
                       try {
@@ -878,7 +878,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.subscriberCountPlaceholder') || 'Введите количество'}
-                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
                 </div>
               </div>
@@ -897,12 +897,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         setSearchDirections('')
                       }
                     }}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left">
                       {deal?.contact?.directions && deal.contact.directions.length > 0
                         ? deal.contact.directions.map((d, idx) => (
-                            <div key={idx} className="text-xs">
+                            <div key={idx} className="text-sm">
                               {getDirectionLabel(d)}
                             </div>
                           ))
@@ -979,13 +979,13 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               }}
                               className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                             />
-                            <label htmlFor={`direction-${direction}`} className="text-xs cursor-pointer">
+                            <label htmlFor={`direction-${direction}`} className="text-sm cursor-pointer">
                               {getDirectionLabel(direction)}
                             </label>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground py-1">No options available</p>
+                        <p className="text-sm text-muted-foreground py-1">No options available</p>
                       )}
                       </div>
                     </div>
@@ -1001,12 +1001,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 <div className="flex-1 relative">
                   <button
                     onClick={() => setOpenMethods(!openMethods)}
-                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
+                    className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
                   >
                     <div className="text-foreground text-left">
                       {deal?.contact?.contactMethods && deal.contact.contactMethods.length > 0
                         ? deal.contact.contactMethods.map((m, idx) => (
-                            <div key={idx} className="text-xs">
+                            <div key={idx} className="text-sm">
                               {getContactMethodLabel(m)}
                             </div>
                           ))
@@ -1052,7 +1052,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                           />
-                          <label htmlFor={`method-${method}`} className="text-xs cursor-pointer">
+                          <label htmlFor={`method-${method}`} className="text-sm cursor-pointer">
                             {getContactMethodLabel(method)}
                           </label>
                         </div>
@@ -1093,7 +1093,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.websiteOrTgChannelPlaceholder') || 'Введите ссылку на сайт или тг канал'}
-                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
                 </div>
               </div>
@@ -1129,7 +1129,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     }, 800)
                   }}
                   placeholder={t('contacts.contactInfoPlaceholder') || 'Номер телефона или никнейм в телеграме'}
-                  className="h-8 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
+                  className="h-9 text-sm border-border/30 hover:border-border/60 focus:border-border bg-transparent"
                 />
                 </div>
               </div>
@@ -1146,12 +1146,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   console.log('[DEAL DETAIL] Rejection Reasons dropdown clicked, current options:', rejectionReasonsOptions)
                   setOpenReasons(!openReasons)
                 }}
-                className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-xs text-left"
+                className="w-full flex items-center justify-between px-3 h-9 rounded-md border border-border/30 hover:border-border/60 transition-colors bg-transparent text-sm text-left"
               >
                 <div className="text-foreground text-left">
                   {deal.rejectionReasons && deal.rejectionReasons.length > 0
                     ? deal.rejectionReasons.map((r, idx) => (
-                        <div key={idx} className="text-xs">
+                        <div key={idx} className="text-sm">
                           {getRejectionReasonLabel(r)}
                         </div>
                       ))
@@ -1207,7 +1207,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           }}
                           className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                         />
-                        <label htmlFor={`reason-${reason}`} className="text-xs cursor-pointer">
+                        <label htmlFor={`reason-${reason}`} className="text-sm cursor-pointer">
                           {getRejectionReasonLabel(reason)}
                         </label>
                       </div>
@@ -1242,7 +1242,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                           />
-                          <label htmlFor={`reason-${reason}`} className="text-xs cursor-pointer">
+                          <label htmlFor={`reason-${reason}`} className="text-sm cursor-pointer">
                             {getRejectionReasonLabel(reason)}
                           </label>
                         </div>
