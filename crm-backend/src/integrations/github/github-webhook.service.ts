@@ -96,14 +96,23 @@ export class GithubWebhookService {
       this.logger.log(`[${environment.toUpperCase()}] Building application...`)
       await this.executeCommand(`cd ${projectPath} && npm run build`, environment)
 
-      // Step 4: Run migrations
+      // Step 4: Backup database before migrations
+      if (environment === 'prod') {
+        this.logger.log(`[${environment.toUpperCase()}] Creating database backup before migrations...`)
+        await this.executeCommand(
+          `/usr/local/bin/backup-crm-db.sh`,
+          environment,
+        )
+      }
+
+      // Step 5: Run migrations
       this.logger.log(`[${environment.toUpperCase()}] Running database migrations...`)
       await this.executeCommand(
         `cd ${projectPath} && npx prisma migrate deploy`,
         environment,
       )
 
-      // Step 5: Restart application
+      // Step 6: Restart application
       this.logger.log(`[${environment.toUpperCase()}] Restarting application...`)
       const port = environment === 'dev' ? 3001 : 3002
       await this.restartApplication(environment, port, projectPath)
