@@ -5,6 +5,7 @@ import { TelegramModule } from './telegram/telegram.module';
 import { VkModule } from './vk/vk.module';
 import { EmailModule } from './email/email.module';
 import { TelephonyModule } from './telephony/telephony.module';
+import { GithubModule } from './github/github.module';
 import { CommonModule } from '@/common/common.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { CommonModule } from '@/common/common.module';
     VkModule,
     EmailModule,
     TelephonyModule,
+    GithubModule,
   ],
   providers: [IntegrationRegistryService],
   exports: [IntegrationRegistryService],
