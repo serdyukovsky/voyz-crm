@@ -26,6 +26,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Слушать на всех интерфейсах для codespace
     port: 5173,
+    allowedHosts: ['tripsystem.ru', 'www.tripsystem.ru', '91.210.106.218', 'localhost'],
     open: true,
     // Оптимизация hot-reload
     hmr: {
