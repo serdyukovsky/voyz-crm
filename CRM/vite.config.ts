@@ -30,9 +30,11 @@ export default defineConfig({
     open: true,
     // Оптимизация hot-reload
     hmr: {
-      overlay: true,
-      // Увеличиваем таймаут для больших файлов
-      clientPort: 5173,
+      overlay: false,
+      host: 'localhost',
+      port: 5173,
+      // Отключаем частую проверку
+      timeout: 30000,
     },
     // Предзагрузка часто используемых модулей
     warmup: {
@@ -52,9 +54,11 @@ export default defineConfig({
     // Оптимизация производительности
     watch: {
       // Игнорируем ненужные файлы
-      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.next/**'],
-      // Используем polling только при необходимости
+      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/.next/**', '**/.npm/**'],
+      // Отключаем polling для скорости
       usePolling: false,
+      interval: 1000,
+      binaryInterval: 2000,
     },
   },
   // Оптимизация сборки
@@ -125,6 +129,7 @@ export default defineConfig({
   esbuild: {
     // Отключаем minify в dev-режиме
     minify: false,
+    logLevel: 'silent',
     // Ускоряем компиляцию
     target: 'esnext',
     // Отключаем sourcemaps в dev
