@@ -25,13 +25,13 @@ export default defineConfig({
   cacheDir: 'node_modules/.vite',
   server: {
     host: '0.0.0.0', // Слушать на всех интерфейсах для codespace
-    port: 5173,
+    port: 3000,
     open: true,
     // Оптимизация hot-reload
     hmr: {
       overlay: true,
       // Увеличиваем таймаут для больших файлов
-      clientPort: 5173,
+      clientPort: 3000,
     },
     // Предзагрузка часто используемых модулей
     warmup: {
