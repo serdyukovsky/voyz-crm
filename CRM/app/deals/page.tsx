@@ -752,7 +752,7 @@ export default function DealsPage() {
       // Get default pipeline and first stage
       const pipelines = await getPipelines()
       const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
-      
+
       if (!defaultPipeline || !defaultPipeline.stages || defaultPipeline.stages.length === 0) {
         showError('No pipeline available', 'Please create a pipeline with stages first')
         return
@@ -760,12 +760,19 @@ export default function DealsPage() {
 
       const firstStage = defaultPipeline.stages.sort((a, b) => a.order - b.order)[0]
 
+      console.log('[DEBUG] Creating deal with:', {
+        pipelineId: defaultPipeline.id,
+        stageId: firstStage.id,
+        firstStage,
+        stageType: typeof firstStage.id
+      })
+
       // Create deal via API
       const newDeal = await createDeal({
         title: 'New Deal',
         amount: 0,
-        pipelineId: defaultPipeline.id,
-        stageId: firstStage.id,
+        pipelineId: String(defaultPipeline.id),
+        stageId: String(firstStage.id),
       })
 
       showSuccess('Deal created successfully')
