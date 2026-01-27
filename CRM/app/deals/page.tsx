@@ -243,6 +243,7 @@ export default function DealsPage() {
   const { searchValue, dealFilters } = useSearch()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const [kanbanDealsCount, setKanbanDealsCount] = useState<number>(0)
 
   const searchInput = useMemo(() => searchValue.trim(), [searchValue])
   const titleFilter = useMemo(() => dealFilters?.title?.trim() || '', [dealFilters])
@@ -937,7 +938,15 @@ export default function DealsPage() {
                 </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">Manage your sales pipeline</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Manage your sales pipeline</span>
+              {viewMode === "kanban" && kanbanDealsCount > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="font-medium text-foreground">{kanbanDealsCount}</span>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <div className="flex border border-border/40 rounded-md overflow-hidden">
@@ -1012,12 +1021,13 @@ export default function DealsPage() {
                   isEditMode={isEditMode}
                 />
               ) : (
-                <DealsKanbanBoard 
-                  key={kanbanRefreshKey} 
+                <DealsKanbanBoard
+                  key={kanbanRefreshKey}
                   pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
                   selectedDealId={selectedDealId}
                   onDealClick={handleDealClick}
                   filters={kanbanFilters}
+                  onDealsCountChange={setKanbanDealsCount}
                 />
               )}
             </div>
