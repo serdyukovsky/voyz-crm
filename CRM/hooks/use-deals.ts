@@ -107,8 +107,11 @@ export function useDealDetail({ dealId }: { dealId: string }) {
   const updateMutation = useMutation({
     mutationFn: (data: any) => updateDeal(dealId, data),
     onSuccess: (updatedDeal) => {
-      // Обновить кэш с новыми данными
+      // Обновить кэш детальной сделки
       queryClient.setQueryData(dealKeys.detail(dealId), updatedDeal)
+      // Инвалидировать все списки чтобы они обновились
+      queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     },
   })
 
@@ -138,6 +141,7 @@ export function useCreateDeal() {
     mutationFn: (data: Parameters<typeof createDeal>[0]) => createDeal(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     },
   })
 }
@@ -151,6 +155,7 @@ export function useUpdateDeal() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: dealKeys.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     },
   })
 }
@@ -163,6 +168,7 @@ export function useDeleteDeal() {
     mutationFn: (id: string) => deleteDeal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     },
   })
 }
