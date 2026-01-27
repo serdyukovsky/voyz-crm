@@ -50,10 +50,10 @@ export class TasksController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
-    // For kanban boards, allow larger limits (up to 10000)
-    // For regular lists, limit to 100 for performance
+    // Allow up to 10000 tasks per request for kanban boards
+    // Default limit is 50 if not specified
     const requestedLimit = limit ? parseInt(limit, 10) : 50;
-    const limitNum = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
+    const limitNum = Math.min(requestedLimit, 10000);
     return this.tasksService.findAll({
       dealId,
       contactId,

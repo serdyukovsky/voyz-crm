@@ -578,10 +578,10 @@ export class DealsService {
     // Managers can see all deals (no filtering by user)
 
     // Hard limit for performance (optimization: prevent loading all deals)
-    // For kanban boards, allow up to 10000 deals
-    // For regular lists, limit to 100
+    // Allow up to 10000 deals per request for kanban boards
+    // Default limit is 50 if not specified
     const requestedLimit = filters?.limit || 50;
-    const limit = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
+    const limit = Math.min(requestedLimit, 10000);
     const take = limit + 1; // +1 to check if hasMore
 
     // Decode cursor if provided
