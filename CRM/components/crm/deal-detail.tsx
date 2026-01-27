@@ -32,7 +32,6 @@ import { useToastNotification } from '@/hooks/use-toast-notification'
 import { SendEmailModal } from '@/components/crm/send-email-modal'
 import { Mail } from 'lucide-react'
 import { getPipeline, type Pipeline, type Stage } from '@/lib/api/pipelines'
-import { updateDeal as updateDealApi } from '@/lib/api/deals'
 import { getUsers, type User } from '@/lib/api/users'
 import { createComment, getDealComments, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -103,9 +102,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       })
       
       // Link contact to deal
-      if (deal?.id) {
-        await updateDealApi(deal.id, { contactId: newContact.id } as any)
-        await refetchDeal()
+      if (dealId) {
+        await updateDeal({ contactId: newContact.id })
       }
       
       return newContact.id
@@ -405,11 +403,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     setShowStageDropdown(false)
 
     try {
-      // Update deal via API
-      await updateDealApi(dealId, { stageId: newStageId })
-      
-      // Reload deal to get updated data
-      await refetchDeal()
+      // Update deal via React Query hook (automatically invalidates cache)
+      await updateDeal({ stageId: newStageId })
 
       // Reload activities to show the stage change activity (created by backend)
       await refetchActivities()
@@ -782,8 +777,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             setAssignedUser('Unassigned')
                             setShowUserDropdown(false)
                             try {
-                              await updateDealApi(dealId, { assignedToId: null })
-                              await refetchDeal()
+                              await updateDeal({ assignedToId: null })
                               await refetchActivities()
                               showSuccess('Responsible user updated')
                             } catch (error) {
@@ -794,8 +788,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             setAssignedUser(user.name)
                             setShowUserDropdown(false)
                             try {
-                              await updateDealApi(dealId, { assignedToId: user.id })
-                              await refetchDeal()
+                              await updateDeal({ assignedToId: user.id })
                               await refetchActivities()
                               showSuccess('Responsible user updated')
                             } catch (error) {

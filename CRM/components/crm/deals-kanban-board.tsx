@@ -1824,15 +1824,23 @@ export function DealsKanbanBoard({
     try {
       await updateDeal(draggedDeal.id, { stageId })
       showSuccess(t('deals.dealMovedSuccess'))
-      
+
+      // Оптимистично обновляем локальное состояние
       setDeals(prevDeals => prevDeals.map(deal =>
         deal.id === draggedDeal.id
           ? { ...deal, stageId, updatedAt: new Date().toISOString() }
           : deal
       ))
+
+      // Инвалидируем кэш React Query для обновления других представлений
+      queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.detail(draggedDeal.id) })
     } catch (error) {
       showError(t('deals.failedToMoveDeal'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
+      // При ошибке тоже инвалидируем чтобы откатить оптимистичное обновление
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     } finally {
       setDraggedDeal(null)
     }
