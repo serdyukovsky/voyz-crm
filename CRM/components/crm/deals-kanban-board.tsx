@@ -115,6 +115,7 @@ interface DealsKanbanBoardProps {
   onFiltersChange?: (filters: FilterState) => void
   onSortChange?: (sort: SortState) => void
   onAddDeal?: (stageId: string) => void
+  onDealsCountChange?: (count: number) => void
 }
 
 interface FilterState {
@@ -1209,8 +1210,8 @@ function KanbanColumn({
   )
 }
 
-export function DealsKanbanBoard({ 
-  pipelineId, 
+export function DealsKanbanBoard({
+  pipelineId,
   onDealClick,
   selectedDealId: externalSelectedDealId,
   showFilters: externalShowFilters,
@@ -1218,7 +1219,8 @@ export function DealsKanbanBoard({
   sort: externalSort,
   onFiltersChange: externalOnFiltersChange,
   onSortChange: externalOnSortChange,
-  onAddDeal
+  onAddDeal,
+  onDealsCountChange
 }: DealsKanbanBoardProps) {
   const { t } = useTranslation()
   const { isCollapsed } = useSidebar()
@@ -1815,6 +1817,11 @@ export function DealsKanbanBoard({
 
     return filtered
   }, [deals, filters, sort])
+
+  // Notify parent component about deals count change
+  useEffect(() => {
+    onDealsCountChange?.(filteredAndSortedDeals.length)
+  }, [filteredAndSortedDeals.length, onDealsCountChange])
 
   const handleDragStart = (deal: DealCardData) => {
     setDraggedDeal(deal)
@@ -2638,12 +2645,6 @@ export function DealsKanbanBoard({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Deals Count */}
-      <div className="px-4 py-2 flex items-center gap-2 text-sm border-b border-border/40">
-        <span className="text-muted-foreground">Сделок:</span>
-        <span className="font-semibold text-foreground">{filteredAndSortedDeals.length}</span>
-      </div>
-
       {/* Kanban Board - Scrollable */}
       <div
         className="flex-1 min-h-0 overflow-x-auto overflow-y-auto"
