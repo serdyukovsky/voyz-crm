@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useMemo } from "react"
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react"
 import { useNavigate } from 'react-router-dom'
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
@@ -229,6 +229,12 @@ function DealsPageContent() {
   // Use new selection state hook
   const selection = useSelectionState()
   const [totalCount, setTotalCount] = useState<number | undefined>(undefined)
+  const [kanbanDealsCount, setKanbanDealsCount] = useState<number>(0)
+
+  const handleDealsCountChange = useCallback((count: number) => {
+    setKanbanDealsCount(count)
+  }, [])
+
   const [dealSources, setDealSources] = useState<DealSource[]>([
     {
       id: "unsorted",
@@ -1277,6 +1283,11 @@ function DealsPageContent() {
             </div>
             <p className="text-sm text-muted-foreground">
               {t('deals.managePipeline')}
+              {viewMode === 'kanban' && (
+                <span className="ml-2">
+                  · {kanbanDealsCount}
+                </span>
+              )}
               {viewMode === 'list' && (
                 <span className="ml-2">
                   · {t('deals.dealsShown') || 'Показано'} {filteredListDeals.length}
@@ -1476,8 +1487,8 @@ function DealsPageContent() {
                 />
               ) : (
                 <Suspense fallback={<CardSkeleton className="h-[600px]" />}>
-                  <DealsKanbanBoard 
-                    key={kanbanRefreshKey} 
+                  <DealsKanbanBoard
+                    key={kanbanRefreshKey}
                     pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
                     showFilters={showFilters}
                     filters={filters}
@@ -1485,6 +1496,7 @@ function DealsPageContent() {
                     onFiltersChange={setFilters}
                     onSortChange={setSort}
                     onAddDeal={handleCreateNewDeal}
+                    onDealsCountChange={handleDealsCountChange}
                   />
                 </Suspense>
               )}
