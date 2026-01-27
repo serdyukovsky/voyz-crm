@@ -1804,7 +1804,6 @@ export function DealsKanbanBoard({
 
   // Notify parent component about deals count change
   useEffect(() => {
-    console.log('📊 Kanban deals count:', filteredAndSortedDeals.length)
     onDealsCountChange?.(filteredAndSortedDeals.length)
   }, [filteredAndSortedDeals.length, onDealsCountChange])
 
