@@ -3,6 +3,7 @@
 console.log('🔴🔴🔴 DEALS PAGE MODULE LOADED - TIMESTAMP:', new Date().toISOString())
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
 import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
@@ -11,7 +12,7 @@ import { PipelineSettingsModal, Funnel } from "@/components/crm/pipeline-setting
 import { DealSourcesPanel, DealSource } from "@/components/crm/deal-sources-panel"
 import { Button } from "@/components/ui/button"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2 } from 'lucide-react'
-// Custom hooks to replace next/navigation
+// Custom hook to replace useSearchParams from next/navigation
 let globalSetParams: ((params: URLSearchParams) => void) | null = null
 
 const useSearchParams = () => {
@@ -21,11 +22,11 @@ const useSearchParams = () => {
     }
     return new URLSearchParams()
   })
-  
+
   useEffect(() => {
     globalSetParams = setParams
     if (typeof window === 'undefined') return
-    
+
     const handlePopState = () => {
       setParams(new URLSearchParams(window.location.search))
     }
@@ -37,33 +38,8 @@ const useSearchParams = () => {
       }
     }
   }, [])
-  
-  return params
-}
 
-const useRouter = () => {
-  return {
-    push: (url: string) => {
-      if (typeof window !== 'undefined') {
-        // Extract path and search params
-        const [path, search] = url.split('?')
-        const newSearch = search || ''
-        
-        // Update search params state immediately
-        if (globalSetParams) {
-          const newParams = new URLSearchParams(newSearch)
-          globalSetParams(newParams)
-        }
-        
-        // Update URL using pushState - this should update the address bar
-        const newUrl = path + (newSearch ? `?${newSearch}` : '')
-        window.history.pushState({ path: newUrl }, '', newUrl)
-        
-        // Force update by dispatching popstate event
-        window.dispatchEvent(new PopStateEvent('popstate'))
-      }
-    }
-  }
+  return params
 }
 import { PageSkeleton, DealsPageSkeleton } from "@/components/shared/loading-skeleton"
 import { createDeal, getDeals, deleteDeal, updateDeal, type Deal as APIDeal } from "@/lib/api/deals"
@@ -961,7 +937,7 @@ export default function DealsPage() {
             </Button>
               <Button size="sm" onClick={handleCreateNewDeal}>
                 <Plus className="mr-2 h-4 w-4" />
-                New Deal
+                Новая сделка
               </Button>
             </div>
             </div>
