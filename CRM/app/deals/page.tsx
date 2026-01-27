@@ -760,19 +760,29 @@ export default function DealsPage() {
 
       const firstStage = defaultPipeline.stages.sort((a, b) => a.order - b.order)[0]
 
-      console.log('[DEBUG] Creating deal with:', {
-        pipelineId: defaultPipeline.id,
-        stageId: firstStage.id,
-        firstStage,
-        stageType: typeof firstStage.id
-      })
+      console.log('[DEBUG] Full pipeline:', defaultPipeline)
+      console.log('[DEBUG] First stage:', firstStage)
+      console.log('[DEBUG] First stage ID:', firstStage?.id)
+      console.log('[DEBUG] First stage ID type:', typeof firstStage?.id)
+      console.log('[DEBUG] First stage stringified:', JSON.stringify(firstStage))
+
+      // Safely extract ID
+      const stageId = firstStage?.id || (firstStage as any)?.stageId || null
+      const pipelineId = defaultPipeline?.id || null
+
+      console.log('[DEBUG] Extracted IDs:', { stageId, pipelineId })
+
+      if (!stageId || !pipelineId) {
+        showError('Invalid data', 'Pipeline or stage ID is missing')
+        return
+      }
 
       // Create deal via API
       const newDeal = await createDeal({
         title: 'New Deal',
         amount: 0,
-        pipelineId: String(defaultPipeline.id),
-        stageId: String(firstStage.id),
+        pipelineId: String(pipelineId),
+        stageId: String(stageId),
       })
 
       showSuccess('Deal created successfully')
