@@ -219,6 +219,16 @@ export default function DealsPage() {
   const { searchValue, dealFilters } = useSearch()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
+  const [kanbanDealsCount, setKanbanDealsCount] = useState<number>(0)
+
+  const handleDealsCountChange = useCallback((count: number) => {
+    console.log('🔔 handleDealsCountChange called with:', count)
+    setKanbanDealsCount(count)
+  }, [])
+
+  useEffect(() => {
+    console.log('📈 Page kanbanDealsCount updated:', kanbanDealsCount)
+  }, [kanbanDealsCount])
 
   const searchInput = useMemo(() => searchValue.trim(), [searchValue])
   const titleFilter = useMemo(() => dealFilters?.title?.trim() || '', [dealFilters])
@@ -728,7 +738,7 @@ export default function DealsPage() {
       // Get default pipeline and first stage
       const pipelines = await getPipelines()
       const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
-      
+
       if (!defaultPipeline || !defaultPipeline.stages || defaultPipeline.stages.length === 0) {
         showError('No pipeline available', 'Please create a pipeline with stages first')
         return
@@ -736,12 +746,29 @@ export default function DealsPage() {
 
       const firstStage = defaultPipeline.stages.sort((a, b) => a.order - b.order)[0]
 
+      console.log('[DEBUG] Full pipeline:', defaultPipeline)
+      console.log('[DEBUG] First stage:', firstStage)
+      console.log('[DEBUG] First stage ID:', firstStage?.id)
+      console.log('[DEBUG] First stage ID type:', typeof firstStage?.id)
+      console.log('[DEBUG] First stage stringified:', JSON.stringify(firstStage))
+
+      // Safely extract ID
+      const stageId = firstStage?.id || (firstStage as any)?.stageId || null
+      const pipelineId = defaultPipeline?.id || null
+
+      console.log('[DEBUG] Extracted IDs:', { stageId, pipelineId })
+
+      if (!stageId || !pipelineId) {
+        showError('Invalid data', 'Pipeline or stage ID is missing')
+        return
+      }
+
       // Create deal via API
       const newDeal = await createDeal({
         title: 'New Deal',
         amount: 0,
-        pipelineId: defaultPipeline.id,
-        stageId: firstStage.id,
+        pipelineId: String(pipelineId),
+        stageId: String(stageId),
       })
 
       showSuccess('Deal created successfully')
@@ -896,7 +923,15 @@ export default function DealsPage() {
                 </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">Manage your sales pipeline</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Manage your sales pipeline</span>
+              {viewMode === "kanban" && (
+                <>
+                  <span>•</span>
+                  <span className="font-medium text-foreground">{kanbanDealsCount}</span>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <div className="flex border border-border/40 rounded-md overflow-hidden">
@@ -971,12 +1006,13 @@ export default function DealsPage() {
                   isEditMode={isEditMode}
                 />
               ) : (
-                <DealsKanbanBoard 
-                  key={kanbanRefreshKey} 
+                <DealsKanbanBoard
+                  key={kanbanRefreshKey}
                   pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
                   selectedDealId={selectedDealId}
                   onDealClick={handleDealClick}
                   filters={kanbanFilters}
+                  onDealsCountChange={handleDealsCountChange}
                 />
               )}
             </div>

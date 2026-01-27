@@ -24,6 +24,7 @@ import { EmailsModule } from './emails/emails.module';
 import { StatsModule } from './stats/stats.module';
 // import { ChatModule } from './chat/chat.module';
 import { SeedModule } from './seed/seed.module';
+import { GithubWebhookModule } from './integrations/github/github-webhook.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RbacGuard } from './common/guards/rbac.guard';
 import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
@@ -52,6 +53,7 @@ import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
     WebsocketModule,
     SeedModule,
     IntegrationsModule,
+    GithubWebhookModule,
     LoggingModule,
     AnalyticsModule,
     EmailsModule,
@@ -78,4 +80,3 @@ import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
   ],
 })
 export class AppModule {}
-

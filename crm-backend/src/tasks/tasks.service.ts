@@ -124,10 +124,10 @@ export class TasksService {
     if (filters?.status) where.status = filters.status;
 
     // Hard limit for performance (optimization: prevent loading all tasks)
-    // For kanban boards, allow up to 10000 tasks
-    // For regular lists, limit to 100
+    // Allow up to 10000 tasks per request for kanban boards
+    // Default limit is 50 if not specified
     const requestedLimit = filters?.limit || 50;
-    const limit = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
+    const limit = Math.min(requestedLimit, 10000);
     const take = limit + 1; // +1 to check if hasMore
 
     // Decode cursor if provided (for tasks we use createdAt, but cursor format uses updatedAt field name)
