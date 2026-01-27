@@ -2638,9 +2638,24 @@ export function DealsKanbanBoard({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Deals Count Badge */}
+      <div className="px-4 py-2 flex items-center gap-2 text-sm text-muted-foreground border-b border-border/40">
+        <span className="font-medium">
+          {filteredAndSortedDeals.length} {filteredAndSortedDeals.length === 1 ? 'deal' : 'deals'}
+        </span>
+        {filteredAndSortedDeals.length > 0 && (
+          <>
+            <span className="text-muted-foreground/50">•</span>
+            <span>
+              Total: ${filteredAndSortedDeals.reduce((sum, deal) => sum + deal.amount, 0).toLocaleString()}
+            </span>
+          </>
+        )}
+      </div>
+
       {/* Kanban Board - Scrollable */}
-      <div 
-        className="flex-1 min-h-0 overflow-x-auto overflow-y-auto" 
+      <div
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-auto"
         style={{ width: '100%' }}
         data-kanban-container
       >
