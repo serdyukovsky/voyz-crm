@@ -245,6 +245,11 @@ export default function DealsPage() {
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
   const [kanbanDealsCount, setKanbanDealsCount] = useState<number>(0)
 
+  const handleDealsCountChange = useCallback((count: number) => {
+    console.log('🔔 handleDealsCountChange called with:', count)
+    setKanbanDealsCount(count)
+  }, [])
+
   useEffect(() => {
     console.log('📈 Page kanbanDealsCount updated:', kanbanDealsCount)
   }, [kanbanDealsCount])
@@ -1034,7 +1039,7 @@ export default function DealsPage() {
                   selectedDealId={selectedDealId}
                   onDealClick={handleDealClick}
                   filters={kanbanFilters}
-                  onDealsCountChange={setKanbanDealsCount}
+                  onDealsCountChange={handleDealsCountChange}
                 />
               )}
             </div>
