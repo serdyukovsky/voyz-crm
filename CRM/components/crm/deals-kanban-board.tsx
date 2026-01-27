@@ -2638,19 +2638,10 @@ export function DealsKanbanBoard({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Deals Count Badge */}
-      <div className="px-4 py-2 flex items-center gap-2 text-sm text-muted-foreground border-b border-border/40">
-        <span className="font-medium">
-          {filteredAndSortedDeals.length} {filteredAndSortedDeals.length === 1 ? 'deal' : 'deals'}
-        </span>
-        {filteredAndSortedDeals.length > 0 && (
-          <>
-            <span className="text-muted-foreground/50">•</span>
-            <span>
-              Total: ${filteredAndSortedDeals.reduce((sum, deal) => sum + deal.amount, 0).toLocaleString()}
-            </span>
-          </>
-        )}
+      {/* Deals Count */}
+      <div className="px-4 py-2 flex items-center gap-2 text-sm border-b border-border/40">
+        <span className="text-muted-foreground">Сделок:</span>
+        <span className="font-semibold text-foreground">{filteredAndSortedDeals.length}</span>
       </div>
 
       {/* Kanban Board - Scrollable */}
