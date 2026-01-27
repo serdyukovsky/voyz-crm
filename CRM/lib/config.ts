@@ -11,7 +11,6 @@ export function getApiBaseUrl(): string {
       console.error('VITE_API_URL is not set. Available env vars:', Object.keys(import.meta.env))
       throw new Error('VITE_API_URL environment variable is not set. Please configure it in .env.local')
     }
-    console.log('✅ API Base URL loaded:', _apiBaseUrl)
   }
   return _apiBaseUrl
 }

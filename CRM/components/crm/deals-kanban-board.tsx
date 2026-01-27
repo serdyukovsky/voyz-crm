@@ -1291,7 +1291,7 @@ export function DealsKanbanBoard({
   
   const socketRef = useRef<Socket | null>(null)
 
-  const loadPipelines = async () => {
+  const loadPipelines = useCallback(async () => {
     try {
       console.log('Loading pipelines...')
       const data = await getPipelines()
@@ -1340,9 +1340,9 @@ export function DealsKanbanBoard({
       }
       setLoading(false) // Ensure loading is false on error
     }
-  }
+  }, [selectedPipeline?.id, pipelineId])
 
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       console.log('Loading companies...')
       const data = await getCompanies()
@@ -1353,9 +1353,9 @@ export function DealsKanbanBoard({
       setCompanies([]) // Set empty array on error
       // Don't show error toast for companies/contacts as they're optional for filters
     }
-  }
+  }, [])
 
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     try {
       console.log('Loading contacts...')
       const data = await getContacts()
@@ -1365,7 +1365,7 @@ export function DealsKanbanBoard({
       console.error('Failed to load contacts:', error)
       setContacts([]) // Set empty array on error
     }
-  }
+  }, [])
 
   // Дебаунс для фильтров (500ms задержка перед запросом)
   // Это предотвращает множественные запросы при быстром изменении фильтров
@@ -1473,25 +1473,9 @@ export function DealsKanbanBoard({
     if (pipeline) {
       if (pipeline.id !== selectedPipeline?.id) {
         console.log('DealsKanbanBoard: Setting pipeline from prop:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
-        console.log('DealsKanbanBoard: Pipeline stages:', pipeline.stages)
-        // Log pipeline without circular references
-        try {
-          const pipelineLog = {
-            id: pipeline.id,
-            name: pipeline.name,
-            description: pipeline.description,
-            isDefault: pipeline.isDefault,
-            isActive: pipeline.isActive,
-            stages: pipeline.stages?.map(s => ({
-              id: s.id,
-              name: s.name,
-              order: s.order,
-              color: s.color,
-            })) || [],
-          }
-          console.log('DealsKanbanBoard: Full pipeline object:', JSON.stringify(pipelineLog, null, 2))
-        } catch (e) {
-          console.log('DealsKanbanBoard: Pipeline (could not stringify):', pipeline.id, pipeline.name)
+        // Log pipeline info (minimal to save memory)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('DealsKanbanBoard: Pipeline set:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
         }
         setSelectedPipeline(pipeline)
       }

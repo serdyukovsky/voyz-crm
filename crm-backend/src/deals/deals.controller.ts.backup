@@ -47,20 +47,12 @@ export class DealsController {
   @ApiOperation({ summary: 'Create a new deal' })
   @ApiResponse({ status: 201, description: 'Deal created' })
   async create(@Body() createDealDto: any, @CurrentUser() user: any) {
-    console.log('🔵 DealsController.create - request:', {
-      pipelineId: createDealDto?.pipelineId,
-      stageId: createDealDto?.stageId,
-      title: createDealDto?.title,
-      amount: createDealDto?.amount,
-      userId: user?.userId || user?.id,
-    });
-    
     try {
       const result = await this.dealsService.create(createDealDto, user.userId || user.id);
-      console.log('✅ DealsController.create - success, deal id:', result?.id);
       return result;
     } catch (error) {
-      console.error('❌ DealsController.create - error:', error);
+      console.error('DealsController.create - error:', error);
+      console.error('DealsController.create - error stack:', error instanceof Error ? error.stack : 'No stack');
       throw error;
     }
   }
