@@ -949,15 +949,12 @@ export default function DealsPage() {
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>Manage your sales pipeline</span>
-              {(() => {
-                console.log('🎯 Render check:', { viewMode, kanbanDealsCount, shouldShow: viewMode === "kanban" && kanbanDealsCount > 0 })
-                return viewMode === "kanban" && kanbanDealsCount > 0 && (
-                  <>
-                    <span>•</span>
-                    <span className="font-medium text-foreground">{kanbanDealsCount}</span>
-                  </>
-                )
-              })()}
+              {viewMode === "kanban" && (
+                <>
+                  <span>•</span>
+                  <span className="font-medium text-foreground">{kanbanDealsCount}</span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
