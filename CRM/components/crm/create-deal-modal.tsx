@@ -68,11 +68,34 @@ export function CreateDealModal({
   const handleSave = async () => {
     if (!title.trim()) return
 
+    // Debug: Log stageId from props before sending
+    console.log('CreateDealModal.handleSave - stageId from props:', {
+      stageId,
+      type: typeof stageId,
+      pipelineId,
+      pipelineIdType: typeof pipelineId
+    })
+
+    // Validate stageId is a valid UUID
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return typeof str === 'string' && uuidRegex.test(str)
+    }
+
+    if (!isValidUUID(stageId)) {
+      console.error('CreateDealModal: INVALID STAGE ID!', {
+        stageId,
+        type: typeof stageId,
+        isObjectString: stageId === '[object Object]'
+      })
+      return
+    }
+
     setLoading(true)
     try {
       const amountValue = amount ? parseFloat(amount.replace(/[^0-9.,]/g, "").replace(",", ".")) : 0
-      
-      await onSave({
+
+      const dealData = {
         title: title.trim(),
         amount: amountValue,
         stageId,
@@ -81,8 +104,12 @@ export function CreateDealModal({
         contactEmail: contactEmail.trim() || undefined,
         companyName: companyName.trim() || undefined,
         companyAddress: companyAddress.trim() || undefined,
-      })
-      
+      }
+
+      console.log('CreateDealModal.handleSave - calling onSave with:', dealData)
+
+      await onSave(dealData)
+
       onClose()
     } catch (error) {
       console.error('Failed to create deal:', error instanceof Error ? error.message : String(error))
