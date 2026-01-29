@@ -223,15 +223,23 @@ export async function createDeal(data: {
   }
 
   try {
+    // Helper to extract ID from value (handles objects with id property)
+    const extractId = (value: any): string | undefined => {
+      if (!value) return undefined
+      if (typeof value === 'string') return value
+      if (typeof value === 'object' && value.id) return String(value.id)
+      return String(value)
+    }
+
     // Clean data to remove any circular references or non-serializable values
     const cleanData = {
       title: String(data.title || ''),
       amount: data.amount !== undefined ? Number(data.amount) : 0,
-      pipelineId: String(data.pipelineId || ''),
-      stageId: String(data.stageId || ''),
-      contactId: data.contactId ? String(data.contactId) : undefined,
-      companyId: data.companyId ? String(data.companyId) : undefined,
-      assignedToId: data.assignedToId ? String(data.assignedToId) : undefined,
+      pipelineId: extractId(data.pipelineId) || '',
+      stageId: extractId(data.stageId) || '',
+      contactId: extractId(data.contactId),
+      companyId: extractId(data.companyId),
+      assignedToId: extractId(data.assignedToId),
       description: data.description ? String(data.description) : undefined,
     }
     
