@@ -223,11 +223,49 @@ export async function createDeal(data: {
   }
 
   try {
+    // DEBUG: Log incoming data with full details
+    console.log('createDeal - incoming data:', JSON.stringify(data, null, 2))
+    console.log('createDeal - stageId:', {
+      type: typeof data.stageId,
+      value: data.stageId,
+      isObject: typeof data.stageId === 'object',
+      stringified: String(data.stageId)
+    })
+
+    // UUID validation helper
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return uuidRegex.test(str)
+    }
+
     // Helper to extract ID from value (handles objects with id property)
-    const extractId = (value: any): string | undefined => {
+    const extractId = (value: any, fieldName: string): string | undefined => {
+      console.log(`extractId(${fieldName}):`, { type: typeof value, value, isObject: typeof value === 'object' })
+
       if (!value) return undefined
-      if (typeof value === 'string') return value
-      if (typeof value === 'object' && value.id) return String(value.id)
+
+      // If it's already a string, check if it's valid
+      if (typeof value === 'string') {
+        // Detect corrupted values
+        if (value === '[object Object]' || value.includes('[object')) {
+          console.error(`extractId(${fieldName}): CORRUPTED VALUE DETECTED! Got "${value}" instead of UUID`)
+          throw new Error(`Invalid ${fieldName}: value was corrupted to "${value}". This is a bug - please report it.`)
+        }
+        return value
+      }
+
+      // If it's an object with id property, extract the id
+      if (typeof value === 'object' && value !== null) {
+        if (value.id) {
+          const id = String(value.id)
+          console.log(`extractId(${fieldName}): extracted id from object:`, id)
+          return id
+        }
+        // Object without id - this shouldn't happen
+        console.error(`extractId(${fieldName}): Object without id property:`, value)
+        throw new Error(`Invalid ${fieldName}: received object without id property`)
+      }
+
       return String(value)
     }
 
@@ -235,13 +273,25 @@ export async function createDeal(data: {
     const cleanData = {
       title: String(data.title || ''),
       amount: data.amount !== undefined ? Number(data.amount) : 0,
-      pipelineId: extractId(data.pipelineId) || '',
-      stageId: extractId(data.stageId) || '',
-      contactId: extractId(data.contactId),
-      companyId: extractId(data.companyId),
-      assignedToId: extractId(data.assignedToId),
+      pipelineId: extractId(data.pipelineId, 'pipelineId') || '',
+      stageId: extractId(data.stageId, 'stageId') || '',
+      contactId: extractId(data.contactId, 'contactId'),
+      companyId: extractId(data.companyId, 'companyId'),
+      assignedToId: extractId(data.assignedToId, 'assignedToId'),
       description: data.description ? String(data.description) : undefined,
     }
+
+    // Validate required fields are valid UUIDs
+    if (!isValidUUID(cleanData.pipelineId)) {
+      console.error('createDeal: Invalid pipelineId:', cleanData.pipelineId)
+      throw new Error(`Invalid pipelineId: "${cleanData.pipelineId}" is not a valid UUID`)
+    }
+    if (!isValidUUID(cleanData.stageId)) {
+      console.error('createDeal: Invalid stageId:', cleanData.stageId)
+      throw new Error(`Invalid stageId: "${cleanData.stageId}" is not a valid UUID`)
+    }
+
+    console.log('createDeal - cleanData validated:', cleanData)
     
     const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/deals`, {

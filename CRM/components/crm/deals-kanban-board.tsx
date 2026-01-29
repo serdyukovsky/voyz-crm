@@ -2489,8 +2489,33 @@ export function DealsKanbanBoard({
     companyName?: string
     companyAddress?: string
   }) => {
+    // Debug: Log all incoming data to trace stageId corruption
+    console.log('handleCreateDeal called with:', {
+      dealData: JSON.stringify(dealData, null, 2),
+      stageIdType: typeof dealData.stageId,
+      stageIdValue: dealData.stageId,
+      selectedPipelineId: selectedPipeline?.id
+    })
+
     if (!selectedPipeline) {
       showError('No pipeline selected', 'Please select a pipeline first')
+      return
+    }
+
+    // Validate stageId early to catch corruption
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return typeof str === 'string' && uuidRegex.test(str)
+    }
+
+    if (!isValidUUID(dealData.stageId)) {
+      console.error('handleCreateDeal: INVALID STAGE ID DETECTED!', {
+        stageId: dealData.stageId,
+        type: typeof dealData.stageId,
+        selectedStageId,
+        isObjectString: dealData.stageId === '[object Object]'
+      })
+      showError('Invalid stage', `Stage ID is invalid: "${dealData.stageId}". Please try again.`)
       return
     }
 
