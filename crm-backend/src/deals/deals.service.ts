@@ -21,24 +21,35 @@ export class DealsService {
 
   async create(data: any, userId: string) {
     try {
+      // Log incoming data for debugging
+      console.log('DealsService.create - incoming data:', JSON.stringify(data, null, 2));
+
       // Extract IDs from objects if needed (defensive programming)
-      const extractId = (value: any): string | null => {
+      const extractId = (value: any, fieldName: string): string | null => {
+        console.log(`extractId(${fieldName}):`, typeof value, value);
         if (!value) return null;
         if (typeof value === 'string') return value;
-        if (typeof value === 'object' && value.id) return String(value.id);
-        return null;
+        if (typeof value === 'object') {
+          // Try common id field names
+          if (value.id) return String(value.id);
+          if (value._id) return String(value._id);
+          // If object has no id, try to stringify it (should not happen)
+          console.error(`extractId(${fieldName}) - object without id:`, value);
+          return null;
+        }
+        return String(value);
       };
 
       // Ensure required fields have defaults
       const dealData = {
         title: data.title || 'New Deal',
         amount: data.amount !== undefined && data.amount !== null ? Number(data.amount) : 0,
-        pipelineId: extractId(data.pipelineId) || data.pipelineId,
-        stageId: extractId(data.stageId) || data.stageId,
+        pipelineId: extractId(data.pipelineId, 'pipelineId'),
+        stageId: extractId(data.stageId, 'stageId'),
         createdById: userId,
-        assignedToId: extractId(data.assignedToId) || data.assignedToId || null,
-        contactId: extractId(data.contactId) || data.contactId || null,
-        companyId: extractId(data.companyId) || data.companyId || null,
+        assignedToId: extractId(data.assignedToId, 'assignedToId') || null,
+        contactId: extractId(data.contactId, 'contactId') || null,
+        companyId: extractId(data.companyId, 'companyId') || null,
         description: data.description || null,
         expectedCloseAt: data.expectedCloseAt || null,
         rejectionReasons: data.rejectionReasons || [],
