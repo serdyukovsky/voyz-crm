@@ -438,6 +438,7 @@ interface KanbanColumnProps {
   onStageDragEnd?: () => void
   onStageDropAndSave?: (targetStageId: string) => void
   isStageDragged?: boolean
+  isAnyStageDragging?: boolean
   availableContacts: Contact[]
   pipelineId: string
   searchQuery?: string
@@ -452,12 +453,12 @@ function isWonOrLostStage(stageName: string): boolean {
          name === 'closed won' || name === 'closed lost'
 }
 
-function KanbanColumn({ 
-  stage, 
-  deals, 
-  isDraggedOver, 
-  onDrop, 
-  onDragStart, 
+function KanbanColumn({
+  stage,
+  deals,
+  isDraggedOver,
+  onDrop,
+  onDragStart,
   onDragEnd,
   onMarkAsWon,
   onMarkAsLost,
@@ -474,6 +475,7 @@ function KanbanColumn({
   onStageDragEnd,
   onStageDropAndSave,
   isStageDragged = false,
+  isAnyStageDragging = false,
   availableContacts,
   pipelineId,
   searchQuery
@@ -769,37 +771,18 @@ function KanbanColumn({
   }
   
   const handleStageDragOver = (e: React.DragEvent) => {
-    // Check if we're dragging a stage (using ref)
-    if (isDraggingStageRef.current) {
-      // This is definitely a stage drag
+    // Use isAnyStageDragging from props to know if ANY stage is being dragged
+    // This is more reliable than checking local ref since each column has its own ref
+    if (isAnyStageDragging) {
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected via ref, calling onStageDragOver for stage:', stage.id)
+      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected, calling onStageDragOver for stage:', stage.id)
       onStageDragOver?.(e, stage.id)
       return
     }
-    
-    // Otherwise, check types as fallback (for stage drags from other columns)
-    const types = Array.from(e.dataTransfer.types)
-    const hasDragType = types.includes('drag-type')
-    const hasApplicationJson = types.includes('application/json')
-    const hasTextPlain = types.includes('text/plain')
-    
-    // If it has all three types, it could be either stage or deal
-    // But since we're at the column level, we'll try stage first
-    // The Card component will handle deal drags if this doesn't match
-    if (hasDragType && hasApplicationJson && hasTextPlain) {
-      // Could be a stage drag from another column, try handling it
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn handleStageDragOver: Possible stage drag (fallback), calling onStageDragOver for stage:', stage.id)
-      onStageDragOver?.(e, stage.id)
-      return
-    }
-    
-    // Otherwise, it's likely a deal drag - let Card handle it
+
+    // Otherwise, it's a deal drag - let Card handle it
     // Don't prevent default here, let it bubble to Card
   }
   
@@ -860,9 +843,40 @@ function KanbanColumn({
       onDrop={handleStageDrop}
     >
       <div className="mb-3 flex items-center gap-2">
+        {/* Always visible drag handle for stage reordering */}
+        <div
+          draggable={!isEditing}
+          onDragStart={(e) => {
+            if (isEditing) return
+            dragStartedRef.current = true
+            if (onStageDragStart) {
+              onStageDragStart(stage.id)
+            }
+            handleStageDragStart(e)
+          }}
+          onDragEnd={(e) => {
+            if (isEditing) return
+            e.preventDefault()
+            e.stopPropagation()
+            setTimeout(() => {
+              dragStartedRef.current = false
+            }, 200)
+            handleStageDragEnd(e)
+          }}
+          style={{ userSelect: 'none' }}
+          title={isEditing ? "Exit edit mode to reorder" : "Drag to reorder stages"}
+          className={cn(
+            "cursor-grab active:cursor-grabbing flex-shrink-0",
+            isStageDragged && "opacity-50",
+            isEditing && "cursor-not-allowed opacity-50"
+          )}
+        >
+          <GripVertical
+            className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+          />
+        </div>
         {isEditing ? (
           <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
-            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div className="relative">
               <div
                 className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
@@ -981,46 +995,12 @@ function KanbanColumn({
             )}
           </div>
         ) : (
-          <div 
+          <div
             className={cn(
               "flex items-center gap-2 flex-1 min-w-0",
               isStageDragged && "opacity-50"
             )}
           >
-            <GripVertical 
-              className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0 hover:text-foreground transition-colors"
-              draggable={true}
-              onDragStart={(e) => {
-                console.log('🔥🔥🔥 GRIP onDragStart FIRED!', { 
-                  stageId: stage.id, 
-                  isEditing,
-                  draggable: true
-                })
-                dragStartedRef.current = true
-                // Call handleStageDragStart first to set draggedStageId
-                // This ensures state is set before dragOver events fire
-                if (onStageDragStart) {
-                  onStageDragStart(stage.id)
-                }
-                // Then call the local handler to set dataTransfer
-                handleStageDragStart(e)
-              }}
-              onDragEnd={(e) => {
-                console.log('🔥🔥🔥 GRIP onDragEnd FIRED!', { 
-                  stageId: stage.id,
-                  hasOnStageDragEnd: !!onStageDragEnd
-                })
-                e.preventDefault()
-                e.stopPropagation()
-                // Reset drag flag after a delay to allow double click to work
-                setTimeout(() => {
-                  dragStartedRef.current = false
-                }, 200)
-                handleStageDragEnd(e)
-              }}
-              style={{ userSelect: 'none' }}
-              title="Drag to reorder"
-            />
             <div className="relative">
               <div
                 className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
@@ -2673,6 +2653,8 @@ export function DealsKanbanBoard({
           const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
           const isDraggedOver = draggedDeal !== null && draggedDeal.stageId !== stage.id
           const isStageDragged = draggedStageId === stage.id
+          // Pass info about whether ANY stage is being dragged (not just this one)
+          const isAnyStageDragging = draggedStageId !== null
 
           return (
             <KanbanColumn
@@ -2698,6 +2680,7 @@ export function DealsKanbanBoard({
               onStageDragEnd={handleStageDragEnd}
               onStageDropAndSave={handleStageDropAndSave}
               isStageDragged={isStageDragged}
+              isAnyStageDragging={isAnyStageDragging}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
               searchQuery={filters.searchQuery || filters.title}

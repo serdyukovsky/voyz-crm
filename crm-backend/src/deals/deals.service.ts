@@ -343,10 +343,16 @@ export class DealsService {
     }
 
     if (filters?.search) {
+      // Search across title, description, number, deal link, and contact link
       andFilters.push({
         OR: [
           { title: { contains: filters.search, mode: 'insensitive' } },
           { description: { contains: filters.search, mode: 'insensitive' } },
+          { number: { contains: filters.search, mode: 'insensitive' } },
+          // Search in deal's own link field
+          { link: { contains: filters.search, mode: 'insensitive' } },
+          // Search in contact's link field
+          { contact: { link: { contains: filters.search, mode: 'insensitive' } } },
         ],
       });
     }
@@ -1906,6 +1912,8 @@ export class DealsService {
         where.OR = [
           { title: { contains: dto.filter.search, mode: 'insensitive' } },
           { description: { contains: dto.filter.search, mode: 'insensitive' } },
+          { number: { contains: dto.filter.search, mode: 'insensitive' } },
+          { contact: { link: { contains: dto.filter.search, mode: 'insensitive' } } },
         ];
       }
 
@@ -2070,6 +2078,8 @@ export class DealsService {
         where.OR = [
           { title: { contains: dto.filter.search, mode: 'insensitive' } },
           { description: { contains: dto.filter.search, mode: 'insensitive' } },
+          { number: { contains: dto.filter.search, mode: 'insensitive' } },
+          { contact: { link: { contains: dto.filter.search, mode: 'insensitive' } } },
         ];
       }
 

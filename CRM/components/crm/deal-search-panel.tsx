@@ -764,21 +764,18 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                         <button
                           key={stage.id}
                           onClick={() => {
-                            const currentIds = filters.stageIds || []
-                            if (isSelected) {
-                              const newIds = currentIds.filter(id => id !== stage.id)
-                              setFilters({ 
-                                ...filters, 
+                            setFilters(prev => {
+                              const currentIds = prev.stageIds || []
+                              const newIds = isSelected
+                                ? currentIds.filter(id => id !== stage.id)
+                                : [...currentIds, stage.id]
+
+                              return {
+                                ...prev,
                                 stageIds: newIds.length > 0 ? newIds : undefined,
                                 activeStagesOnly: false
-                              })
-                            } else {
-                              setFilters({ 
-                                ...filters, 
-                                stageIds: [...currentIds, stage.id],
-                                activeStagesOnly: false
-                              })
-                            }
+                              }
+                            })
                           }}
                           className="w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-background hover:bg-accent/50 transition-colors flex items-center gap-2"
                           style={{ backgroundColor: stage.color ? `${stage.color}20` : undefined }}
@@ -788,7 +785,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                             onCheckedChange={() => {}}
                             className="pointer-events-none"
                           />
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: stage.color }}
                           />
