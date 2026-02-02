@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { getApiBaseUrl } from '../config'
 
 export interface ChatThread {
   id: string
@@ -85,7 +85,7 @@ function getAuthHeaders() {
 }
 
 export async function getOrCreateThread(dto: CreateThreadDto): Promise<ChatThread> {
-  const response = await fetch(`${API_BASE_URL}/chat/threads`, {
+  const response = await fetch(`${getApiBaseUrl()}/chat/threads`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(dto),
@@ -103,7 +103,7 @@ export async function getOrCreateThread(dto: CreateThreadDto): Promise<ChatThrea
 }
 
 export async function getUserThreads(): Promise<ChatThread[]> {
-  const response = await fetch(`${API_BASE_URL}/chat/threads`, {
+  const response = await fetch(`${getApiBaseUrl()}/chat/threads`, {
     headers: getAuthHeaders(),
   })
 
@@ -115,7 +115,7 @@ export async function getUserThreads(): Promise<ChatThread[]> {
 }
 
 export async function getThread(threadId: string): Promise<ChatThread> {
-  const response = await fetch(`${API_BASE_URL}/chat/threads/${threadId}`, {
+  const response = await fetch(`${getApiBaseUrl()}/chat/threads/${threadId}`, {
     headers: getAuthHeaders(),
   })
 
@@ -130,7 +130,7 @@ export async function sendMessage(
   threadId: string,
   dto: SendMessageDto,
 ): Promise<ChatMessage> {
-  const response = await fetch(`${API_BASE_URL}/chat/threads/${threadId}/messages`, {
+  const response = await fetch(`${getApiBaseUrl()}/chat/threads/${threadId}/messages`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(dto),
