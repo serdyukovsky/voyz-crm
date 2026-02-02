@@ -343,6 +343,7 @@ export class DealsService {
     }
 
     if (filters?.search) {
+      console.log('🔍 DealsService: Search filter:', filters.search);
       // Search across title, description, number, deal link, and contact link
       andFilters.push({
         OR: [
@@ -643,6 +644,7 @@ export class DealsService {
         expectedCloseAt: true,
         closedAt: true,
         description: true,
+        link: true,
         updatedAt: true,
         createdAt: true,
         tags: true,
@@ -722,6 +724,15 @@ export class DealsService {
       console.log('📋 Query returned', deals.length, 'deals with taskStatuses filter');
     }
 
+    // Debug logging for search
+    if (filters?.search) {
+      console.log('🔍 DealsService: Found', deals.length, 'deals for search:', filters.search);
+      const dealsWithLinks = deals.filter(d => d.link);
+      if (dealsWithLinks.length > 0) {
+        console.log('🔗 Deals with links:', dealsWithLinks.map(d => ({ id: d.id, title: d.title, link: d.link })));
+      }
+    }
+
     // Always return paginated response format (even if empty)
     if (deals.length === 0) {
       if (filters?.taskStatuses?.length) {
@@ -784,6 +795,7 @@ export class DealsService {
         expectedCloseAt: true,
         closedAt: true,
         description: true,
+        link: true,
         tags: true,
         rejectionReasons: true,
         createdAt: true,

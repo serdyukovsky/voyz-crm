@@ -7,6 +7,7 @@ export interface Deal {
   amount: number
   budget?: number | null
   description?: string | null
+  link?: string | null
   createdById?: string
   expectedCloseAt?: string | null
   closedAt?: string | null
@@ -100,7 +101,9 @@ export async function getDeals(params?: {
   }
 
   const queryParams = new URLSearchParams()
-  if (params?.search) queryParams.append('search', params.search)
+  // Use title as search if search is not provided (for backward compatibility)
+  const searchValue = params?.search || params?.title
+  if (searchValue) queryParams.append('search', searchValue)
   if (params?.pipelineId) queryParams.append('pipelineId', params.pipelineId)
   if (params?.stageId) queryParams.append('stageId', params.stageId)
   if (params?.stageIds?.length) queryParams.append('stageIds', params.stageIds.join(','))
@@ -108,7 +111,6 @@ export async function getDeals(params?: {
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.companyId) queryParams.append('companyId', params.companyId)
   if (params?.createdById) queryParams.append('createdById', params.createdById)
-  if (params?.title) queryParams.append('title', params.title)
   if (params?.number) queryParams.append('number', params.number)
   if (params?.description) queryParams.append('description', params.description)
   if (params?.amountMin !== undefined) queryParams.append('amountMin', String(params.amountMin))
@@ -133,6 +135,10 @@ export async function getDeals(params?: {
   try {
     const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
+
+    if (params?.search || params?.title) {
+      console.log('🔍 getDeals: Searching with URL:', url)
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -159,6 +165,14 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
+
+    if (params?.search || params?.title) {
+      console.log('🔍 getDeals: Received', data?.data?.length || 0, 'deals')
+      const dealsWithLinks = data?.data?.filter((d: Deal) => d.link) || []
+      if (dealsWithLinks.length > 0) {
+        console.log('🔗 getDeals: Deals with links:', dealsWithLinks.map((d: Deal) => ({ title: d.title, link: d.link })))
+      }
+    }
 
     // API always returns paginated response now
     if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
