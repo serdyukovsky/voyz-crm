@@ -26,7 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { 
+import { formatSmartDate } from "@/lib/utils/date-formatter"
+import {
   GripVertical, 
   MoreVertical,
   Link as LinkIcon,
@@ -407,7 +408,7 @@ function DealCard({
         {/* Updated Date + Task Indicator */}
         <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            {formatRelativeTime(deal.updatedAt)}
+            {formatSmartDate(deal.updatedAt)}
           </div>
           <TaskIndicator tasks={deal.tasks} />
         </div>
@@ -1571,13 +1572,8 @@ export function DealsKanbanBoard({
       })
     }
 
-    // Apply title filter (search by name)
-    if (filters.title) {
-      const searchLower = filters.title.toLowerCase()
-      filtered = filtered.filter(d => 
-        d.title?.toLowerCase().includes(searchLower)
-      )
-    }
+    // Note: filters.title is now handled by backend via search parameter
+    // No need for client-side filtering
 
     if (filters.number) {
       const searchLower = filters.number.toLowerCase()
