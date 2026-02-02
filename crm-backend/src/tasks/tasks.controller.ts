@@ -40,13 +40,14 @@ export class TasksController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.VIEWER)
-  @ApiOperation({ summary: 'Get all tasks with optional filters and pagination' })
+  @ApiOperation({ summary: 'Get all tasks with optional filters, search, and pagination' })
   @ApiResponse({ status: 200, description: 'List of tasks (array if no cursor, paginated response if cursor provided)' })
   findAll(
     @Query('dealId') dealId?: string,
     @Query('contactId') contactId?: string,
     @Query('assignedToId') assignedToId?: string,
     @Query('status') status?: TaskStatus,
+    @Query('search') search?: string,
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
@@ -59,6 +60,7 @@ export class TasksController {
       contactId,
       assignedToId,
       status,
+      search,
       limit: limitNum,
       cursor,
     });
