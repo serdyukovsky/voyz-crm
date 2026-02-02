@@ -13,8 +13,8 @@ import {
   type SendMessageDto,
 } from '@/lib/api/chat'
 import { io, Socket } from 'socket.io-client'
+import { getWsUrl } from '@/lib/config'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
 
 export function useChat() {
@@ -25,9 +25,9 @@ export function useChat() {
   useEffect(() => {
     if (!token) return
 
-    // Remove /api suffix if present, Socket.IO will add its own path
-    const baseUrl = API_BASE_URL.replace(/\/api\/?$/, '')
-    const newSocket = io(`${baseUrl}/realtime`, {
+    // Get WebSocket URL from config
+    const wsUrl = getWsUrl()
+    const newSocket = io(wsUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })

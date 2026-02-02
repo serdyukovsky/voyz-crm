@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { getApiBaseUrl } from '@/lib/config'
 
 export type ActivityType =
   | 'deal_created'
@@ -93,9 +94,7 @@ export function useDealActivity({ dealId }: UseDealActivityOptions) {
   const loadActivity = async () => {
     try {
       setLoading(true)
-      const API_BASE_URL = typeof window !== 'undefined' ?
-        (import.meta.env.VITE_API_URL || 'http://localhost:3001/api') :
-        'http://localhost:3001/api'
+      const API_BASE_URL = getApiBaseUrl()
 
       const response = await fetch(`${API_BASE_URL}/activities?entityType=deal&entityId=${dealId}`, {
         headers: {

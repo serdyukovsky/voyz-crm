@@ -31,8 +31,11 @@ import {
   DialogContent,
 } from "@/components/ui/dialog"
 
-// Lazy load heavy kanban board component (998 lines)
-const DealsKanbanBoard = lazy(() => import("@/components/crm/deals-kanban-board").then(m => ({ default: m.DealsKanbanBoard })))
+// Lazy load heavy kanban board component
+const DealsKanbanBoard = lazy(() =>
+  import("@/components/crm/deals-kanban-board")
+    .then(module => ({ default: module.DealsKanbanBoard }))
+)
 
 const defaultFunnels: Funnel[] = [
   { id: "default", name: "Sales Pipeline" },
