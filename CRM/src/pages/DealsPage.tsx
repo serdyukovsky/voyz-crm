@@ -30,6 +30,12 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Lazy load heavy kanban board component
 const DealsKanbanBoard = lazy(() =>
@@ -1337,24 +1343,29 @@ function DealsPageContent() {
               <Settings className="mr-2 h-4 w-4 shrink-0" />
               {t('settings.title')}
             </Button>
-            <Select
-              value={`${sort.field}-${sort.direction}`}
-              onValueChange={(value) => {
-                const [field, direction] = value.split('-') as ['amount' | 'updatedAt', 'asc' | 'desc']
-                setSort({ field, direction })
-              }}
-            >
-              <SelectTrigger className="h-8 w-[180px] text-xs" size="sm">
-                <ArrowUpDown className="mr-2 h-4 w-4 shrink-0" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="amount-desc">{t('deals.amount')}: {t('deals.highToLow')}</SelectItem>
-                <SelectItem value="amount-asc">{t('deals.amount')}: {t('deals.lowToHigh')}</SelectItem>
-                <SelectItem value="updatedAt-desc">{t('deals.lastUpdate')}: {t('deals.newest')}</SelectItem>
-                <SelectItem value="updatedAt-asc">{t('deals.lastUpdate')}: {t('deals.oldest')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="text-xs">
+                  <ArrowUpDown className="mr-2 h-4 w-4 shrink-0" />
+                  {sort.direction === 'desc' ? 'Сначала новые' : 'Сначала старые'}
+                  <ChevronDown className="ml-2 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setSort({ field: 'updatedAt', direction: 'desc' })}
+                  className={sort.direction === 'desc' ? 'bg-accent' : ''}
+                >
+                  Сначала новые
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSort({ field: 'updatedAt', direction: 'asc' })}
+                  className={sort.direction === 'asc' ? 'bg-accent' : ''}
+                >
+                  Сначала старые
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
               <Button size="sm" onClick={() => handleCreateNewDeal()} className="text-xs">
                 <Plus className="mr-2 h-4 w-4 shrink-0" />
                 {t('deals.newDeal')}

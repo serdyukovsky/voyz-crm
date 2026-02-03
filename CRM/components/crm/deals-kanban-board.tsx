@@ -843,32 +843,48 @@ function KanbanColumn({
       onDragOver={handleStageDragOver}
       onDrop={handleStageDrop}
     >
-      <div className="mb-3 flex items-center gap-2">
-        {/* Always visible drag handle for stage reordering */}
+      <div
+        className={cn(
+          "mb-3 flex items-center gap-2 rounded-lg transition-all",
+          !isEditing && "cursor-grab active:cursor-grabbing",
+          isStageDragged && "opacity-50 ring-2 ring-primary ring-offset-2"
+        )}
+        draggable={!isEditing}
+        onDragStart={(e) => {
+          if (isEditing) return
+          dragStartedRef.current = true
+          if (onStageDragStart) {
+            onStageDragStart(stage.id)
+          }
+          handleStageDragStart(e)
+          // Create custom drag image with stage name - same width as column (w-72 = 288px)
+          const dragPreview = document.createElement('div')
+          dragPreview.style.cssText = 'width: 288px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); position: absolute; top: -1000px;'
+          dragPreview.innerHTML = `
+            <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${stage.color}; flex-shrink: 0;"></div>
+            <span style="flex: 1; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stage.name}</span>
+            <span style="font-size: 12px; background: var(--secondary, #f3f4f6); padding: 2px 8px; border-radius: 4px; flex-shrink: 0;">${deals.length}</span>
+          `
+          document.body.appendChild(dragPreview)
+          e.dataTransfer.setDragImage(dragPreview, 144, 20)
+          setTimeout(() => document.body.removeChild(dragPreview), 0)
+        }}
+        onDragEnd={(e) => {
+          if (isEditing) return
+          e.preventDefault()
+          e.stopPropagation()
+          setTimeout(() => {
+            dragStartedRef.current = false
+          }, 200)
+          handleStageDragEnd(e)
+        }}
+        style={{ userSelect: 'none' }}
+        title={isEditing ? "Выйдите из режима редактирования для сортировки" : "Перетащите для изменения порядка этапов"}
+      >
+        {/* Drag handle icon */}
         <div
-          draggable={!isEditing}
-          onDragStart={(e) => {
-            if (isEditing) return
-            dragStartedRef.current = true
-            if (onStageDragStart) {
-              onStageDragStart(stage.id)
-            }
-            handleStageDragStart(e)
-          }}
-          onDragEnd={(e) => {
-            if (isEditing) return
-            e.preventDefault()
-            e.stopPropagation()
-            setTimeout(() => {
-              dragStartedRef.current = false
-            }, 200)
-            handleStageDragEnd(e)
-          }}
-          style={{ userSelect: 'none' }}
-          title={isEditing ? "Exit edit mode to reorder" : "Drag to reorder stages"}
           className={cn(
-            "cursor-grab active:cursor-grabbing flex-shrink-0",
-            isStageDragged && "opacity-50",
+            "flex-shrink-0",
             isEditing && "cursor-not-allowed opacity-50"
           )}
         >

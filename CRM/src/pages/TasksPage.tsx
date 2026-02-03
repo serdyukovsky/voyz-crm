@@ -4,9 +4,14 @@ import { TasksListView } from "@/components/crm/tasks-list-view"
 import { TasksKanbanView } from "@/components/crm/tasks-kanban-view"
 import { CalendarView } from "@/components/crm/calendar-view"
 import { Button } from "@/components/ui/button"
-import { Plus } from 'lucide-react'
+import { Plus, User, ChevronDown } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { CreateTaskModal } from '@/components/crm/create-task-modal'
 import { createTask } from '@/lib/api/tasks'
@@ -127,22 +132,37 @@ export default function TasksPage() {
             </TabsList>
           </Tabs>
 
-          <Select
-            value={userFilter || "all"}
-            onValueChange={(value) => setUserFilter(value === "all" ? "" : value)}
-          >
-            <SelectTrigger className="h-8 w-[200px] text-xs" size="sm">
-              <SelectValue placeholder="Все пользователи" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все пользователи</SelectItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-xs">
+                <User className="mr-2 h-4 w-4 shrink-0" />
+                {userFilter
+                  ? users.find(u => u.id === userFilter)
+                    ? `${users.find(u => u.id === userFilter)?.firstName || ''} ${users.find(u => u.id === userFilter)?.lastName || ''}`.trim() || users.find(u => u.id === userFilter)?.email
+                    : 'Все пользователи'
+                  : 'Все пользователи'
+                }
+                <ChevronDown className="ml-2 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => setUserFilter("")}
+                className={!userFilter ? 'bg-accent' : ''}
+              >
+                Все пользователи
+              </DropdownMenuItem>
               {users.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
+                <DropdownMenuItem
+                  key={user.id}
+                  onClick={() => setUserFilter(user.id)}
+                  className={userFilter === user.id ? 'bg-accent' : ''}
+                >
                   {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
-                </SelectItem>
+                </DropdownMenuItem>
               ))}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {view === "kanban" ? (
