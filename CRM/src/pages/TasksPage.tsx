@@ -18,7 +18,7 @@ export default function TasksPage() {
   const { searchValue } = useSearch()
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
   const [userFilter, setUserFilter] = useState<string>("")
-  const [users, setUsers] = useState<Array<{id: string, name: string, email: string}>>([])
+  const [users, setUsers] = useState<Array<{id: string, firstName: string, lastName: string, email: string}>>([])
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
   const [tasksRefreshKey, setTasksRefreshKey] = useState(0)
   const { showSuccess, showError } = useToastNotification()
@@ -132,12 +132,14 @@ export default function TasksPage() {
             onValueChange={(value) => setUserFilter(value === "all" ? "" : value)}
           >
             <SelectTrigger className="h-8 w-[200px] text-xs" size="sm">
-              <SelectValue placeholder="All Users" />
+              <SelectValue placeholder="Все пользователи" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
+              <SelectItem value="all">Все пользователи</SelectItem>
               {users.map((user) => (
-                <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                <SelectItem key={user.id} value={user.id}>
+                  {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
