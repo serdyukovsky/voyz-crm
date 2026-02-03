@@ -138,7 +138,7 @@ export function formatSmartDate(dateString: string | Date | null | undefined): s
 
     // This week (less than 7 days)
     if (diffInSeconds < 604800) {
-      return dateFnsFormat(date, 'EEE HH:mm', { locale: ru })
+      return dateFnsFormat(date, 'EEEEEE HH:mm', { locale: ru })
     }
 
     // This year
