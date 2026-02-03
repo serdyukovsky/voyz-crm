@@ -11,6 +11,7 @@ import { PageSkeleton } from '@/components/shared/loading-skeleton'
 import { AuthProvider, useAuth } from '@/contexts/auth-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { setGlobalUnauthorizedHandler } from '@/lib/api/api-client'
+import { SearchProvider } from '@/components/crm/search-context'
 // Temporarily disabled Analytics to debug white screen
 // import { Analytics } from '@vercel/analytics/react'
 
@@ -205,8 +206,10 @@ function App() {
         >
           <BrowserRouter>
             <AuthProvider>
-              <UnauthorizedHandler />
-              <AppRoutes />
+              <SearchProvider>
+                <UnauthorizedHandler />
+                <AppRoutes />
+              </SearchProvider>
             </AuthProvider>
           </BrowserRouter>
           <Toaster />
