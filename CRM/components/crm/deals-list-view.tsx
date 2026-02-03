@@ -2,6 +2,7 @@
 
 import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
+import { ru } from "date-fns/locale"
 import { Trash2, MoveRight, Link as LinkIcon, Users, Hash, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect, useMemo } from "react"
@@ -97,7 +98,7 @@ export function DealsListView({
   }
 
   const formatDate = (dateString: string) => {
-    return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+    return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ru })
   }
 
   const handleSelectAll = (checked: boolean) => {

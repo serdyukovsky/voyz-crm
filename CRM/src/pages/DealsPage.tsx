@@ -852,6 +852,7 @@ function DealsPageContent() {
   // Обновляем фильтры при изменении поиска или панели
   useEffect(() => {
     const newTitle = searchValue.trim() || dealFilters?.title?.trim() || undefined
+    console.log('🔍 DealsPage: Search value changed:', { searchValue, newTitle, dealFilters })
     setFilters(prev => {
       const newFilters = {
         ...prev,
@@ -866,6 +867,7 @@ function DealsPageContent() {
         updatedBefore: dealFilters?.dateTo,
         taskStatuses: dealFilters?.taskStatuses,
       }
+      console.log('🔍 DealsPage: New filters:', newFilters)
       return newFilters
     })
   }, [searchValue, dealFilters])
@@ -907,7 +909,7 @@ function DealsPageContent() {
       if (selectedPipelineForList) {
         console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList, 'filters:', filters)
         setListLoading(true)
-        const listParams = { 
+        const listParams = {
           pipelineId: selectedPipelineForList,
           companyId: filters.companyId,
           contactId: filters.contactId,
@@ -917,6 +919,7 @@ function DealsPageContent() {
           stageIds: effectiveStageIds,
           limit: 50,
         }
+        console.log('🔍 DealsPage: Calling getDeals with params:', listParams)
         getDeals(listParams)
           .then((response) => {
             // API now always returns paginated response
@@ -1352,7 +1355,7 @@ function DealsPageContent() {
                 <SelectItem value="updatedAt-asc">{t('deals.lastUpdate')}: {t('deals.oldest')}</SelectItem>
               </SelectContent>
             </Select>
-              <Button size="sm" onClick={handleCreateNewDeal} className="text-xs">
+              <Button size="sm" onClick={() => handleCreateNewDeal()} className="text-xs">
                 <Plus className="mr-2 h-4 w-4 shrink-0" />
                 {t('deals.newDeal')}
               </Button>
