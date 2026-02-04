@@ -19,9 +19,12 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
+  StickyNote,
+  Pin,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -31,6 +34,7 @@ interface ActivityTimelineProps {
   activities: Activity[]
   className?: string
   pipelineStages?: Array<{ id: string; name: string }>
+  onUnpinNote?: (commentId: string) => Promise<void>
 }
 
 const activityIcons: Record<ActivityType, typeof Clock> = {
@@ -244,6 +248,64 @@ function formatActivityMessage(activity: Activity, pipelineStages?: Array<{ id: 
   }
 }
 
+// Check if activity is an internal note
+function isInternalNote(activity: Activity): boolean {
+  return activity.type === 'COMMENT_ADDED' && activity.payload?.commentType === 'INTERNAL_NOTE'
+}
+
+// Pinned note item component
+function PinnedNoteItem({ activity, onUnpin }: { activity: Activity; onUnpin?: (commentId: string) => Promise<void> }) {
+  const { t } = useTranslation()
+  const [isUnpinning, setIsUnpinning] = useState(false)
+  const date = parseISO(activity.createdAt)
+  const dateString = format(date, 'dd.MM.yyyy HH:mm')
+
+  const handleUnpin = async () => {
+    if (!onUnpin || !activity.payload?.commentId) return
+    setIsUnpinning(true)
+    try {
+      await onUnpin(activity.payload.commentId)
+    } catch (error) {
+      console.error('Failed to unpin note:', error)
+    } finally {
+      setIsUnpinning(false)
+    }
+  }
+
+  return (
+    <div className="flex gap-3 p-3 bg-card border border-primary/30 rounded-lg group shadow-sm">
+      <div className="shrink-0 mt-0.5">
+        <div className="rounded-full p-1.5 bg-primary/10 text-primary">
+          <StickyNote className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{dateString}</span>
+            <span>{activity.user.name}</span>
+          </div>
+          {onUnpin && activity.payload?.commentId && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={handleUnpin}
+              disabled={isUnpinning}
+              title={t('deals.unpinNote') || 'Открепить'}
+            >
+              <Pin className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+          )}
+        </div>
+        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+          {activity.payload?.content || ''}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity; isLast: boolean; pipelineStages?: Array<{ id: string; name: string }> }) {
   const { t } = useTranslation()
   const Icon = activityIcons[activity.type] || Clock
@@ -341,17 +403,38 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
   )
 }
 
-export function ActivityTimeline({ activities, className, pipelineStages }: ActivityTimelineProps) {
+export function ActivityTimeline({ activities, className, pipelineStages, onUnpinNote }: ActivityTimelineProps) {
   const { t } = useTranslation()
 
-  // Group activities by date
+  // Separate pinned notes from regular activities
+  const { pinnedNotes, regularActivities } = useMemo(() => {
+    const pinned: Activity[] = []
+    const regular: Activity[] = []
+
+    activities.forEach(activity => {
+      if (isInternalNote(activity)) {
+        pinned.push(activity)
+      } else {
+        regular.push(activity)
+      }
+    })
+
+    // Sort pinned notes by date (newest first)
+    pinned.sort((a, b) =>
+      parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()
+    )
+
+    return { pinnedNotes: pinned, regularActivities: regular }
+  }, [activities])
+
+  // Group regular activities by date
   const groupedActivities = useMemo(() => {
     const groups: Record<string, Activity[]> = {}
-    
-    activities.forEach(activity => {
+
+    regularActivities.forEach(activity => {
       const date = parseISO(activity.createdAt)
       const dateKey = format(date, 'yyyy-MM-dd')
-      
+
       if (!groups[dateKey]) {
         groups[dateKey] = []
       }
@@ -360,13 +443,13 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
 
     // Sort activities within each group (oldest first)
     Object.keys(groups).forEach(key => {
-      groups[key].sort((a, b) => 
+      groups[key].sort((a, b) =>
         parseISO(a.createdAt).getTime() - parseISO(b.createdAt).getTime()
       )
     })
 
     return groups
-  }, [activities])
+  }, [regularActivities])
 
   const sortedDates = useMemo(() => 
     Object.keys(groupedActivities).sort((a, b) => 
@@ -403,6 +486,16 @@ export function ActivityTimeline({ activities, className, pipelineStages }: Acti
 
   return (
     <div className={cn("space-y-4", className)}>
+      {/* Pinned Notes Section - Sticky at top */}
+      {pinnedNotes.length > 0 && (
+        <div className="sticky top-[-24px] z-20 space-y-2 pb-4 -mx-6 px-6 pt-6 bg-background">
+          {pinnedNotes.map((note) => (
+            <PinnedNoteItem key={note.id} activity={note} onUnpin={onUnpinNote} />
+          ))}
+        </div>
+      )}
+
+      {/* Regular Activity Timeline */}
       {sortedDates.map((dateKey) => {
         const dateActivities = groupedActivities[dateKey]
         const date = parseISO(dateKey)

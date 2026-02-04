@@ -165,5 +165,33 @@ export async function deleteComment(commentId: string): Promise<void> {
   }
 }
 
+export async function updateCommentType(commentId: string, type: CommentType): Promise<Comment> {
+  if (typeof window === 'undefined') {
+    throw new Error('updateCommentType can only be called on the client side')
+  }
+
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('No access token found')
+  }
+
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/comments/${commentId}/type`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ type }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error')
+    throw new Error(`Failed to update comment type: ${response.status} ${errorText}`)
+  }
+
+  return response.json()
+}
+
 
 
