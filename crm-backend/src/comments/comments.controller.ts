@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Delete,
   Param,
@@ -44,6 +45,17 @@ export class CommentsController {
   @ApiOperation({ summary: 'Get comments for a contact' })
   findByContact(@Param('contactId') contactId: string) {
     return this.commentsService.findByContact(contactId);
+  }
+
+  @Patch(':id/type')
+  @ApiOperation({ summary: 'Update comment type (pin/unpin)' })
+  @ApiResponse({ status: 200, description: 'Comment type updated' })
+  updateType(
+    @Param('id') id: string,
+    @Body('type') type: 'COMMENT' | 'INTERNAL_NOTE' | 'CLIENT_MESSAGE',
+    @CurrentUser() user: any,
+  ) {
+    return this.commentsService.updateType(id, type, user.userId || user.id);
   }
 
   @Delete(':id')
