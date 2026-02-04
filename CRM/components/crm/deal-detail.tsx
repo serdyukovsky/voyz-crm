@@ -33,7 +33,7 @@ import { SendEmailModal } from '@/components/crm/send-email-modal'
 import { Mail } from 'lucide-react'
 import { getPipeline, type Pipeline, type Stage } from '@/lib/api/pipelines'
 import { getUsers, type User } from '@/lib/api/users'
-import { createComment, getDealComments, type Comment, type CommentType } from '@/lib/api/comments'
+import { createComment, getDealComments, updateCommentType, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { getSystemFieldOptions } from '@/lib/api/system-field-options'
 
@@ -563,19 +563,34 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   }
 
   const handleBack = () => {
-    const isNewDeal = typeof window !== 'undefined' && 
+    const isNewDeal = typeof window !== 'undefined' &&
       sessionStorage.getItem(`deal-${dealId}-isNew`) === 'true'
-    
+
     if (isNewDeal && (!deal?.title?.trim() && !deal?.amount)) {
       sessionStorage.removeItem(`deal-${dealId}`)
       sessionStorage.removeItem(`deal-${dealId}-isNew`)
     }
-    
+
     // If onClose is provided, use it (modal mode), otherwise navigate
     if (onClose) {
       onClose()
     } else {
       navigate('/deals')
+    }
+  }
+
+  const handleUnpinNote = async (commentId: string) => {
+    try {
+      // Change INTERNAL_NOTE to COMMENT (unpin)
+      await updateCommentType(commentId, 'COMMENT')
+
+      // Reload activities to reflect the change
+      await refetchActivities()
+
+      showSuccess('Примечание откреплено')
+    } catch (error) {
+      console.error('Failed to unpin note:', error)
+      showError(t('deals.unpinError') || 'Не удалось открепить примечание', error instanceof Error ? error.message : 'Unknown error')
     }
   }
 
@@ -1392,9 +1407,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 ))}
               </div>
             ) : (
-              <ActivityTimeline 
-                activities={activities} 
+              <ActivityTimeline
+                activities={activities}
                 pipelineStages={pipeline?.stages?.map(s => ({ id: s.id, name: s.name }))}
+                onUnpinNote={handleUnpinNote}
               />
             )}
           </div>
