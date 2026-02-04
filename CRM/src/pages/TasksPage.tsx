@@ -4,45 +4,59 @@ import { TasksListView } from "@/components/crm/tasks-list-view"
 import { TasksKanbanView } from "@/components/crm/tasks-kanban-view"
 import { CalendarView } from "@/components/crm/calendar-view"
 import { Button } from "@/components/ui/button"
-import { Plus } from 'lucide-react'
+import { Plus, User, ChevronDown } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getContacts } from '@/lib/api/contacts'
-import { Contact } from '@/types/contact'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { CreateTaskModal } from '@/components/crm/create-task-modal'
 import { createTask } from '@/lib/api/tasks'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { useSearch } from '@/components/crm/search-context'
 
 export default function TasksPage() {
   const { t } = useTranslation()
+  const { searchValue } = useSearch()
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
-  const [searchQuery, setSearchQuery] = useState("")
   const [userFilter, setUserFilter] = useState<string>("")
-  const [dealFilter, setDealFilter] = useState<string>("")
-  const [contactFilter, setContactFilter] = useState<string>("")
-  const [dateFilter, setDateFilter] = useState<string>("")
-  const [statusFilter, setStatusFilter] = useState<string>("")
-  const [contacts, setContacts] = useState<Contact[]>([])
+  const [users, setUsers] = useState<Array<{id: string, firstName: string, lastName: string, email: string}>>([])
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
   const [tasksRefreshKey, setTasksRefreshKey] = useState(0)
   const { showSuccess, showError } = useToastNotification()
 
-  const users = [t('tasks.allUsers'), "Alex Chen", "Sarah Lee", "Mike Johnson"]
-  const deals = [t('tasks.allDeals'), "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]
-  const dateOptions = [t('tasks.allDates'), t('tasks.today'), t('tasks.thisWeek'), t('tasks.overdue'), t('tasks.upcoming')]
-  const statusOptions = [t('tasks.allStatus'), t('tasks.completed'), t('tasks.incomplete')]
-
   useEffect(() => {
-    const loadContacts = async () => {
+    const loadUsers = async () => {
       try {
-        const contactsData = await getContacts()
-        setContacts(contactsData)
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const usersData = await response.json()
+          setUsers(usersData)
+
+          // Get current user and set as default filter
+          const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+
+          if (userResponse.ok) {
+            const currentUser = await userResponse.json()
+            setUserFilter(currentUser.id)
+          }
+        }
       } catch (error) {
-        console.error('Failed to load contacts:', error)
+        console.error('Failed to load users:', error)
       }
     }
-    loadContacts()
+    loadUsers()
   }, [])
 
   const handleCreateTask = async (taskData: {
@@ -118,105 +132,50 @@ export default function TasksPage() {
             </TabsList>
           </Tabs>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <Select 
-              value={userFilter || "all"} 
-              onValueChange={(value) => setUserFilter(value === "all" ? "" : value)}
-            >
-              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
-                <SelectValue placeholder={t('tasks.filterByUser')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('tasks.allUsers')}</SelectItem>
-                {users.filter(user => user !== t('tasks.allUsers')).map((user) => (
-                  <SelectItem key={user} value={user}>{user}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={dealFilter || "all"} 
-              onValueChange={(value) => setDealFilter(value === "all" ? "" : value)}
-            >
-              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
-                <SelectValue placeholder={t('tasks.filterByDeal')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('tasks.allDeals')}</SelectItem>
-                {deals.filter(deal => deal !== t('tasks.allDeals')).map((deal) => (
-                  <SelectItem key={deal} value={deal}>{deal}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={contactFilter || "all"} 
-              onValueChange={(value) => setContactFilter(value === "all" ? "" : value)}
-            >
-              <SelectTrigger className="h-8 w-[180px] text-xs" size="sm">
-                <SelectValue placeholder={t('deals.allContacts')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('deals.allContacts')}</SelectItem>
-                {contacts.map((contact) => (
-                  <SelectItem key={contact.id} value={contact.id}>
-                    {contact.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={dateFilter || "all"} 
-              onValueChange={(value) => setDateFilter(value === "all" ? "" : value.toLowerCase())}
-            >
-              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
-                <SelectValue placeholder={t('tasks.filterByDate')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('tasks.allDates')}</SelectItem>
-                {dateOptions.filter(option => option !== t('tasks.allDates')).map((option) => (
-                  <SelectItem key={option} value={option.toLowerCase()}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={statusFilter || "all"} 
-              onValueChange={(value) => setStatusFilter(value === "all" ? "" : value.toLowerCase())}
-            >
-              <SelectTrigger className="h-8 w-[160px] text-xs" size="sm">
-                <SelectValue placeholder={t('tasks.filterByStatus')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('tasks.allStatus')}</SelectItem>
-                {statusOptions.filter(option => option !== t('tasks.allStatus')).map((option) => (
-                  <SelectItem key={option} value={option.toLowerCase()}>{option}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-xs">
+                <User className="mr-2 h-4 w-4 shrink-0" />
+                {userFilter
+                  ? users.find(u => u.id === userFilter)
+                    ? `${users.find(u => u.id === userFilter)?.firstName || ''} ${users.find(u => u.id === userFilter)?.lastName || ''}`.trim() || users.find(u => u.id === userFilter)?.email
+                    : 'Все пользователи'
+                  : 'Все пользователи'
+                }
+                <ChevronDown className="ml-2 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => setUserFilter("")}
+                className={!userFilter ? 'bg-accent' : ''}
+              >
+                Все пользователи
+              </DropdownMenuItem>
+              {users.map((user) => (
+                <DropdownMenuItem
+                  key={user.id}
+                  onClick={() => setUserFilter(user.id)}
+                  className={userFilter === user.id ? 'bg-accent' : ''}
+                >
+                  {`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {view === "kanban" ? (
-          <TasksKanbanView 
+          <TasksKanbanView
             key={tasksRefreshKey}
-            searchQuery={searchQuery}
+            searchQuery={searchValue}
             userFilter={userFilter}
-            dealFilter={dealFilter}
-            contactFilter={contactFilter}
-            dateFilter={dateFilter}
-            statusFilter={statusFilter}
           />
         ) : view === "list" ? (
-          <TasksListView 
+          <TasksListView
             key={tasksRefreshKey}
-            searchQuery={searchQuery}
+            searchQuery={searchValue}
             userFilter={userFilter}
-            dealFilter={dealFilter}
-            contactFilter={contactFilter}
-            dateFilter={dateFilter}
-            statusFilter={statusFilter}
           />
         ) : (
           <CalendarView />

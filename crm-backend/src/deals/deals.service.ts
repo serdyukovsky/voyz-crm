@@ -21,24 +21,35 @@ export class DealsService {
 
   async create(data: any, userId: string) {
     try {
+      // Log incoming data for debugging
+      console.log('DealsService.create - incoming data:', JSON.stringify(data, null, 2));
+
       // Extract IDs from objects if needed (defensive programming)
-      const extractId = (value: any): string | null => {
+      const extractId = (value: any, fieldName: string): string | null => {
+        console.log(`extractId(${fieldName}):`, typeof value, value);
         if (!value) return null;
         if (typeof value === 'string') return value;
-        if (typeof value === 'object' && value.id) return String(value.id);
-        return null;
+        if (typeof value === 'object') {
+          // Try common id field names
+          if (value.id) return String(value.id);
+          if (value._id) return String(value._id);
+          // If object has no id, try to stringify it (should not happen)
+          console.error(`extractId(${fieldName}) - object without id:`, value);
+          return null;
+        }
+        return String(value);
       };
 
       // Ensure required fields have defaults
       const dealData = {
         title: data.title || 'New Deal',
         amount: data.amount !== undefined && data.amount !== null ? Number(data.amount) : 0,
-        pipelineId: extractId(data.pipelineId) || data.pipelineId,
-        stageId: extractId(data.stageId) || data.stageId,
+        pipelineId: extractId(data.pipelineId, 'pipelineId'),
+        stageId: extractId(data.stageId, 'stageId'),
         createdById: userId,
-        assignedToId: extractId(data.assignedToId) || data.assignedToId || null,
-        contactId: extractId(data.contactId) || data.contactId || null,
-        companyId: extractId(data.companyId) || data.companyId || null,
+        assignedToId: extractId(data.assignedToId, 'assignedToId') || null,
+        contactId: extractId(data.contactId, 'contactId') || null,
+        companyId: extractId(data.companyId, 'companyId') || null,
         description: data.description || null,
         expectedCloseAt: data.expectedCloseAt || null,
         rejectionReasons: data.rejectionReasons || [],
@@ -332,10 +343,17 @@ export class DealsService {
     }
 
     if (filters?.search) {
+      console.log('🔍 DealsService: Search filter:', filters.search);
+      // Search across title, description, number, deal link, and contact link
       andFilters.push({
         OR: [
           { title: { contains: filters.search, mode: 'insensitive' } },
           { description: { contains: filters.search, mode: 'insensitive' } },
+          { number: { contains: filters.search, mode: 'insensitive' } },
+          // Search in deal's own link field
+          { link: { contains: filters.search, mode: 'insensitive' } },
+          // Search in contact's link field
+          { contact: { link: { contains: filters.search, mode: 'insensitive' } } },
         ],
       });
     }
@@ -626,6 +644,7 @@ export class DealsService {
         expectedCloseAt: true,
         closedAt: true,
         description: true,
+        link: true,
         updatedAt: true,
         createdAt: true,
         tags: true,
@@ -705,6 +724,15 @@ export class DealsService {
       console.log('📋 Query returned', deals.length, 'deals with taskStatuses filter');
     }
 
+    // Debug logging for search
+    if (filters?.search) {
+      console.log('🔍 DealsService: Found', deals.length, 'deals for search:', filters.search);
+      const dealsWithLinks = deals.filter(d => d.link);
+      if (dealsWithLinks.length > 0) {
+        console.log('🔗 Deals with links:', dealsWithLinks.map(d => ({ id: d.id, title: d.title, link: d.link })));
+      }
+    }
+
     // Always return paginated response format (even if empty)
     if (deals.length === 0) {
       if (filters?.taskStatuses?.length) {
@@ -767,6 +795,7 @@ export class DealsService {
         expectedCloseAt: true,
         closedAt: true,
         description: true,
+        link: true,
         tags: true,
         rejectionReasons: true,
         createdAt: true,
@@ -1895,6 +1924,8 @@ export class DealsService {
         where.OR = [
           { title: { contains: dto.filter.search, mode: 'insensitive' } },
           { description: { contains: dto.filter.search, mode: 'insensitive' } },
+          { number: { contains: dto.filter.search, mode: 'insensitive' } },
+          { contact: { link: { contains: dto.filter.search, mode: 'insensitive' } } },
         ];
       }
 
@@ -2059,6 +2090,8 @@ export class DealsService {
         where.OR = [
           { title: { contains: dto.filter.search, mode: 'insensitive' } },
           { description: { contains: dto.filter.search, mode: 'insensitive' } },
+          { number: { contains: dto.filter.search, mode: 'insensitive' } },
+          { contact: { link: { contains: dto.filter.search, mode: 'insensitive' } } },
         ];
       }
 

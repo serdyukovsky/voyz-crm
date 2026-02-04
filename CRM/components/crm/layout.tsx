@@ -5,7 +5,7 @@ import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { SidebarProvider, useSidebar } from "./sidebar-context"
 import { SearchProvider } from "./search-context"
-import { ChatProvider } from "./chat-context"
+// import { ChatProvider } from "./chat-context" // Disabled - not available on dev backend
 import { QuickSearch } from "@/components/shared/quick-search"
 import { cn } from "@/lib/utils"
 
@@ -39,9 +39,8 @@ export function Layout({ children }: LayoutProps) {
   return (
     <SidebarProvider>
       <SearchProvider>
-        <ChatProvider>
-          <LayoutContent>{children}</LayoutContent>
-        </ChatProvider>
+        {/* ChatProvider disabled - chat module not available on dev backend */}
+        <LayoutContent>{children}</LayoutContent>
       </SearchProvider>
     </SidebarProvider>
   )

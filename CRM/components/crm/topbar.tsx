@@ -136,7 +136,7 @@ export function Topbar() {
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               placeholder={t('common.searchPlaceholder') || 'Поиск и фильтр'}
-              className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-12 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+              className="h-8 w-full border-0 bg-secondary/50 pl-9 pr-20 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               aria-label={t('common.search')}
               onFocus={() => {
                 if (isDealsPage) {

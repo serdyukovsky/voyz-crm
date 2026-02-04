@@ -26,7 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { 
+import { formatSmartDate } from "@/lib/utils/date-formatter"
+import {
   GripVertical, 
   MoreVertical,
   Link as LinkIcon,
@@ -407,7 +408,7 @@ function DealCard({
         {/* Updated Date + Task Indicator */}
         <div className="flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
-            {formatRelativeTime(deal.updatedAt)}
+            {formatSmartDate(deal.updatedAt)}
           </div>
           <TaskIndicator tasks={deal.tasks} />
         </div>
@@ -438,6 +439,7 @@ interface KanbanColumnProps {
   onStageDragEnd?: () => void
   onStageDropAndSave?: (targetStageId: string) => void
   isStageDragged?: boolean
+  isAnyStageDragging?: boolean
   availableContacts: Contact[]
   pipelineId: string
   searchQuery?: string
@@ -452,12 +454,12 @@ function isWonOrLostStage(stageName: string): boolean {
          name === 'closed won' || name === 'closed lost'
 }
 
-function KanbanColumn({ 
-  stage, 
-  deals, 
-  isDraggedOver, 
-  onDrop, 
-  onDragStart, 
+function KanbanColumn({
+  stage,
+  deals,
+  isDraggedOver,
+  onDrop,
+  onDragStart,
   onDragEnd,
   onMarkAsWon,
   onMarkAsLost,
@@ -474,6 +476,7 @@ function KanbanColumn({
   onStageDragEnd,
   onStageDropAndSave,
   isStageDragged = false,
+  isAnyStageDragging = false,
   availableContacts,
   pipelineId,
   searchQuery
@@ -769,37 +772,18 @@ function KanbanColumn({
   }
   
   const handleStageDragOver = (e: React.DragEvent) => {
-    // Check if we're dragging a stage (using ref)
-    if (isDraggingStageRef.current) {
-      // This is definitely a stage drag
+    // Use isAnyStageDragging from props to know if ANY stage is being dragged
+    // This is more reliable than checking local ref since each column has its own ref
+    if (isAnyStageDragging) {
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected via ref, calling onStageDragOver for stage:', stage.id)
+      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected, calling onStageDragOver for stage:', stage.id)
       onStageDragOver?.(e, stage.id)
       return
     }
-    
-    // Otherwise, check types as fallback (for stage drags from other columns)
-    const types = Array.from(e.dataTransfer.types)
-    const hasDragType = types.includes('drag-type')
-    const hasApplicationJson = types.includes('application/json')
-    const hasTextPlain = types.includes('text/plain')
-    
-    // If it has all three types, it could be either stage or deal
-    // But since we're at the column level, we'll try stage first
-    // The Card component will handle deal drags if this doesn't match
-    if (hasDragType && hasApplicationJson && hasTextPlain) {
-      // Could be a stage drag from another column, try handling it
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn handleStageDragOver: Possible stage drag (fallback), calling onStageDragOver for stage:', stage.id)
-      onStageDragOver?.(e, stage.id)
-      return
-    }
-    
-    // Otherwise, it's likely a deal drag - let Card handle it
+
+    // Otherwise, it's a deal drag - let Card handle it
     // Don't prevent default here, let it bubble to Card
   }
   
@@ -859,10 +843,57 @@ function KanbanColumn({
       onDragOver={handleStageDragOver}
       onDrop={handleStageDrop}
     >
-      <div className="mb-3 flex items-center gap-2">
+      <div
+        className={cn(
+          "mb-3 flex items-center gap-2 rounded-lg transition-all",
+          !isEditing && "cursor-grab active:cursor-grabbing",
+          isStageDragged && "opacity-50 ring-2 ring-primary ring-offset-2"
+        )}
+        draggable={!isEditing}
+        onDragStart={(e) => {
+          if (isEditing) return
+          dragStartedRef.current = true
+          if (onStageDragStart) {
+            onStageDragStart(stage.id)
+          }
+          handleStageDragStart(e)
+          // Create custom drag image with stage name - same width as column (w-72 = 288px)
+          const dragPreview = document.createElement('div')
+          dragPreview.style.cssText = 'width: 288px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); position: absolute; top: -1000px;'
+          dragPreview.innerHTML = `
+            <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${stage.color}; flex-shrink: 0;"></div>
+            <span style="flex: 1; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stage.name}</span>
+            <span style="font-size: 12px; background: var(--secondary, #f3f4f6); padding: 2px 8px; border-radius: 4px; flex-shrink: 0;">${deals.length}</span>
+          `
+          document.body.appendChild(dragPreview)
+          e.dataTransfer.setDragImage(dragPreview, 144, 20)
+          setTimeout(() => document.body.removeChild(dragPreview), 0)
+        }}
+        onDragEnd={(e) => {
+          if (isEditing) return
+          e.preventDefault()
+          e.stopPropagation()
+          setTimeout(() => {
+            dragStartedRef.current = false
+          }, 200)
+          handleStageDragEnd(e)
+        }}
+        style={{ userSelect: 'none' }}
+        title={isEditing ? "Выйдите из режима редактирования для сортировки" : "Перетащите для изменения порядка этапов"}
+      >
+        {/* Drag handle icon */}
+        <div
+          className={cn(
+            "flex-shrink-0",
+            isEditing && "cursor-not-allowed opacity-50"
+          )}
+        >
+          <GripVertical
+            className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+          />
+        </div>
         {isEditing ? (
           <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
-            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div className="relative">
               <div
                 className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
@@ -981,46 +1012,12 @@ function KanbanColumn({
             )}
           </div>
         ) : (
-          <div 
+          <div
             className={cn(
               "flex items-center gap-2 flex-1 min-w-0",
               isStageDragged && "opacity-50"
             )}
           >
-            <GripVertical 
-              className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0 hover:text-foreground transition-colors"
-              draggable={true}
-              onDragStart={(e) => {
-                console.log('🔥🔥🔥 GRIP onDragStart FIRED!', { 
-                  stageId: stage.id, 
-                  isEditing,
-                  draggable: true
-                })
-                dragStartedRef.current = true
-                // Call handleStageDragStart first to set draggedStageId
-                // This ensures state is set before dragOver events fire
-                if (onStageDragStart) {
-                  onStageDragStart(stage.id)
-                }
-                // Then call the local handler to set dataTransfer
-                handleStageDragStart(e)
-              }}
-              onDragEnd={(e) => {
-                console.log('🔥🔥🔥 GRIP onDragEnd FIRED!', { 
-                  stageId: stage.id,
-                  hasOnStageDragEnd: !!onStageDragEnd
-                })
-                e.preventDefault()
-                e.stopPropagation()
-                // Reset drag flag after a delay to allow double click to work
-                setTimeout(() => {
-                  dragStartedRef.current = false
-                }, 200)
-                handleStageDragEnd(e)
-              }}
-              style={{ userSelect: 'none' }}
-              title="Drag to reorder"
-            />
             <div className="relative">
               <div
                 className="w-3 h-3 rounded-full flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary transition-all"
@@ -1293,7 +1290,7 @@ export function DealsKanbanBoard({
   
   const socketRef = useRef<Socket | null>(null)
 
-  const loadPipelines = async () => {
+  const loadPipelines = useCallback(async () => {
     try {
       console.log('Loading pipelines...')
       const data = await getPipelines()
@@ -1342,9 +1339,9 @@ export function DealsKanbanBoard({
       }
       setLoading(false) // Ensure loading is false on error
     }
-  }
+  }, [selectedPipeline?.id, pipelineId])
 
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       console.log('Loading companies...')
       const data = await getCompanies()
@@ -1355,9 +1352,9 @@ export function DealsKanbanBoard({
       setCompanies([]) // Set empty array on error
       // Don't show error toast for companies/contacts as they're optional for filters
     }
-  }
+  }, [])
 
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     try {
       console.log('Loading contacts...')
       const data = await getContacts()
@@ -1367,7 +1364,7 @@ export function DealsKanbanBoard({
       console.error('Failed to load contacts:', error)
       setContacts([]) // Set empty array on error
     }
-  }
+  }, [])
 
   // Дебаунс для фильтров (500ms задержка перед запросом)
   // Это предотвращает множественные запросы при быстром изменении фильтров
@@ -1475,25 +1472,9 @@ export function DealsKanbanBoard({
     if (pipeline) {
       if (pipeline.id !== selectedPipeline?.id) {
         console.log('DealsKanbanBoard: Setting pipeline from prop:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
-        console.log('DealsKanbanBoard: Pipeline stages:', pipeline.stages)
-        // Log pipeline without circular references
-        try {
-          const pipelineLog = {
-            id: pipeline.id,
-            name: pipeline.name,
-            description: pipeline.description,
-            isDefault: pipeline.isDefault,
-            isActive: pipeline.isActive,
-            stages: pipeline.stages?.map(s => ({
-              id: s.id,
-              name: s.name,
-              order: s.order,
-              color: s.color,
-            })) || [],
-          }
-          console.log('DealsKanbanBoard: Full pipeline object:', JSON.stringify(pipelineLog, null, 2))
-        } catch (e) {
-          console.log('DealsKanbanBoard: Pipeline (could not stringify):', pipeline.id, pipeline.name)
+        // Log pipeline info (minimal to save memory)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('DealsKanbanBoard: Pipeline set:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
         }
         setSelectedPipeline(pipeline)
       }
@@ -1607,13 +1588,8 @@ export function DealsKanbanBoard({
       })
     }
 
-    // Apply title filter (search by name)
-    if (filters.title) {
-      const searchLower = filters.title.toLowerCase()
-      filtered = filtered.filter(d => 
-        d.title?.toLowerCase().includes(searchLower)
-      )
-    }
+    // Note: filters.title is now handled by backend via search parameter
+    // No need for client-side filtering
 
     if (filters.number) {
       const searchLower = filters.number.toLowerCase()
@@ -2499,62 +2475,65 @@ export function DealsKanbanBoard({
     title: string
     amount: number
     stageId: string
-    contactName?: string
-    contactPhone?: string
-    contactEmail?: string
-    companyName?: string
-    companyAddress?: string
+    contactData?: {
+      link?: string
+      subscriberCount?: string
+      contactMethods?: string[]
+      websiteOrTgChannel?: string
+      contactInfo?: string
+    }
   }) => {
+    // Debug: Log all incoming data to trace stageId corruption
+    console.log('handleCreateDeal called with:', {
+      dealData: JSON.stringify(dealData, null, 2),
+      stageIdType: typeof dealData.stageId,
+      stageIdValue: dealData.stageId,
+      selectedPipelineId: selectedPipeline?.id
+    })
+
     if (!selectedPipeline) {
       showError('No pipeline selected', 'Please select a pipeline first')
       return
     }
 
+    // Validate stageId early to catch corruption
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return typeof str === 'string' && uuidRegex.test(str)
+    }
+
+    if (!isValidUUID(dealData.stageId)) {
+      console.error('handleCreateDeal: INVALID STAGE ID DETECTED!', {
+        stageId: dealData.stageId,
+        type: typeof dealData.stageId,
+        selectedStageId,
+        isObjectString: dealData.stageId === '[object Object]'
+      })
+      showError('Invalid stage', `Stage ID is invalid: "${dealData.stageId}". Please try again.`)
+      return
+    }
+
     try {
       let contactId: string | undefined
-      let companyId: string | undefined
 
-      // Create contact if provided
-      if (dealData.contactName || dealData.contactPhone || dealData.contactEmail) {
+      // Create contact if any contact data provided
+      const contactData = dealData.contactData
+      if (contactData && (contactData.link || contactData.subscriberCount || contactData.contactMethods?.length || contactData.websiteOrTgChannel || contactData.contactInfo)) {
         const { createContact } = await import('@/lib/api/contacts')
         try {
           const contact = await createContact({
-            fullName: dealData.contactName || '',
-            phone: dealData.contactPhone,
-            email: dealData.contactEmail,
-            companyId: companyId,
+            fullName: dealData.title, // Use deal title as contact name
+            link: contactData.link,
+            subscriberCount: contactData.subscriberCount,
+            contactMethods: contactData.contactMethods,
+            websiteOrTgChannel: contactData.websiteOrTgChannel,
+            contactInfo: contactData.contactInfo,
           })
           contactId = contact.id
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error)
           console.error('Failed to create contact:', errorMsg)
           // Continue without contact
-        }
-      }
-
-      // Create company if provided
-      if (dealData.companyName) {
-        const { createCompany } = await import('@/lib/api/companies')
-        try {
-          const company = await createCompany({
-            name: dealData.companyName,
-            address: dealData.companyAddress,
-          })
-          companyId = company.id
-          
-          // Update contact with company if contact was created
-          if (contactId && !dealData.contactName) {
-            const { updateContact } = await import('@/lib/api/contacts')
-            try {
-              await updateContact(contactId, { companyId })
-            } catch (error) {
-              const errorMsg = error instanceof Error ? error.message : String(error)
-              console.error('Failed to update contact with company:', errorMsg)
-            }
-          }
-        } catch (error) {
-          console.error('Failed to create company:', error)
-          // Continue without company
         }
       }
 
@@ -2566,16 +2545,14 @@ export function DealsKanbanBoard({
         pipelineId: selectedPipeline?.id,
         stageId: dealData.stageId,
         contactId: contactId || undefined,
-        companyId: companyId || undefined,
       })
-      
+
       const newDeal = await createDeal({
         title: dealData.title,
         amount: dealData.amount,
         pipelineId: selectedPipeline.id,
         stageId: dealData.stageId,
         contactId,
-        companyId,
       })
 
       console.log('Deal created successfully:', newDeal?.id, newDeal?.title, newDeal?.amount)
@@ -2664,6 +2641,8 @@ export function DealsKanbanBoard({
           const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
           const isDraggedOver = draggedDeal !== null && draggedDeal.stageId !== stage.id
           const isStageDragged = draggedStageId === stage.id
+          // Pass info about whether ANY stage is being dragged (not just this one)
+          const isAnyStageDragging = draggedStageId !== null
 
           return (
             <KanbanColumn
@@ -2689,6 +2668,7 @@ export function DealsKanbanBoard({
               onStageDragEnd={handleStageDragEnd}
               onStageDropAndSave={handleStageDropAndSave}
               isStageDragged={isStageDragged}
+              isAnyStageDragging={isAnyStageDragging}
               availableContacts={contacts}
               pipelineId={selectedPipeline.id}
               searchQuery={filters.searchQuery || filters.title}

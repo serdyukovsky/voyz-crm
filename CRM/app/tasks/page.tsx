@@ -8,9 +8,6 @@ import { CalendarView } from "@/components/crm/calendar-view"
 import { Button } from "@/components/ui/button"
 import { Plus, Search, Filter } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getContacts } from '@/lib/api/contacts'
-import { Contact } from '@/types/contact'
 import { CreateTaskModal } from '@/components/crm/create-task-modal'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { useAuthGuard } from '@/hooks/use-auth-guard'
@@ -76,11 +73,7 @@ export default function TasksPage() {
   const [view, setView] = useState<"list" | "kanban" | "calendar">("kanban")
   const [searchQuery, setSearchQuery] = useState("")
   const [userFilter, setUserFilter] = useState<string>("")
-  const [dealFilter, setDealFilter] = useState<string>("")
-  const [contactFilter, setContactFilter] = useState<string>("")
-  const [dateFilter, setDateFilter] = useState<string>("")
-  const [statusFilter, setStatusFilter] = useState<string>("")
-  const [contacts, setContacts] = useState<Contact[]>([])
+  const [users, setUsers] = useState<Array<{id: string, name: string, email: string}>>([])
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => {
     // Initialize from URL on mount
@@ -100,10 +93,7 @@ export default function TasksPage() {
   // React Query hooks for data fetching
   const { data: tasksResponse, isLoading, error: tasksError } = useTasks({
     search: debouncedSearch,
-    status: statusFilter || undefined,
     assignedToId: userFilter || undefined,
-    dealId: dealFilter || undefined,
-    contactId: contactFilter || undefined,
     limit: 100,
     enabled: true,
   })
@@ -192,10 +182,35 @@ export default function TasksPage() {
     console.log('TasksPage: isCreateTaskModalOpen changed to:', isCreateTaskModalOpen)
   }, [isCreateTaskModalOpen])
 
-  const users = ["All Users", "Alex Chen", "Sarah Lee", "Mike Johnson"]
-  const deals = ["All Deals", "Acme Corp", "TechStart", "CloudFlow", "DataCo", "DesignHub", "InnovateLabs"]
-  const dateOptions = ["All Dates", "Today", "This Week", "Overdue", "Upcoming"]
-  const statusOptions = ["All Status", "Completed", "Incomplete"]
+  // Load users and set current user as default filter
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (response.ok) {
+          const usersData = await response.json()
+          setUsers(usersData)
+
+          // Get current user from token and set as default filter
+          const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (userResponse.ok) {
+            const currentUser = await userResponse.json()
+            setUserFilter(currentUser.id)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load users:', error)
+      }
+    }
+    loadUsers()
+  }, [])
 
   // Replaced manual handleCreateTask with React Query mutation
   const handleCreateTask = async (taskData: {
@@ -229,18 +244,6 @@ export default function TasksPage() {
     })
   }
 
-  // Load contacts for contact filter dropdown
-  useEffect(() => {
-    const loadContacts = async () => {
-      try {
-        const contactsData = await getContacts()
-        setContacts(contactsData)
-      } catch (error) {
-        console.error('Failed to load contacts:', error)
-      }
-    }
-    loadContacts()
-  }, [])
 
   return (
     <CRMLayout>
@@ -295,7 +298,7 @@ export default function TasksPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Filter className="h-3 w-3" />
-              <span>Filters:</span>
+              <span>Assigned to:</span>
             </div>
 
             <select
@@ -304,55 +307,9 @@ export default function TasksPage() {
               className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               aria-label="Filter by user"
             >
+              <option value="">All Users</option>
               {users.map((user) => (
-                <option key={user} value={user === "All Users" ? "" : user}>{user}</option>
-              ))}
-            </select>
-
-            <select
-              value={dealFilter}
-              onChange={(e) => setDealFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by deal"
-            >
-              {deals.map((deal) => (
-                <option key={deal} value={deal === "All Deals" ? "" : deal}>{deal}</option>
-              ))}
-            </select>
-
-            <Select value={contactFilter || "all"} onValueChange={(value) => setContactFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="h-8 w-[180px]">
-                <SelectValue placeholder="All Contacts" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Contacts</SelectItem>
-                {contacts.map((contact) => (
-                  <SelectItem key={contact.id} value={contact.id}>
-                    {contact.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by date"
-            >
-              {dateOptions.map((option) => (
-                <option key={option} value={option === "All Dates" ? "" : option.toLowerCase()}>{option}</option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter by status"
-            >
-              {statusOptions.map((option) => (
-                <option key={option} value={option === "All Status" ? "" : option.toLowerCase()}>{option}</option>
+                <option key={user.id} value={user.id}>{user.name}</option>
               ))}
             </select>
 
@@ -375,10 +332,6 @@ export default function TasksPage() {
           <TasksKanbanView
             searchQuery={debouncedSearch}
             userFilter={userFilter}
-            dealFilter={dealFilter}
-            contactFilter={contactFilter}
-            dateFilter={dateFilter}
-            statusFilter={statusFilter}
             selectedTaskId={selectedTaskId}
             onTaskSelect={handleTaskSelect}
           />
@@ -386,10 +339,6 @@ export default function TasksPage() {
           <TasksListView
             searchQuery={debouncedSearch}
             userFilter={userFilter}
-            dealFilter={dealFilter}
-            contactFilter={contactFilter}
-            dateFilter={dateFilter}
-            statusFilter={statusFilter}
             selectedTaskId={selectedTaskId}
             onTaskSelect={handleTaskSelect}
           />

@@ -8,8 +8,6 @@ import { Contact as ContactIcon } from "lucide-react"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
 import { ContactBadge } from "./contact-badge"
-import { getContacts } from '@/lib/api/contacts'
-import type { Contact } from '@/lib/api/contacts'
 import { deleteTask, updateTask } from '@/lib/api/tasks'
 import { useTasks } from '@/hooks/use-tasks'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -36,15 +34,11 @@ interface Task {
 interface TasksListViewProps {
   searchQuery: string
   userFilter: string
-  dealFilter: string
-  contactFilter: string
-  dateFilter: string
-  statusFilter: string
   selectedTaskId?: string | null
   onTaskSelect?: (taskId: string | null) => void
 }
 
-function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter, selectedTaskId, onTaskSelect }: TasksListViewProps) {
+function TasksListView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }: TasksListViewProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -52,11 +46,9 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<{ id: string; name: string } | null>(null)
   const [isDealModalOpen, setIsDealModalOpen] = useState(false)
-  const [contacts, setContacts] = useState<Contact[]>([])
 
   // React Query hook to fetch tasks with caching
   const { data: tasksResponse, isLoading: loading, error: tasksError } = useTasks({
-    status: statusFilter || undefined,
     limit: 100,
   })
 
@@ -103,62 +95,17 @@ function TasksListView({ searchQuery, userFilter, dealFilter, contactFilter, dat
     }
   }, [tasksResponse, t, tasksError])
 
-  useEffect(() => {
-    const loadContacts = async () => {
-      try {
-        const contactsData = await getContacts()
-        setContacts(contactsData)
-      } catch (error) {
-        console.error('Failed to load contacts:', error)
-      }
-    }
-    loadContacts()
-  }, [])
-
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
       // Search filter
       if (searchQuery && task.title && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    
-    // User filter
-    if (userFilter && task.assignee !== userFilter) return false
-    
-    // Deal filter
-    if (dealFilter && task.dealName !== dealFilter) return false
-    
-    // Contact filter
-    if (contactFilter && task.contactId !== contactFilter) return false
-    
-    // Status filter
-    if (statusFilter === "completed" && !task.completed) return false
-    if (statusFilter === "incomplete" && task.completed) return false
-    
-    // Date filter
-    if (dateFilter && task.dueDate) {
-      try {
-        const taskDate = new Date(task.dueDate)
-        if (isNaN(taskDate.getTime())) return true // Skip invalid dates
-        
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        if (dateFilter === "today" && taskDate.toDateString() !== today.toDateString()) return false
-        if (dateFilter === "overdue" && taskDate >= today) return false
-        if (dateFilter === "upcoming" && taskDate <= today) return false
-        if (dateFilter === "this week") {
-          const weekFromNow = new Date(today)
-          weekFromNow.setDate(weekFromNow.getDate() + 7)
-          if (taskDate < today || taskDate > weekFromNow) return false
-        }
-      } catch (error) {
-        console.error('Error parsing date:', task.dueDate, error)
-        return true // Skip tasks with invalid dates
-      }
-    }
-    
-    return true
+
+      // User filter - compare by assigneeId
+      if (userFilter && task.assigneeId !== userFilter) return false
+
+      return true
     })
-  }, [tasks, searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter])
+  }, [tasks, searchQuery, userFilter])
 
   console.log('📋 TasksListView: Filtered tasks:', filteredTasks.length, 'from', tasks.length, 'total tasks')
 
