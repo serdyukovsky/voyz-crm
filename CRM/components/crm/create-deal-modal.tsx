@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Settings, ChevronDown } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 import { useTranslation } from "@/lib/i18n/i18n-context"
 
 interface CreateDealModalProps {
@@ -28,16 +28,8 @@ interface CreateDealModalProps {
     }
   }) => Promise<void>
   stageId: string
+  stageName?: string
   pipelineId: string
-  dealsCount?: number
-  totalAmount?: number
-}
-
-const CONTACT_METHOD_OPTIONS = ['Whatsapp', 'Telegram', 'Direct']
-const CONTACT_METHOD_LABELS: Record<string, string> = {
-  'Whatsapp': 'WhatsApp',
-  'Telegram': 'Telegram',
-  'Direct': 'Напрямую',
 }
 
 export function CreateDealModal({
@@ -45,9 +37,8 @@ export function CreateDealModal({
   onClose,
   onSave,
   stageId,
+  stageName,
   pipelineId,
-  dealsCount = 0,
-  totalAmount = 0
 }: CreateDealModalProps) {
   const { t } = useTranslation()
   const [title, setTitle] = useState("")
@@ -58,6 +49,7 @@ export function CreateDealModal({
   const [contactInfo, setContactInfo] = useState("")
   const [openMethodsDropdown, setOpenMethodsDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [contactMethodsOptions] = useState<string[]>(['Whatsapp', 'Telegram', 'Direct'])
 
   useEffect(() => {
     if (isOpen) {
@@ -153,67 +145,63 @@ export function CreateDealModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
-        <DialogHeader className="text-center">
+        <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {t('deals.newDeal') || 'Новая сделка'}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            {dealsCount} {t('deals.deals') || 'сделок'}: {totalAmount.toLocaleString('ru-RU')} ₽
-          </p>
+          {stageName && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Этап: {stageName}
+            </p>
+          )}
         </DialogHeader>
 
-        <div className="space-y-4 mt-6">
+        <div className="space-y-3 mt-4">
           {/* Название */}
-          <div>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t('deals.dealName') || 'Название'}
-              className="h-12 text-base rounded-lg"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
-                  e.preventDefault()
-                  handleSave()
-                }
-                if (e.key === "Escape") {
-                  onClose()
-                }
-              }}
-              autoFocus
-            />
-          </div>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t('deals.dealName') || 'Название'}
+            className="h-11 rounded-lg"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
+                e.preventDefault()
+                handleSave()
+              }
+              if (e.key === "Escape") {
+                onClose()
+              }
+            }}
+            autoFocus
+          />
 
           {/* Ссылка */}
-          <div>
-            <Input
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder={t('contacts.link') || 'Ссылка'}
-              className="h-12 text-base rounded-lg"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
+          <Input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder={t('contacts.link') || 'Ссылка'}
+            className="h-11 rounded-lg"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
+                e.preventDefault()
+                handleSave()
+              }
+            }}
+          />
 
           {/* Кол-во подписчиков */}
-          <div>
-            <Input
-              value={subscriberCount}
-              onChange={(e) => setSubscriberCount(e.target.value)}
-              placeholder={t('contacts.subscriberCount') || 'Кол-во подписчиков'}
-              className="h-12 text-base rounded-lg"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
+          <Input
+            value={subscriberCount}
+            onChange={(e) => setSubscriberCount(e.target.value)}
+            placeholder={t('contacts.subscriberCount') || 'Кол-во подписчиков'}
+            className="h-11 rounded-lg"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
+                e.preventDefault()
+                handleSave()
+              }
+            }}
+          />
 
           {/* Способ связи - Multi-select Dropdown */}
           <div className="methods-dropdown-container relative">
@@ -223,11 +211,11 @@ export function CreateDealModal({
                 e.stopPropagation()
                 setOpenMethodsDropdown(!openMethodsDropdown)
               }}
-              className="w-full h-12 px-3 flex items-center justify-between rounded-lg border border-input bg-background text-base"
+              className="w-full h-11 px-3 flex items-center justify-between rounded-lg border border-input bg-background text-sm"
             >
               <span className={contactMethods.length > 0 ? "text-foreground" : "text-muted-foreground"}>
                 {contactMethods.length > 0
-                  ? contactMethods.map(m => CONTACT_METHOD_LABELS[m] || m).join(', ')
+                  ? contactMethods.join(', ')
                   : t('contacts.contactMethods') || "Способ связи"
                 }
               </span>
@@ -236,85 +224,64 @@ export function CreateDealModal({
 
             {openMethodsDropdown && (
               <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-input bg-card shadow-lg z-50 p-2 space-y-1">
-                {CONTACT_METHOD_OPTIONS.map((method) => (
-                  <div key={method} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent/50">
-                    <input
-                      type="checkbox"
-                      id={`create-method-${method}`}
-                      checked={contactMethods.includes(method)}
-                      onChange={() => toggleContactMethod(method)}
-                      className="h-4 w-4 rounded border border-border cursor-pointer"
-                    />
-                    <label htmlFor={`create-method-${method}`} className="text-sm cursor-pointer flex-1">
-                      {CONTACT_METHOD_LABELS[method] || method}
-                    </label>
-                  </div>
-                ))}
+                {contactMethodsOptions.length > 0 ? (
+                  contactMethodsOptions.map((method) => (
+                    <div key={method} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent/50">
+                      <input
+                        type="checkbox"
+                        id={`create-method-${method}`}
+                        checked={contactMethods.includes(method)}
+                        onChange={() => toggleContactMethod(method)}
+                        className="h-4 w-4 rounded border border-border cursor-pointer"
+                      />
+                      <label htmlFor={`create-method-${method}`} className="text-sm cursor-pointer flex-1">
+                        {method}
+                      </label>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2 px-2">Нет доступных опций</p>
+                )}
               </div>
             )}
           </div>
 
           {/* Сайт, тг канал */}
-          <div>
-            <Input
-              value={websiteOrTgChannel}
-              onChange={(e) => setWebsiteOrTgChannel(e.target.value)}
-              placeholder={t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
-              className="h-12 text-base rounded-lg"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
+          <Input
+            value={websiteOrTgChannel}
+            onChange={(e) => setWebsiteOrTgChannel(e.target.value)}
+            placeholder={t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
+            className="h-11 rounded-lg"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
+                e.preventDefault()
+                handleSave()
+              }
+            }}
+          />
 
           {/* Контакт */}
-          <div>
-            <Input
-              value={contactInfo}
-              onChange={(e) => setContactInfo(e.target.value)}
-              placeholder={t('contacts.contactInfo') || 'Контакт'}
-              className="h-12 text-base rounded-lg"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
+          <Input
+            value={contactInfo}
+            onChange={(e) => setContactInfo(e.target.value)}
+            placeholder={t('contacts.contactInfo') || 'Контакт'}
+            className="h-11 rounded-lg"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
+                e.preventDefault()
+                handleSave()
+              }
+            }}
+          />
 
-          {/* Кнопки */}
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="flex-1 h-12 text-base rounded-lg"
-              disabled={loading}
-            >
-              {t('common.cancel') || 'Отмена'}
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!title.trim() || loading}
-              className="flex-1 h-12 text-base rounded-lg"
-            >
-              {t('common.add') || 'Добавить'}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 rounded-lg"
-              onClick={() => {
-                // TODO: Open settings
-              }}
-              title={t('common.settings') || 'Настройки'}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          </div>
+          {/* Кнопка Добавить */}
+          <Button
+            onClick={handleSave}
+            disabled={!title.trim() || loading}
+            className="w-full h-11 rounded-lg mt-4"
+          >
+            {t('common.add') || 'Добавить'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

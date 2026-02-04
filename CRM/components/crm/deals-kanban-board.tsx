@@ -32,11 +32,10 @@ import {
   MoreVertical,
   Link as LinkIcon,
   Users,
-  Hash, 
-  CheckCircle2, 
-  XCircle, 
+  Hash,
+  CheckCircle2,
+  XCircle,
   UserPlus,
-  ExternalLink,
   Filter,
   ArrowUpDown,
   X,
@@ -202,9 +201,25 @@ function DealCard({
   searchQuery
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
+
+  const handleDelete = async () => {
+    if (!onDeleteDeal) return
+    setIsDeleting(true)
+    try {
+      await onDeleteDeal(deal.id)
+      showSuccess('Сделка удалена')
+      setShowDeleteDialog(false)
+    } catch (error) {
+      showError('Не удалось удалить сделку', error instanceof Error ? error.message : 'Неизвестная ошибка')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation()
@@ -255,17 +270,18 @@ function DealCard({
   const isHighlighted = searchQuery && deal.title.toLowerCase().includes(searchQuery.toLowerCase())
 
   return (
-    <Card
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={handleCardClick}
-      className={cn(
-        "mb-2 cursor-pointer transition-all group shadow-none",
-        isDragging && "opacity-50",
-        isHighlighted && "bg-blue-50/40 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-800/30"
-      )}
-    >
+    <>
+      <Card
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleCardClick}
+        className={cn(
+          "mb-2 cursor-pointer transition-all group shadow-none",
+          isDragging && "opacity-50",
+          isHighlighted && "bg-blue-50/40 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-800/30"
+        )}
+      >
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
           <div 
@@ -289,47 +305,25 @@ function DealCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onClick={() => onOpenInSidebar(deal.id)}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                {t('dealCard.openInSidebar')}
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onReassignContact(deal.id)}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                {t('dealCard.reassignContact')}
+                <UserPlus className="h-4 w-4" />
+                Сменить ответственного
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => onMarkAsWon(deal.id)}
-                className="text-green-600 dark:text-green-400"
-              >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
+              <DropdownMenuItem onClick={() => onMarkAsWon(deal.id)}>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
                 {t('dealCard.markAsWon')}
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onMarkAsLost(deal.id)}
-                className="text-red-600 dark:text-red-400"
-              >
-                <XCircle className="mr-2 h-4 w-4" />
+              <DropdownMenuItem onClick={() => onMarkAsLost(deal.id)}>
+                <XCircle className="h-4 w-4 text-red-500" />
                 {t('dealCard.markAsLost')}
               </DropdownMenuItem>
               {onDeleteDeal && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={async () => {
-                      if (confirm(`Are you sure you want to delete deal "${deal.title}"?`)) {
-                        try {
-                          await onDeleteDeal(deal.id)
-                          showSuccess('Deal deleted successfully')
-                        } catch (error) {
-                          showError('Failed to delete deal', error instanceof Error ? error.message : 'Unknown error')
-                        }
-                      }
-                    }}
-                    className="text-red-600 dark:text-red-400"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {t('deals.delete') || 'Delete Deal'}
+                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                    Удалить сделку
                   </DropdownMenuItem>
                 </>
               )}
@@ -414,6 +408,28 @@ function DealCard({
         </div>
       </CardContent>
     </Card>
+
+    {/* Delete Confirmation Dialog */}
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Удалить сделку?</DialogTitle>
+          <DialogDescription>
+            Вы уверены, что хотите удалить сделку "{deal.title}"? Это действие нельзя отменить.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Удаление...' : 'Удалить'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
@@ -2689,9 +2705,8 @@ export function DealsKanbanBoard({
           }}
           onSave={handleCreateDeal}
           stageId={selectedStageId}
+          stageName={selectedPipeline.stages.find(s => s.id === selectedStageId)?.name}
           pipelineId={selectedPipeline.id}
-          dealsCount={selectedStageDealsCount}
-          totalAmount={selectedStageTotalAmount}
         />
       )}
 
