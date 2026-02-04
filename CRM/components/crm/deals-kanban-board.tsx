@@ -2475,11 +2475,13 @@ export function DealsKanbanBoard({
     title: string
     amount: number
     stageId: string
-    contactName?: string
-    contactPhone?: string
-    contactEmail?: string
-    companyName?: string
-    companyAddress?: string
+    contactData?: {
+      link?: string
+      subscriberCount?: string
+      contactMethods?: string[]
+      websiteOrTgChannel?: string
+      contactInfo?: string
+    }
   }) => {
     // Debug: Log all incoming data to trace stageId corruption
     console.log('handleCreateDeal called with:', {
@@ -2513,49 +2515,25 @@ export function DealsKanbanBoard({
 
     try {
       let contactId: string | undefined
-      let companyId: string | undefined
 
-      // Create contact if provided
-      if (dealData.contactName || dealData.contactPhone || dealData.contactEmail) {
+      // Create contact if any contact data provided
+      const contactData = dealData.contactData
+      if (contactData && (contactData.link || contactData.subscriberCount || contactData.contactMethods?.length || contactData.websiteOrTgChannel || contactData.contactInfo)) {
         const { createContact } = await import('@/lib/api/contacts')
         try {
           const contact = await createContact({
-            fullName: dealData.contactName || '',
-            phone: dealData.contactPhone,
-            email: dealData.contactEmail,
-            companyId: companyId,
+            fullName: dealData.title, // Use deal title as contact name
+            link: contactData.link,
+            subscriberCount: contactData.subscriberCount,
+            contactMethods: contactData.contactMethods,
+            websiteOrTgChannel: contactData.websiteOrTgChannel,
+            contactInfo: contactData.contactInfo,
           })
           contactId = contact.id
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error)
           console.error('Failed to create contact:', errorMsg)
           // Continue without contact
-        }
-      }
-
-      // Create company if provided
-      if (dealData.companyName) {
-        const { createCompany } = await import('@/lib/api/companies')
-        try {
-          const company = await createCompany({
-            name: dealData.companyName,
-            address: dealData.companyAddress,
-          })
-          companyId = company.id
-          
-          // Update contact with company if contact was created
-          if (contactId && !dealData.contactName) {
-            const { updateContact } = await import('@/lib/api/contacts')
-            try {
-              await updateContact(contactId, { companyId })
-            } catch (error) {
-              const errorMsg = error instanceof Error ? error.message : String(error)
-              console.error('Failed to update contact with company:', errorMsg)
-            }
-          }
-        } catch (error) {
-          console.error('Failed to create company:', error)
-          // Continue without company
         }
       }
 
@@ -2567,16 +2545,14 @@ export function DealsKanbanBoard({
         pipelineId: selectedPipeline?.id,
         stageId: dealData.stageId,
         contactId: contactId || undefined,
-        companyId: companyId || undefined,
       })
-      
+
       const newDeal = await createDeal({
         title: dealData.title,
         amount: dealData.amount,
         pipelineId: selectedPipeline.id,
         stageId: dealData.stageId,
         contactId,
-        companyId,
       })
 
       console.log('Deal created successfully:', newDeal?.id, newDeal?.title, newDeal?.amount)
