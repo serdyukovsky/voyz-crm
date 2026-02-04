@@ -5,25 +5,13 @@ import { Link } from 'react-router-dom'
 import { GripVertical } from 'lucide-react'
 import type { Deal, Stage } from "./kanban-board"
 import { TaskIndicator } from "./task-indicator"
+import { formatSmartDate } from "@/lib/utils/date-formatter"
 
 interface DealCardProps {
   deal: Deal
   stage: Stage
   onDragStart?: (deal: Deal) => void
   onDragEnd?: () => void
-}
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-  // Use fixed locale to avoid hydration mismatch
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDragEnd }: DealCardProps) {
@@ -117,7 +105,7 @@ export const DealCard = memo(function DealCard({ deal, stage, onDragStart, onDra
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              {formatRelativeTime(deal.updatedAt)}
+              {formatSmartDate(deal.updatedAt)}
             </span>
             <TaskIndicator tasks={deal.tasks} />
           </div>

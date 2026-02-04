@@ -9,8 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Settings } from "lucide-react"
+import { Settings, ChevronDown } from "lucide-react"
 import { useTranslation } from "@/lib/i18n/i18n-context"
 
 interface CreateDealModalProps {
@@ -20,11 +19,13 @@ interface CreateDealModalProps {
     title: string
     amount: number
     stageId: string
-    contactName?: string
-    contactPhone?: string
-    contactEmail?: string
-    companyName?: string
-    companyAddress?: string
+    contactData?: {
+      link?: string
+      subscriberCount?: string
+      contactMethods?: string[]
+      websiteOrTgChannel?: string
+      contactInfo?: string
+    }
   }) => Promise<void>
   stageId: string
   pipelineId: string
@@ -32,10 +33,17 @@ interface CreateDealModalProps {
   totalAmount?: number
 }
 
-export function CreateDealModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
+const CONTACT_METHOD_OPTIONS = ['Whatsapp', 'Telegram', 'Direct']
+const CONTACT_METHOD_LABELS: Record<string, string> = {
+  'Whatsapp': 'WhatsApp',
+  'Telegram': 'Telegram',
+  'Direct': 'Напрямую',
+}
+
+export function CreateDealModal({
+  isOpen,
+  onClose,
+  onSave,
   stageId,
   pipelineId,
   dealsCount = 0,
@@ -43,46 +51,88 @@ export function CreateDealModal({
 }: CreateDealModalProps) {
   const { t } = useTranslation()
   const [title, setTitle] = useState("")
-  const [amount, setAmount] = useState("0")
-  const [contactName, setContactName] = useState("")
-  const [contactPhone, setContactPhone] = useState("")
-  const [contactEmail, setContactEmail] = useState("")
-  const [companyName, setCompanyName] = useState("")
-  const [companyAddress, setCompanyAddress] = useState("")
+  const [link, setLink] = useState("")
+  const [subscriberCount, setSubscriberCount] = useState("")
+  const [contactMethods, setContactMethods] = useState<string[]>([])
+  const [websiteOrTgChannel, setWebsiteOrTgChannel] = useState("")
+  const [contactInfo, setContactInfo] = useState("")
+  const [openMethodsDropdown, setOpenMethodsDropdown] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       // Reset form when opening
       setTitle("")
-      setAmount("0")
-      setContactName("")
-      setContactPhone("")
-      setContactEmail("")
-      setCompanyName("")
-      setCompanyAddress("")
+      setLink("")
+      setSubscriberCount("")
+      setContactMethods([])
+      setWebsiteOrTgChannel("")
+      setContactInfo("")
+      setOpenMethodsDropdown(false)
       setLoading(false)
     }
   }, [isOpen])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.methods-dropdown-container')) {
+        setOpenMethodsDropdown(false)
+      }
+    }
+
+    if (openMethodsDropdown) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [openMethodsDropdown])
+
   const handleSave = async () => {
     if (!title.trim()) return
 
+    // Debug: Log stageId from props before sending
+    console.log('CreateDealModal.handleSave - stageId from props:', {
+      stageId,
+      type: typeof stageId,
+      pipelineId,
+      pipelineIdType: typeof pipelineId
+    })
+
+    // Validate stageId is a valid UUID
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return typeof str === 'string' && uuidRegex.test(str)
+    }
+
+    if (!isValidUUID(stageId)) {
+      console.error('CreateDealModal: INVALID STAGE ID!', {
+        stageId,
+        type: typeof stageId,
+        isObjectString: stageId === '[object Object]'
+      })
+      return
+    }
+
     setLoading(true)
     try {
-      const amountValue = amount ? parseFloat(amount.replace(/[^0-9.,]/g, "").replace(",", ".")) : 0
-      
-      await onSave({
+      const dealData = {
         title: title.trim(),
-        amount: amountValue,
+        amount: 0,
         stageId,
-        contactName: contactName.trim() || undefined,
-        contactPhone: contactPhone.trim() || undefined,
-        contactEmail: contactEmail.trim() || undefined,
-        companyName: companyName.trim() || undefined,
-        companyAddress: companyAddress.trim() || undefined,
-      })
-      
+        contactData: {
+          link: link.trim() || undefined,
+          subscriberCount: subscriberCount.trim() || undefined,
+          contactMethods: contactMethods.length > 0 ? contactMethods : undefined,
+          websiteOrTgChannel: websiteOrTgChannel.trim() || undefined,
+          contactInfo: contactInfo.trim() || undefined,
+        }
+      }
+
+      console.log('CreateDealModal.handleSave - calling onSave with:', dealData)
+
+      await onSave(dealData)
+
       onClose()
     } catch (error) {
       console.error('Failed to create deal:', error instanceof Error ? error.message : String(error))
@@ -92,10 +142,12 @@ export function CreateDealModal({
     }
   }
 
-  const formatAmount = (value: string) => {
-    // Remove all non-numeric characters except comma and dot
-    const cleaned = value.replace(/[^0-9.,]/g, "")
-    return cleaned
+  const toggleContactMethod = (method: string) => {
+    setContactMethods(prev =>
+      prev.includes(method)
+        ? prev.filter(m => m !== method)
+        : [...prev, method]
+    )
   }
 
   return (
@@ -117,9 +169,9 @@ export function CreateDealModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t('deals.dealName') || 'Название'}
-              className="h-10"
+              className="h-12 text-base rounded-lg"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
                   e.preventDefault()
                   handleSave()
                 }
@@ -131,16 +183,15 @@ export function CreateDealModal({
             />
           </div>
 
-          {/* Сумма */}
+          {/* Ссылка */}
           <div>
             <Input
-              type="text"
-              value={amount}
-              onChange={(e) => setAmount(formatAmount(e.target.value))}
-              placeholder="0 ₽"
-              className="h-10"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder={t('contacts.link') || 'Ссылка'}
+              className="h-12 text-base rounded-lg"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
                   e.preventDefault()
                   handleSave()
                 }
@@ -148,15 +199,15 @@ export function CreateDealModal({
             />
           </div>
 
-          {/* Контакт: Имя */}
+          {/* Кол-во подписчиков */}
           <div>
             <Input
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder={t('deals.contactName') || 'Контакт: Имя'}
-              className="h-10"
+              value={subscriberCount}
+              onChange={(e) => setSubscriberCount(e.target.value)}
+              placeholder={t('contacts.subscriberCount') || 'Кол-во подписчиков'}
+              className="h-12 text-base rounded-lg"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
                   e.preventDefault()
                   handleSave()
                 }
@@ -164,16 +215,54 @@ export function CreateDealModal({
             />
           </div>
 
-          {/* Контакт: Телефон */}
+          {/* Способ связи - Multi-select Dropdown */}
+          <div className="methods-dropdown-container relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenMethodsDropdown(!openMethodsDropdown)
+              }}
+              className="w-full h-12 px-3 flex items-center justify-between rounded-lg border border-input bg-background text-base"
+            >
+              <span className={contactMethods.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                {contactMethods.length > 0
+                  ? contactMethods.map(m => CONTACT_METHOD_LABELS[m] || m).join(', ')
+                  : t('contacts.contactMethods') || "Способ связи"
+                }
+              </span>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openMethodsDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {openMethodsDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-input bg-card shadow-lg z-50 p-2 space-y-1">
+                {CONTACT_METHOD_OPTIONS.map((method) => (
+                  <div key={method} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent/50">
+                    <input
+                      type="checkbox"
+                      id={`create-method-${method}`}
+                      checked={contactMethods.includes(method)}
+                      onChange={() => toggleContactMethod(method)}
+                      className="h-4 w-4 rounded border border-border cursor-pointer"
+                    />
+                    <label htmlFor={`create-method-${method}`} className="text-sm cursor-pointer flex-1">
+                      {CONTACT_METHOD_LABELS[method] || method}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Сайт, тг канал */}
           <div>
             <Input
-              type="tel"
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              placeholder={t('deals.contactPhone') || 'Контакт: Телефон'}
-              className="h-10"
+              value={websiteOrTgChannel}
+              onChange={(e) => setWebsiteOrTgChannel(e.target.value)}
+              placeholder={t('contacts.websiteOrTgChannel') || 'Сайт, тг канал'}
+              className="h-12 text-base rounded-lg"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
                   e.preventDefault()
                   handleSave()
                 }
@@ -181,48 +270,15 @@ export function CreateDealModal({
             />
           </div>
 
-          {/* Контакт: Email */}
+          {/* Контакт */}
           <div>
             <Input
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              placeholder={t('deals.contactEmail') || 'Контакт: Email'}
-              className="h-10"
+              value={contactInfo}
+              onChange={(e) => setContactInfo(e.target.value)}
+              placeholder={t('contacts.contactInfo') || 'Контакт'}
+              className="h-12 text-base rounded-lg"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
-
-          {/* Компания: Название */}
-          <div>
-            <Input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder={t('deals.companyName') || 'Компания: Название'}
-              className="h-10"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSave()
-                }
-              }}
-            />
-          </div>
-
-          {/* Компания: Адрес */}
-          <div>
-            <Input
-              value={companyAddress}
-              onChange={(e) => setCompanyAddress(e.target.value)}
-              placeholder={t('deals.companyAddress') || 'Компания: Адрес'}
-              className="h-10"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !openMethodsDropdown) {
                   e.preventDefault()
                   handleSave()
                 }
@@ -232,31 +288,31 @@ export function CreateDealModal({
 
           {/* Кнопки */}
           <div className="flex gap-2 pt-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={onClose}
-              className="flex-1"
+              className="flex-1 h-12 text-base rounded-lg"
               disabled={loading}
             >
-              {t('common.cancel') || 'Отменить'}
+              {t('common.cancel') || 'Отмена'}
             </Button>
-            <Button 
-              onClick={handleSave} 
+            <Button
+              onClick={handleSave}
               disabled={!title.trim() || loading}
-              className="flex-1"
+              className="flex-1 h-12 text-base rounded-lg"
             >
               {t('common.add') || 'Добавить'}
             </Button>
             <Button
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="h-10 w-10"
+              className="h-12 w-12 rounded-lg"
               onClick={() => {
                 // TODO: Open settings
               }}
               title={t('common.settings') || 'Настройки'}
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -264,4 +320,3 @@ export function CreateDealModal({
     </Dialog>
   )
 }
-

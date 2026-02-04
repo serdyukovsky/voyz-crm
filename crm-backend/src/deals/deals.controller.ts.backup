@@ -47,20 +47,12 @@ export class DealsController {
   @ApiOperation({ summary: 'Create a new deal' })
   @ApiResponse({ status: 201, description: 'Deal created' })
   async create(@Body() createDealDto: any, @CurrentUser() user: any) {
-    console.log('🔵 DealsController.create - request:', {
-      pipelineId: createDealDto?.pipelineId,
-      stageId: createDealDto?.stageId,
-      title: createDealDto?.title,
-      amount: createDealDto?.amount,
-      userId: user?.userId || user?.id,
-    });
-    
     try {
       const result = await this.dealsService.create(createDealDto, user.userId || user.id);
-      console.log('✅ DealsController.create - success, deal id:', result?.id);
       return result;
     } catch (error) {
-      console.error('❌ DealsController.create - error:', error);
+      console.error('DealsController.create - error:', error);
+      console.error('DealsController.create - error stack:', error instanceof Error ? error.stack : 'No stack');
       throw error;
     }
   }
@@ -100,10 +92,10 @@ export class DealsController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
-    // Allow up to 10000 deals per request for kanban boards
-    // Default limit is 50 if not specified
+    // For kanban boards, allow larger limits (up to 10000)
+    // For regular lists, limit to 100 for performance
     const requestedLimit = limit ? parseInt(limit, 10) : 50;
-    const limitNum = Math.min(requestedLimit, 10000);
+    const limitNum = requestedLimit > 1000 ? Math.min(requestedLimit, 10000) : Math.min(requestedLimit, 100);
     const parsedStageIds = this.parseList(stageIds);
     const combinedStageIds = stageId ? [stageId, ...(parsedStageIds || [])] : parsedStageIds;
 

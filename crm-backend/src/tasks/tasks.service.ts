@@ -112,6 +112,7 @@ export class TasksService {
     contactId?: string;
     assignedToId?: string;
     status?: TaskStatus;
+    search?: string;
     limit?: number;
     cursor?: string; // base64 encoded cursor
   }): Promise<PaginatedResponse<any> | any[]> {
@@ -122,6 +123,14 @@ export class TasksService {
     if (filters?.contactId) where.contactId = filters.contactId;
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
     if (filters?.status) where.status = filters.status;
+
+    // Search filter (search across title and description)
+    if (filters?.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { description: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
 
     // Hard limit for performance (optimization: prevent loading all tasks)
     // Allow up to 10000 tasks per request for kanban boards

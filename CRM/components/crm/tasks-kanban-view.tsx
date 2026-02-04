@@ -121,22 +121,17 @@ const getDateCategories = (t: (key: string) => string): DateCategory[] => [
 interface TasksKanbanViewProps {
   searchQuery: string
   userFilter: string
-  dealFilter: string
-  contactFilter: string
-  dateFilter: string
-  statusFilter: string
   selectedTaskId?: string | null
   onTaskSelect?: (taskId: string | null) => void
 }
 
-export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFilter, dateFilter, statusFilter, selectedTaskId, onTaskSelect }: TasksKanbanViewProps) {
+export function TasksKanbanView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }: TasksKanbanViewProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
   const [tasks, setTasks] = useState<Task[]>([])
 
   // Use infinite scroll for tasks (100 per page instead of loading all 10000 at once)
   const { data, isLoading: loading, error: tasksError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteTasks({
-    status: statusFilter || undefined,
     pageSize: 100,
     enabled: true,
   })
@@ -201,39 +196,13 @@ export function TasksKanbanView({ searchQuery, userFilter, dealFilter, contactFi
     return tasks.filter(task => {
     // Search filter
     if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    
-    // User filter
-    if (userFilter && task.assignee !== userFilter) return false
-    
-    // Deal filter
-    if (dealFilter && task.dealName !== dealFilter) return false
-    
-    // Contact filter
-    if (contactFilter && task.contactId !== contactFilter) return false
-    
-    // Status filter
-    if (statusFilter === "completed" && !task.completed) return false
-    if (statusFilter === "incomplete" && task.completed) return false
-    
-    // Date filter
-    if (dateFilter) {
-      const taskDate = new Date(task.dueDate)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      if (dateFilter === "today" && taskDate.toDateString() !== today.toDateString()) return false
-      if (dateFilter === "overdue" && taskDate >= today) return false
-      if (dateFilter === "upcoming" && taskDate <= today) return false
-      if (dateFilter === "this week") {
-        const weekFromNow = new Date(today)
-        weekFromNow.setDate(weekFromNow.getDate() + 7)
-        if (taskDate < today || taskDate > weekFromNow) return false
-      }
-    }
-    
+
+    // User filter - compare by assigneeId
+    if (userFilter && task.assigneeId !== userFilter) return false
+
     return true
     })
-  }, [tasks, searchQuery, userFilter, dealFilter, contactFilter, dateFilter, t])
+  }, [tasks, searchQuery, userFilter])
 
   // Get all date categories
   const allCategories = useMemo(() => getDateCategories(t), [t])

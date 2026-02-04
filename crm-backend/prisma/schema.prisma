@@ -197,6 +197,7 @@ model Deal {
   expectedCloseAt   DateTime?
   closedAt          DateTime?
   description       String?
+  link              String?
   tags              String[]           @default([])
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt

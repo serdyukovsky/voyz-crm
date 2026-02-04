@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useChatThreads, useChatThread, useCreateThread, useSendMessage } from '@/hooks/use-chat'
 import { getUsers, type User } from '@/lib/api/users'
 import { formatDistanceToNow } from 'date-fns'
+import { ru } from 'date-fns/locale'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface ChatPanelProps {
@@ -454,7 +455,7 @@ export function ChatPanel({
                                     </div>
                                   )}
                                   <span className="text-xs text-muted-foreground mt-1">
-                                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true, locale: ru })}
                                   </span>
                                 </div>
                               </div>

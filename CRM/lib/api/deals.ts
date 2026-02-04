@@ -7,6 +7,7 @@ export interface Deal {
   amount: number
   budget?: number | null
   description?: string | null
+  link?: string | null
   createdById?: string
   expectedCloseAt?: string | null
   closedAt?: string | null
@@ -100,7 +101,9 @@ export async function getDeals(params?: {
   }
 
   const queryParams = new URLSearchParams()
-  if (params?.search) queryParams.append('search', params.search)
+  // Use title as search if search is not provided (for backward compatibility)
+  const searchValue = params?.search || params?.title
+  if (searchValue) queryParams.append('search', searchValue)
   if (params?.pipelineId) queryParams.append('pipelineId', params.pipelineId)
   if (params?.stageId) queryParams.append('stageId', params.stageId)
   if (params?.stageIds?.length) queryParams.append('stageIds', params.stageIds.join(','))
@@ -108,7 +111,6 @@ export async function getDeals(params?: {
   if (params?.contactId) queryParams.append('contactId', params.contactId)
   if (params?.companyId) queryParams.append('companyId', params.companyId)
   if (params?.createdById) queryParams.append('createdById', params.createdById)
-  if (params?.title) queryParams.append('title', params.title)
   if (params?.number) queryParams.append('number', params.number)
   if (params?.description) queryParams.append('description', params.description)
   if (params?.amountMin !== undefined) queryParams.append('amountMin', String(params.amountMin))
@@ -133,6 +135,10 @@ export async function getDeals(params?: {
   try {
     const API_BASE_URL = getApiBaseUrl()
     const url = `${API_BASE_URL}/deals?${queryParams.toString()}`
+
+    if (params?.search || params?.title) {
+      console.log('🔍 getDeals: Searching with URL:', url)
+    }
 
     const response = await fetch(url, {
       headers: {
@@ -159,6 +165,14 @@ export async function getDeals(params?: {
     }
 
     const data = await response.json()
+
+    if (params?.search || params?.title) {
+      console.log('🔍 getDeals: Received', data?.data?.length || 0, 'deals')
+      const dealsWithLinks = data?.data?.filter((d: Deal) => d.link) || []
+      if (dealsWithLinks.length > 0) {
+        console.log('🔗 getDeals: Deals with links:', dealsWithLinks.map((d: Deal) => ({ title: d.title, link: d.link })))
+      }
+    }
 
     // API always returns paginated response now
     if (data && typeof data === 'object' && 'data' in data && 'hasMore' in data) {
@@ -223,17 +237,75 @@ export async function createDeal(data: {
   }
 
   try {
+    // DEBUG: Log incoming data with full details
+    console.log('createDeal - incoming data:', JSON.stringify(data, null, 2))
+    console.log('createDeal - stageId:', {
+      type: typeof data.stageId,
+      value: data.stageId,
+      isObject: typeof data.stageId === 'object',
+      stringified: String(data.stageId)
+    })
+
+    // UUID validation helper
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return uuidRegex.test(str)
+    }
+
+    // Helper to extract ID from value (handles objects with id property)
+    const extractId = (value: any, fieldName: string): string | undefined => {
+      console.log(`extractId(${fieldName}):`, { type: typeof value, value, isObject: typeof value === 'object' })
+
+      if (!value) return undefined
+
+      // If it's already a string, check if it's valid
+      if (typeof value === 'string') {
+        // Detect corrupted values
+        if (value === '[object Object]' || value.includes('[object')) {
+          console.error(`extractId(${fieldName}): CORRUPTED VALUE DETECTED! Got "${value}" instead of UUID`)
+          throw new Error(`Invalid ${fieldName}: value was corrupted to "${value}". This is a bug - please report it.`)
+        }
+        return value
+      }
+
+      // If it's an object with id property, extract the id
+      if (typeof value === 'object' && value !== null) {
+        if (value.id) {
+          const id = String(value.id)
+          console.log(`extractId(${fieldName}): extracted id from object:`, id)
+          return id
+        }
+        // Object without id - this shouldn't happen
+        console.error(`extractId(${fieldName}): Object without id property:`, value)
+        throw new Error(`Invalid ${fieldName}: received object without id property`)
+      }
+
+      return String(value)
+    }
+
     // Clean data to remove any circular references or non-serializable values
     const cleanData = {
       title: String(data.title || ''),
       amount: data.amount !== undefined ? Number(data.amount) : 0,
-      pipelineId: String(data.pipelineId || ''),
-      stageId: String(data.stageId || ''),
-      contactId: data.contactId ? String(data.contactId) : undefined,
-      companyId: data.companyId ? String(data.companyId) : undefined,
-      assignedToId: data.assignedToId ? String(data.assignedToId) : undefined,
+      pipelineId: extractId(data.pipelineId, 'pipelineId') || '',
+      stageId: extractId(data.stageId, 'stageId') || '',
+      contactId: extractId(data.contactId, 'contactId'),
+      companyId: extractId(data.companyId, 'companyId'),
+      assignedToId: extractId(data.assignedToId, 'assignedToId'),
       description: data.description ? String(data.description) : undefined,
     }
+
+    // Validate required fields are valid UUIDs
+    if (!isValidUUID(cleanData.pipelineId)) {
+      console.error('createDeal: Invalid pipelineId:', cleanData.pipelineId)
+      throw new Error(`Invalid pipelineId: "${cleanData.pipelineId}" is not a valid UUID`)
+    }
+    if (!isValidUUID(cleanData.stageId)) {
+      console.error('createDeal: Invalid stageId:', cleanData.stageId)
+      throw new Error(`Invalid stageId: "${cleanData.stageId}" is not a valid UUID`)
+    }
+
+    console.log('createDeal - cleanData validated:', cleanData)
     
     const API_BASE_URL = getApiBaseUrl()
     const response = await fetch(`${API_BASE_URL}/deals`, {
