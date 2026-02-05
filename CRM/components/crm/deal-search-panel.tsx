@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { CheckCircle2, XCircle, AlertCircle, Calendar, User, Building2, Contact, Filter } from 'lucide-react'
+import { CheckCircle2, XCircle, AlertCircle, Calendar, User, Contact, Filter } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { getPipelines, type Pipeline, type Stage } from '@/lib/api/pipelines'
 import { getContacts } from '@/lib/api/contacts'
-import { getCompanies } from '@/lib/api/companies'
 import { getUsers } from '@/lib/api/users'
 import { getDeals, type Deal } from '@/lib/api/deals'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -23,7 +22,6 @@ export interface DealSearchFilters {
   stageIds?: string[]
   assignedToId?: string
   contactId?: string
-  companyId?: string
   createdById?: string
   amountMin?: number
   amountMax?: number
@@ -64,7 +62,6 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const { isCollapsed } = useSidebar()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [contacts, setContacts] = useState<any[]>([])
-  const [companies, setCompanies] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -74,7 +71,6 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false)
   const [isCreatedByOpen, setIsCreatedByOpen] = useState(false)
   const [isContactOpen, setIsContactOpen] = useState(false)
-  const [isCompanyOpen, setIsCompanyOpen] = useState(false)
   const [isDirectionsOpen, setIsDirectionsOpen] = useState(false)
   const [isTasksOpen, setIsTasksOpen] = useState(false)
   const [allDirections, setAllDirections] = useState<string[]>([])
@@ -82,7 +78,6 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   const assignedToRef = useRef<HTMLDivElement>(null)
   const createdByRef = useRef<HTMLDivElement>(null)
   const contactRef = useRef<HTMLDivElement>(null)
-  const companyRef = useRef<HTMLDivElement>(null)
   const directionsRef = useRef<HTMLDivElement>(null)
   const tasksRef = useRef<HTMLDivElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -100,17 +95,15 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
     const loadData = async () => {
       setLoading(true)
       try {
-        const [pipelinesData, contactsData, companiesData, usersData, dealsData] = await Promise.all([
+        const [pipelinesData, contactsData, usersData, dealsData] = await Promise.all([
           getPipelines().catch(() => []),
           getContacts().catch(() => []),
-          getCompanies().catch(() => []),
           getUsers().catch(() => []),
           getDeals().then(r => r.data).catch(() => [])
         ])
 
         setPipelines(pipelinesData)
         setContacts(contactsData)
-        setCompanies(companiesData)
         setUsers(usersData.filter(u => u.isActive))
 
         // Собираем все уникальные теги из сделок
@@ -289,16 +282,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
           setIsContactOpen(false)
         }
       }
-      
-      // Закрываем список компаний
-      if (isCompanyOpen && companyRef.current) {
-        const isInsideList = companyRef.current.contains(target)
-        const isOnButton = target.closest('[data-company-button]')
-        if (!isInsideList && !isOnButton) {
-          setIsCompanyOpen(false)
-        }
-      }
-      
+
       // Закрываем список направлений
       if (isDirectionsOpen && directionsRef.current) {
         const isInsideList = directionsRef.current.contains(target)
@@ -318,13 +302,13 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
       }
     }
 
-    if (isStagesOpen || isAssignedToOpen || isCreatedByOpen || isContactOpen || isCompanyOpen || isDirectionsOpen || isTasksOpen) {
+    if (isStagesOpen || isAssignedToOpen || isCreatedByOpen || isContactOpen || isDirectionsOpen || isTasksOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => {
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isStagesOpen, isAssignedToOpen, isCreatedByOpen, isContactOpen, isCompanyOpen, isDirectionsOpen, isTasksOpen])
+  }, [isStagesOpen, isAssignedToOpen, isCreatedByOpen, isContactOpen, isDirectionsOpen, isTasksOpen])
 
   if (!open) return null
 
@@ -978,67 +962,6 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
                               )}
                             >
                               {contact.fullName}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
-              </div>
-
-              {/* Компания */}
-              <div className="space-y-1.5">
-                {(() => {
-                  const selectedCompany = companies.find(c => c.id === filters.companyId)
-                  return (
-                    <>
-                      <button
-                        data-company-button
-                        onClick={() => setIsCompanyOpen(!isCompanyOpen)}
-                        className={cn(
-                          "w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-transparent",
-                          "hover:bg-accent/50 transition-colors",
-                          "flex items-center gap-2",
-                          "group",
-                          "text-foreground/70 hover:text-foreground",
-                          isCompanyOpen && "bg-accent"
-                        )}
-                      >
-                        <Building2 className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-                        <span className="truncate">
-                          {selectedCompany 
-                            ? selectedCompany.name
-                            : t('deals.search.fields.company') || 'Компания'}
-                        </span>
-                      </button>
-                      {isCompanyOpen && (
-                        <div 
-                          ref={companyRef}
-                          className="bg-muted/30 rounded-md p-2 space-y-0.5 max-h-96 overflow-y-auto"
-                        >
-                          <button
-                            onClick={() => {
-                              setFilters({ ...filters, companyId: undefined })
-                              setIsCompanyOpen(false)
-                            }}
-                            className="w-full text-left px-3 py-1.5 rounded-md text-xs h-7 border border-input bg-background hover:bg-accent/50 transition-colors"
-                          >
-                            {t('deals.search.allValues') || 'Все значения'}
-                          </button>
-                          {companies.map((company) => (
-                            <button
-                              key={company.id}
-                              onClick={() => {
-                                setFilters({ ...filters, companyId: company.id })
-                                setIsCompanyOpen(false)
-                              }}
-                              className={cn(
-                                "w-full text-left px-3 py-1.5 rounded-md text-xs hover:bg-accent/50 transition-colors",
-                                filters.companyId === company.id && "bg-accent"
-                              )}
-                            >
-                              {company.name}
                             </button>
                           ))}
                         </div>
