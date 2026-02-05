@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { LayoutDashboard, Target, CheckSquare, BarChart3, ScrollText, Upload, Users, Settings, Moon, Sun, ChevronLeft, ChevronRight, Contact, Building2, Languages, MessageSquare } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from "@/lib/utils"
@@ -8,21 +8,22 @@ import { useTheme } from 'next-themes'
 import { useSidebar } from './sidebar-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useChatContext } from './chat-context'
+import { useUserRole } from '@/hooks/use-user-role'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const navItemsConfig = [
-  { href: "/", icon: LayoutDashboard, key: "common.dashboard" },
-  { href: "/deals", icon: Target, key: "common.deals" },
-  { href: "/tasks", icon: CheckSquare, key: "common.tasks" },
-  { href: "/contacts", icon: Contact, key: "common.contacts" },
-  { href: "/companies", icon: Building2, key: "common.companies" },
-  { href: "/messages", icon: MessageSquare, key: "common.messages" },
-  { href: "/analytics", icon: BarChart3, key: "common.analytics" },
-  { href: "/logs", icon: ScrollText, key: "common.logs" },
-  { href: "/import-export", icon: Upload, key: "common.importExport" },
-  { href: "/users", icon: Users, key: "common.users" },
-  { href: "/settings", icon: Settings, key: "common.settings" },
+  { href: "/", icon: LayoutDashboard, key: "common.dashboard", adminOnly: false },
+  { href: "/deals", icon: Target, key: "common.deals", adminOnly: false },
+  { href: "/tasks", icon: CheckSquare, key: "common.tasks", adminOnly: false },
+  { href: "/contacts", icon: Contact, key: "common.contacts", adminOnly: false },
+  { href: "/companies", icon: Building2, key: "common.companies", adminOnly: true },
+  { href: "/messages", icon: MessageSquare, key: "common.messages", adminOnly: true },
+  { href: "/analytics", icon: BarChart3, key: "common.analytics", adminOnly: true },
+  { href: "/logs", icon: ScrollText, key: "common.logs", adminOnly: true },
+  { href: "/import-export", icon: Upload, key: "common.importExport", adminOnly: true },
+  { href: "/users", icon: Users, key: "common.users", adminOnly: false },
+  { href: "/settings", icon: Settings, key: "common.settings", adminOnly: false },
 ]
 
 export function Sidebar() {
@@ -34,6 +35,7 @@ export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const { t, language, setLanguage } = useTranslation()
   const chatContext = useChatContext()
+  const { isAdmin } = useUserRole()
 
   useEffect(() => {
     setMounted(true)
@@ -41,7 +43,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!mounted) return
-    
+
     const updateTheme = () => {
       if (theme === 'dark') {
         setIsDark(true)
@@ -51,20 +53,25 @@ export function Sidebar() {
         setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
       }
     }
-    
+
     updateTheme()
-    
+
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       mediaQuery.addEventListener('change', updateTheme)
       return () => mediaQuery.removeEventListener('change', updateTheme)
     }
   }, [theme, mounted])
-  
-  const navItems = navItemsConfig.map(item => ({
-    ...item,
-    label: t(item.key)
-  }))
+
+  // Filter nav items based on user role
+  const navItems = useMemo(() => {
+    return navItemsConfig
+      .filter(item => !item.adminOnly || isAdmin)
+      .map(item => ({
+        ...item,
+        label: t(item.key)
+      }))
+  }, [isAdmin, t])
 
   return (
     <TooltipProvider delayDuration={400}>
