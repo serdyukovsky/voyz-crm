@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { UserRole } from '@/lib/api/users'
 
 interface UseUserRoleOptions {
@@ -8,24 +8,41 @@ interface UseUserRoleOptions {
 }
 
 export function useUserRole({ userRole }: UseUserRoleOptions = {}) {
-  // Get role from localStorage or context if not provided
-  const currentRole = useMemo(() => {
-    if (userRole) return userRole
-    
-    if (typeof window !== 'undefined') {
-      const userStr = localStorage.getItem('user')
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr)
-          return user.role as UserRole
-        } catch {
-          return null
+  const [storedRole, setStoredRole] = useState<UserRole | null>(null)
+
+  // Read role from localStorage on mount and when it changes
+  useEffect(() => {
+    const readRole = () => {
+      if (typeof window !== 'undefined') {
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr)
+            setStoredRole(user.role as UserRole)
+          } catch {
+            setStoredRole(null)
+          }
+        } else {
+          setStoredRole(null)
         }
       }
     }
-    
-    return null
-  }, [userRole])
+
+    readRole()
+
+    // Listen for storage changes (e.g., login/logout in another tab)
+    window.addEventListener('storage', readRole)
+
+    // Custom event for same-tab updates
+    window.addEventListener('user-changed', readRole)
+
+    return () => {
+      window.removeEventListener('storage', readRole)
+      window.removeEventListener('user-changed', readRole)
+    }
+  }, [])
+
+  const currentRole = userRole || storedRole
 
   const isAdmin = currentRole === 'ADMIN'
   const isManager = currentRole === 'MANAGER' || isAdmin
