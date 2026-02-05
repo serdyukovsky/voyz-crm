@@ -366,6 +366,15 @@ export async function updateDeal(id: string, data: Partial<Deal> & { stageId?: s
   return response.json()
 }
 
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+    this.name = 'ApiError'
+  }
+}
+
 export async function deleteDeal(id: string): Promise<void> {
   const token = localStorage.getItem('access_token')
   if (!token) {
@@ -381,7 +390,7 @@ export async function deleteDeal(id: string): Promise<void> {
   })
 
   if (!response.ok) {
-    throw new Error('Failed to delete deal')
+    throw new ApiError('Failed to delete deal', response.status)
   }
 }
 

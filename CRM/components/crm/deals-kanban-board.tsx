@@ -214,8 +214,12 @@ function DealCard({
       await onDeleteDeal(deal.id)
       showSuccess('Сделка удалена')
       setShowDeleteDialog(false)
-    } catch (error) {
-      showError('Не удалось удалить сделку', error instanceof Error ? error.message : 'Неизвестная ошибка')
+    } catch (error: any) {
+      if (error?.status === 403) {
+        showError('Недостаточно прав', 'У вас нет прав для удаления сделок')
+      } else {
+        showError('Не удалось удалить сделку', error instanceof Error ? error.message : 'Неизвестная ошибка')
+      }
     } finally {
       setIsDeleting(false)
     }
