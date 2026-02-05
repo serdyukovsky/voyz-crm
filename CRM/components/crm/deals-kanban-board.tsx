@@ -2557,6 +2557,18 @@ export function DealsKanbanBoard({
         }
       }
 
+      // Get current user ID
+      let currentUserId: string | undefined
+      try {
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          const user = JSON.parse(userStr)
+          currentUserId = user.id
+        }
+      } catch (error) {
+        console.error('Failed to get current user:', error)
+      }
+
       // Create deal
       const { createDeal } = await import('@/lib/api/deals')
       console.log('Creating deal with data:', {
@@ -2565,6 +2577,7 @@ export function DealsKanbanBoard({
         pipelineId: selectedPipeline?.id,
         stageId: dealData.stageId,
         contactId: contactId || undefined,
+        assignedToId: currentUserId,
       })
 
       const newDeal = await createDeal({
@@ -2573,6 +2586,7 @@ export function DealsKanbanBoard({
         pipelineId: selectedPipeline.id,
         stageId: dealData.stageId,
         contactId,
+        assignedToId: currentUserId,
       })
 
       console.log('Deal created successfully:', newDeal?.id, newDeal?.title, newDeal?.amount)
