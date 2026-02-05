@@ -215,7 +215,8 @@ const demoDeals: Deal[] = [
 
 export default function DealsPage() {
   useAuthGuard()
-  const { isAdmin } = useUserRole()
+  const { isAdmin, role } = useUserRole()
+  console.log('🔐 DealsPage: isAdmin =', isAdmin, ', role =', role)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { searchValue, dealFilters } = useSearch()
