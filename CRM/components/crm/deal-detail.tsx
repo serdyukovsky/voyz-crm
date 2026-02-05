@@ -858,7 +858,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     linkTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { link: value || undefined }, dealId)
+                        // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
+                        await updateContact(contactId, { link: value || null }, dealId)
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
@@ -899,7 +900,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     subscriberCountTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { subscriberCount: value || undefined }, dealId)
+                        // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
+                        await updateContact(contactId, { subscriberCount: value || null }, dealId)
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly (not on every keystroke)
@@ -1127,7 +1129,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     websiteTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { websiteOrTgChannel: value || undefined }, dealId)
+                        // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
+                        await updateContact(contactId, { websiteOrTgChannel: value || null }, dealId)
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
@@ -1167,7 +1170,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     contactInfoTimeoutRef.current = setTimeout(async () => {
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
-                        await updateContact(contactId, { contactInfo: value || undefined }, dealId)
+                        // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
+                        await updateContact(contactId, { contactInfo: value || null }, dealId)
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
