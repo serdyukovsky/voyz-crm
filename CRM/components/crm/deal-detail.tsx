@@ -859,8 +859,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
                         await updateContact(contactId, { link: value || undefined }, dealId)
-                        await refetchDeal()
-                        await refetchActivities()
+                        // Invalidate contact cache instead of refetching entire deal
+                        queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                        // Only refetch activities if value changed significantly
+                        if (deal?.contact?.link !== value) {
+                          await refetchActivities()
+                        }
                       } catch (error) {
                         console.error('Failed to update link:', error)
                         // Restore previous value on error
@@ -896,8 +900,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
                         await updateContact(contactId, { subscriberCount: value || undefined }, dealId)
-                        await refetchDeal()
-                        await refetchActivities()
+                        // Invalidate contact cache instead of refetching entire deal
+                        queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                        // Only refetch activities if value changed significantly (not on every keystroke)
+                        if (deal?.contact?.subscriberCount !== value) {
+                          await refetchActivities()
+                        }
                       } catch (error) {
                         console.error('Failed to update subscriber count:', error)
                         setContactSubscriberCount(deal?.contact?.subscriberCount || '')
@@ -1120,8 +1128,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
                         await updateContact(contactId, { websiteOrTgChannel: value || undefined }, dealId)
-                        await refetchDeal()
-                        await refetchActivities()
+                        // Invalidate contact cache instead of refetching entire deal
+                        queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                        // Only refetch activities if value changed significantly
+                        if (deal?.contact?.websiteOrTgChannel !== value) {
+                          await refetchActivities()
+                        }
                       } catch (error) {
                         console.error('Failed to update website/TG channel:', error)
                         setContactWebsite(deal?.contact?.websiteOrTgChannel || '')
@@ -1156,8 +1168,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                       try {
                         const contactId = deal?.contact?.id || await ensureContact()
                         await updateContact(contactId, { contactInfo: value || undefined }, dealId)
-                        await refetchDeal()
-                        await refetchActivities()
+                        // Invalidate contact cache instead of refetching entire deal
+                        queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                        // Only refetch activities if value changed significantly
+                        if (deal?.contact?.contactInfo !== value) {
+                          await refetchActivities()
+                        }
                       } catch (error) {
                         console.error('Failed to update contact info:', error)
                         setContactInfo(deal?.contact?.contactInfo || '')
