@@ -211,7 +211,7 @@ function DealsPageContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { searchValue, dealFilters } = useSearch()
-  const { canManagePipelines } = useUserRole()
+  const { canManagePipelines, isAdmin } = useUserRole()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -1334,15 +1334,17 @@ function DealsPageContent() {
                 <List className="h-4 w-4" />
               </button>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsEditMode(!isEditMode)}
-              className="text-xs"
-            >
-              <Settings className="mr-2 h-4 w-4 shrink-0" />
-              {t('settings.title')}
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditMode(!isEditMode)}
+                className="text-xs"
+              >
+                <Settings className="mr-2 h-4 w-4 shrink-0" />
+                {t('settings.title')}
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="text-xs">
