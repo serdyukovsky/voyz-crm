@@ -1130,11 +1130,23 @@ function DealsPageContent() {
         showError(t('deals.noPipelineSelected'), t('deals.selectOrCreatePipeline'))
         return
       }
-      
+
       const currentFunnel = pipelines.find(p => p.id === currentFunnelId)
       if (!currentFunnel || !currentFunnel.stages || currentFunnel.stages.length === 0) {
         showError(t('deals.noPipelineAvailable'), t('deals.createPipelineWithStages'))
         return
+      }
+
+      // Get current user ID
+      let currentUserId: string | undefined
+      try {
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          const user = JSON.parse(userStr)
+          currentUserId = user.id
+        }
+      } catch (error) {
+        console.error('Failed to get current user:', error)
       }
 
       // Use provided stageId or default to first stage
@@ -1146,6 +1158,7 @@ function DealsPageContent() {
         pipelineId: currentFunnelId,
         stageId: targetStageId,
         status: 'open',
+        assignedToId: currentUserId,
       })
 
       showSuccess(t('deals.dealCreatedSuccess'))
