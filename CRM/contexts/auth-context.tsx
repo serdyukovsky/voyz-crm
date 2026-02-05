@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Update localStorage with fresh user data
       localStorage.setItem('user', JSON.stringify(userData))
+      // Notify other components about user change
+      window.dispatchEvent(new Event('user-changed'))
     } catch (error) {
       // Distinguish between auth failures and network errors
       if (error instanceof NetworkError) {
@@ -206,6 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(userData)
     setAuthStatus('authenticated')
+    // Notify other components about user change
+    window.dispatchEvent(new Event('user-changed'))
   }, [])
 
   const logout = useCallback(async () => {
@@ -237,7 +241,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('user')
       localStorage.removeItem('user_id')
       localStorage.removeItem('userId')
-      
+      // Notify other components about user change
+      window.dispatchEvent(new Event('user-changed'))
+
       // Clear React Query cache
       queryClient.clear()
       
