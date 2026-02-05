@@ -46,6 +46,7 @@ import { createDeal, getDeals, deleteDeal, updateDeal, type Deal as APIDeal } fr
 import { getPipelines, createPipeline, createStage, type Pipeline, type Stage as PipelineStage } from "@/lib/api/pipelines"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useAuthGuard } from '@/hooks/use-auth-guard'
+import { useUserRole } from '@/hooks/use-user-role'
 import { useSearch } from "@/components/crm/search-context"
 
 const defaultFunnels: Funnel[] = [
@@ -214,6 +215,7 @@ const demoDeals: Deal[] = [
 
 export default function DealsPage() {
   useAuthGuard()
+  const { isAdmin } = useUserRole()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { searchValue, dealFilters } = useSearch()
@@ -843,18 +845,20 @@ export default function DealsPage() {
                           </button>
                         ))
                       )}
-                      <div className="border-t border-border/50">
-                        <button
-                          onClick={() => {
-                            setIsFunnelDropdownOpen(false)
-                            setIsSettingsOpen(true)
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Добавить воронку
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="border-t border-border/50">
+                          <button
+                            onClick={() => {
+                              setIsFunnelDropdownOpen(false)
+                              setIsSettingsOpen(true)
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Добавить воронку
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -907,18 +911,20 @@ export default function DealsPage() {
                         </button>
                       ))
                     )}
-                    <div className="border-t border-border/50">
-                      <button
-                        onClick={() => {
-                          setIsFunnelDropdownOpen(false)
-                          setIsSettingsOpen(true)
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Добавить воронку
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="border-t border-border/50">
+                        <button
+                          onClick={() => {
+                            setIsFunnelDropdownOpen(false)
+                            setIsSettingsOpen(true)
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Добавить воронку
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -958,14 +964,16 @@ export default function DealsPage() {
                 <List className="h-4 w-4" />
               </button>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsEditMode(!isEditMode)}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Настройки
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditMode(!isEditMode)}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Настройки
+              </Button>
+            )}
             <Button variant="outline" size="sm">
               <Filter className="mr-2 h-4 w-4" />
               Filter
