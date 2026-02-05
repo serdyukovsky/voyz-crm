@@ -386,13 +386,17 @@ export class ContactsService {
 
     // Handle new fields
     if (updateData.link !== undefined) {
-      dbUpdateData.link = sanitizeOptionalTextFields(updateData.link);
+      const sanitized = sanitizeOptionalTextFields(updateData.link);
+      // Use null to clear field in Prisma (undefined means "don't update")
+      dbUpdateData.link = sanitized === undefined ? null : sanitized;
       if (dbUpdateData.link !== existing.link) {
         changes.link = { old: existing.link, new: dbUpdateData.link };
       }
     }
     if (updateData.subscriberCount !== undefined) {
-      dbUpdateData.subscriberCount = sanitizeOptionalTextFields(updateData.subscriberCount);
+      const sanitized = sanitizeOptionalTextFields(updateData.subscriberCount);
+      // Use null to clear field in Prisma (undefined means "don't update")
+      dbUpdateData.subscriberCount = sanitized === undefined ? null : sanitized;
       if (dbUpdateData.subscriberCount !== existing.subscriberCount) {
         changes.subscriberCount = { old: existing.subscriberCount, new: dbUpdateData.subscriberCount };
       }
@@ -415,13 +419,17 @@ export class ContactsService {
       }
     }
     if (updateData.websiteOrTgChannel !== undefined) {
-      dbUpdateData.websiteOrTgChannel = sanitizeOptionalTextFields(updateData.websiteOrTgChannel);
+      const sanitized = sanitizeOptionalTextFields(updateData.websiteOrTgChannel);
+      // Use null to clear field in Prisma (undefined means "don't update")
+      dbUpdateData.websiteOrTgChannel = sanitized === undefined ? null : sanitized;
       if (dbUpdateData.websiteOrTgChannel !== existing.websiteOrTgChannel) {
         changes.websiteOrTgChannel = { old: existing.websiteOrTgChannel, new: dbUpdateData.websiteOrTgChannel };
       }
     }
     if (updateData.contactInfo !== undefined) {
-      dbUpdateData.contactInfo = sanitizeOptionalTextFields(updateData.contactInfo);
+      const sanitized = sanitizeOptionalTextFields(updateData.contactInfo);
+      // Use null to clear field in Prisma (undefined means "don't update")
+      dbUpdateData.contactInfo = sanitized === undefined ? null : sanitized;
       if (dbUpdateData.contactInfo !== existing.contactInfo) {
         changes.contactInfo = { old: existing.contactInfo, new: dbUpdateData.contactInfo };
       }

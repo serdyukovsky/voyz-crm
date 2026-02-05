@@ -1128,9 +1128,11 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     // Debounce API call
                     websiteTimeoutRef.current = setTimeout(async () => {
                       try {
+                        console.log('[websiteOrTgChannel] Updating with value:', value, 'sending:', value || null)
                         const contactId = deal?.contact?.id || await ensureContact()
                         // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
                         await updateContact(contactId, { websiteOrTgChannel: value || null }, dealId)
+                        console.log('[websiteOrTgChannel] Update successful')
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
