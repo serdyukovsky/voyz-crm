@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DealColumnSkeleton } from "./deal-card-skeleton"
 import { Button } from "@/components/ui/button"
@@ -340,9 +340,6 @@ function DealCard({
           <div className="mb-2" data-no-navigate>
             <div className="flex items-center gap-2">
               <Avatar className="h-5 w-5">
-                {deal.assignedTo.avatar && (
-                  <AvatarImage src={deal.assignedTo.avatar} alt={deal.assignedTo.name} />
-                )}
                 <AvatarFallback className="text-xs">
                   {deal.assignedTo.name
                     .split(' ')

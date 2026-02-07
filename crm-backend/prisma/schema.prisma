@@ -92,7 +92,7 @@ model Stage {
   order      Int
   color      String         @default("#6B7280")
   isDefault  Boolean        @default(false)
-  isClosed   Boolean        @default(false)
+  type       StageType      @default(OPEN)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   deals      Deal[]
@@ -557,6 +557,12 @@ model ChatThreadParticipant {
   @@index([threadId])
   @@index([userId])
   @@map("chat_thread_participants")
+}
+
+enum StageType {
+  OPEN
+  WON
+  LOST
 }
 
 enum UserRole {

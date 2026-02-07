@@ -22,7 +22,7 @@ export interface PipelineStageDto {
   order: number;
   color?: string;
   isDefault?: boolean;
-  isClosed?: boolean;
+  type?: 'OPEN' | 'WON' | 'LOST';
 }
 
 export interface PipelineDto {

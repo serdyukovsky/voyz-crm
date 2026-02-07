@@ -19,9 +19,9 @@ export class AnalyticsService {
 
     const [total, won, lost, inProgress] = await Promise.all([
       this.prisma.deal.count({ where }),
-      this.prisma.deal.count({ where: { ...where, stage: { isClosed: true, name: { contains: 'Won' } } } }),
-      this.prisma.deal.count({ where: { ...where, stage: { isClosed: true, name: { contains: 'Lost' } } } }),
-      this.prisma.deal.count({ where: { ...where, stage: { isClosed: false } } }),
+      this.prisma.deal.count({ where: { ...where, stage: { type: 'WON' } } }),
+      this.prisma.deal.count({ where: { ...where, stage: { type: 'LOST' } } }),
+      this.prisma.deal.count({ where: { ...where, stage: { type: 'OPEN' } } }),
     ]);
 
     return { total, won, lost, inProgress, conversionRate: total > 0 ? (won / total) * 100 : 0 };

@@ -15,12 +15,12 @@ export class SeedService {
     };
 
     const STAGES_DATA = [
-      { name: 'Новый лид', color: '#94a3b8', order: 0, isDefault: true, isClosed: false },
-      { name: 'Квалификация', color: '#3b82f6', order: 1, isDefault: false, isClosed: false },
-      { name: 'Переговоры', color: '#f59e0b', order: 2, isDefault: false, isClosed: false },
-      { name: 'Отправлено КП', color: '#8b5cf6', order: 3, isDefault: false, isClosed: false },
-      { name: 'Закрыто-Выиграно', color: '#10b981', order: 4, isDefault: false, isClosed: true },
-      { name: 'Закрыто-Проиграно', color: '#ef4444', order: 5, isDefault: false, isClosed: true },
+      { name: 'Новый лид', color: '#94a3b8', order: 0, isDefault: true, type: 'OPEN' as const },
+      { name: 'Квалификация', color: '#3b82f6', order: 1, isDefault: false, type: 'OPEN' as const },
+      { name: 'Переговоры', color: '#f59e0b', order: 2, isDefault: false, type: 'OPEN' as const },
+      { name: 'Отправлено КП', color: '#8b5cf6', order: 3, isDefault: false, type: 'OPEN' as const },
+      { name: 'Закрыто-Выиграно', color: '#10b981', order: 4, isDefault: false, type: 'WON' as const },
+      { name: 'Закрыто-Проиграно', color: '#ef4444', order: 5, isDefault: false, type: 'LOST' as const },
     ];
 
     const TEST_DEALS = [
