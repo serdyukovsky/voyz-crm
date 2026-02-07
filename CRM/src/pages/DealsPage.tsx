@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
 import { DealsListView } from "@/components/crm/deals-list-view"
-import { PipelineSettingsModal, Funnel } from "@/components/crm/pipeline-settings-modal"
 import { DealSourcesPanel, DealSource } from "@/components/crm/deal-sources-panel"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -14,8 +13,7 @@ import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, Check
 import { PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeleton"
 import { RedirectOldDealUrl } from "@/components/shared/redirect-old-deal-url"
 import { useToastNotification } from "@/hooks/use-toast-notification"
-import { usePipelines, useCreatePipeline } from "@/hooks/use-pipelines"
-import { createStage, updateStage, deleteStage } from "@/lib/api/pipelines"
+import { usePipelines } from "@/hooks/use-pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
 import { useCompanies } from "@/hooks/use-companies"
 import { useContacts } from "@/hooks/use-contacts"
@@ -42,11 +40,6 @@ const DealsKanbanBoard = lazy(() =>
   import("@/components/crm/deals-kanban-board")
     .then(module => ({ default: module.DealsKanbanBoard }))
 )
-
-const defaultFunnels: Funnel[] = [
-  { id: "default", name: "Sales Pipeline" },
-  { id: "marketing", name: "Marketing Leads" },
-]
 
 const defaultStages: Stage[] = [
   { 
@@ -213,7 +206,6 @@ function DealsPageContent() {
   const { searchValue, dealFilters } = useSearch()
   const { canManagePipelines, isAdmin } = useUserRole()
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban")
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isFunnelDropdownOpen, setIsFunnelDropdownOpen] = useState(false)
   
@@ -280,8 +272,7 @@ function DealsPageContent() {
   ])
 
   // Используем React Query для загрузки пайплайнов
-  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError, refetch: refetchPipelines } = usePipelines()
-  const createPipelineMutation = useCreatePipeline()
+  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = usePipelines()
   const createDealMutation = useCreateDeal()
   const { data: companies = [] } = useCompanies()
 
@@ -304,7 +295,7 @@ function DealsPageContent() {
   const { data: contacts = [] } = useContacts()
 
   // Преобразуем пайплайны в воронки
-  const funnelsList: Funnel[] = pipelines.map(p => ({
+  const funnelsList = pipelines.map(p => ({
     id: p.id,
     name: p.name,
   }))
@@ -346,224 +337,6 @@ function DealsPageContent() {
   }, [pipelinesError, navigate])
 
   const currentFunnel = funnelsList.find(f => f.id === currentFunnelId) || funnelsList[0] || null
-
-  const handleAddFunnel = async (name: string) => {
-    if (!name.trim()) {
-      showError(t('pipeline.nameRequired'), t('pipeline.pleaseEnterName'))
-      return
-    }
-
-    try {
-      // Создаём pipeline
-      const newPipeline = await createPipelineMutation.mutateAsync({ name: name.trim(), isDefault: false })
-      
-      // Создаём дефолтные стадии (кроме Выиграно/Проиграно - они уже созданы бэкендом)
-      const additionalStagesToCreate = [
-        { name: 'Новый лид', color: '#6B8AFF', order: 0, isDefault: true },
-        { name: 'Квалификация', color: '#F59E0B', order: 1, isDefault: false },
-        { name: 'Переговоры', color: '#8B5CF6', order: 2, isDefault: false },
-      ]
-
-      let stagesCreated = 0
-      for (const stageData of additionalStagesToCreate) {
-        try {
-          await createStage(newPipeline.id, stageData)
-          stagesCreated++
-        } catch (stageError) {
-          console.error(`Failed to create stage ${stageData.name}:`, stageError)
-        }
-      }
-
-      // Обновляем список pipelines чтобы загрузить созданные стадии
-      await refetchPipelines()
-      
-      // Выбираем созданный pipeline
-      setCurrentFunnelId(newPipeline.id)
-      
-      showSuccess(t('pipeline.createdWithStages', { name: newPipeline.name, count: stagesCreated + 2 }))
-    } catch (error) {
-      console.error('Failed to create pipeline:', error)
-      showError(t('pipeline.createError'), t('messages.pleaseTryAgain'))
-    }
-  }
-
-  const handleAddFunnelOld = async (name: string) => {
-    if (!name.trim()) {
-      showError(t('pipeline.nameRequired'), t('pipeline.pleaseEnterName'))
-      return
-    }
-
-    try {
-      console.log('Creating pipeline:', name.trim())
-      const newPipeline = await createPipeline({
-        name: name.trim(),
-        isDefault: false,
-      })
-
-      console.log('Pipeline created:', newPipeline)
-
-      const defaultStagesToCreate = [
-        { name: 'New', color: '#6B8AFF', order: 0, isDefault: true },
-        { name: 'In Progress', color: '#F59E0B', order: 1, isDefault: false },
-        { name: 'Negotiation', color: '#8B5CF6', order: 2, isDefault: false },
-        { name: 'Closed Won', color: '#10B981', order: 3, isDefault: false, isClosed: true },
-        { name: 'Closed Lost', color: '#EF4444', order: 4, isDefault: false, isClosed: true },
-      ]
-
-      console.log('Creating default stages for pipeline:', newPipeline.id)
-      let stagesCreated = 0
-      for (const stageData of defaultStagesToCreate) {
-        try {
-          const createdStage = await createStage(newPipeline.id, stageData)
-          console.log('Stage created:', stageData.name, createdStage.id)
-          stagesCreated++
-        } catch (stageError) {
-          console.error(`Failed to create stage ${stageData.name}:`, stageError)
-        }
-      }
-      console.log(`Created ${stagesCreated} out of ${defaultStagesToCreate.length} stages`)
-
-      showSuccess(t('pipeline.createdWithStages', { name: newPipeline.name, count: stagesCreated }))
-      
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      console.log('Refreshing pipelines list to get created pipeline with stages...')
-      const pipelines = await getPipelines()
-      console.log('Refreshed pipelines:', pipelines.length)
-      
-      const createdPipeline = pipelines.find(p => p.id === newPipeline.id)
-      if (createdPipeline) {
-        console.log('Found created pipeline with stages:', createdPipeline.stages?.length || 0)
-      } else {
-        console.warn('Created pipeline not found in refreshed list, retrying...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        const retryPipelines = await getPipelines()
-        const retryPipeline = retryPipelines.find(p => p.id === newPipeline.id)
-        if (retryPipeline) {
-          console.log('Found pipeline on retry:', retryPipeline.stages?.length || 0, 'stages')
-        }
-      }
-      
-      const funnelsList: Funnel[] = pipelines.map(p => ({
-        id: p.id,
-        name: p.name,
-      }))
-      
-      console.log('Updating funnels list:', funnelsList.length, funnelsList)
-      // funnels обновляются автоматически через React Query
-      
-      console.log('Setting currentFunnelId to:', newPipeline.id)
-      setCurrentFunnelId(newPipeline.id)
-      
-      setKanbanRefreshKey(prev => {
-        const newKey = prev + 1
-        console.log('Kanban refresh key updated to:', newKey)
-        return newKey
-      })
-      
-      setIsSettingsOpen(false)
-      console.log('Settings modal closed')
-      
-      console.log('Pipeline creation completed successfully')
-    } catch (error) {
-      console.error('Failed to create pipeline:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', {
-        message: errorMessage,
-        error: error,
-        stack: error instanceof Error ? error.stack : undefined
-      })
-      showError(t('pipeline.createError'), errorMessage)
-    }
-  }
-
-  const handleDeleteFunnel = async (funnelId: string) => {
-    const funnel = funnelsList.find(f => f.id === funnelId)
-    if (!funnel) return
-    
-    try {
-      // Удаление обрабатывается через React Query мутацию
-      // funnels обновятся автоматически после инвалидации кэша
-      
-      if (currentFunnelId === funnelId) {
-        const remainingPipelines = funnelsList.filter(f => f.id !== funnelId)
-        if (remainingPipelines.length > 0) {
-          setCurrentFunnelId(remainingPipelines[0].id)
-        } else {
-          setCurrentFunnelId("")
-        }
-      }
-    } catch (error) {
-      console.error('Failed to delete pipeline:', error)
-      showError('Failed to delete pipeline', error instanceof Error ? error.message : 'Unknown error')
-    }
-  }
-
-  const handleUpdateStages = async (updatedStages: Stage[]) => {
-    if (!currentFunnelId) return
-    
-    try {
-      // Get current pipeline
-      const currentPipeline = pipelines.find(p => p.id === currentFunnelId)
-      if (!currentPipeline) return
-      
-      // Compare with existing stages to determine what changed
-      const existingStages = currentPipeline.stages || []
-      
-      // Delete removed stages
-      for (const existingStage of existingStages) {
-        const stillExists = updatedStages.find(s => s.id === existingStage.id)
-        if (!stillExists) {
-          try {
-            await deleteStage(existingStage.id)
-          } catch (error) {
-            console.error('Failed to delete stage:', error)
-          }
-        }
-      }
-      
-      // Create or update stages
-      for (let i = 0; i < updatedStages.length; i++) {
-        const stage = updatedStages[i]
-        const isNewStage = stage.id.startsWith('stage-')
-        
-        if (isNewStage) {
-          // Create new stage
-          try {
-            await createStage(currentFunnelId, {
-              name: stage.label,
-              color: stage.color,
-              order: i,
-              isDefault: false,
-              isClosed: stage.label.toLowerCase().includes('closed') || stage.label.toLowerCase().includes('won') || stage.label.toLowerCase().includes('lost'),
-            })
-          } catch (error) {
-            console.error('Failed to create stage:', error)
-          }
-        } else {
-          // Update existing stage
-          try {
-            await updateStage(stage.id, {
-              name: stage.label,
-              color: stage.color,
-              order: i,
-            })
-          } catch (error) {
-            console.error('Failed to update stage:', error)
-          }
-        }
-      }
-      
-      // Reload pipelines to get updated stages
-      await refetchPipelines()
-      showSuccess('Stages updated successfully')
-    } catch (error) {
-      console.error('Failed to update stages:', error)
-      showError('Failed to update stages')
-    }
-    
-    setStages(updatedStages)
-  }
 
   const handleSelectFunnel = (funnelId: string) => {
     setCurrentFunnelId(funnelId)
@@ -1227,7 +1000,7 @@ function DealsPageContent() {
                           <button
                             onClick={() => {
                               setIsFunnelDropdownOpen(false)
-                              setIsSettingsOpen(true)
+                              navigate('/settings/pipelines')
                             }}
                             className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
                           >
@@ -1293,7 +1066,7 @@ function DealsPageContent() {
                         <button
                           onClick={() => {
                             setIsFunnelDropdownOpen(false)
-                            setIsSettingsOpen(true)
+                            navigate('/settings/pipelines')
                           }}
                           className="w-full text-left px-4 py-2.5 text-sm text-primary hover:bg-accent/50 transition-colors flex items-center gap-2"
                         >
@@ -1607,18 +1380,6 @@ function DealsPageContent() {
           )
           )}
         </div>
-
-        <PipelineSettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          stages={stages}
-          onUpdateStages={handleUpdateStages}
-          funnels={funnelsList}
-          currentFunnelId={currentFunnelId}
-          onSelectFunnel={setCurrentFunnelId}
-          onAddFunnel={handleAddFunnel}
-          onDeleteFunnel={handleDeleteFunnel}
-        />
 
         {/* Bulk Assign Confirmation Dialog */}
         <Dialog

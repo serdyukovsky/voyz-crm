@@ -1,5 +1,6 @@
-import { IsString, IsInt, IsOptional, IsBoolean, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsBoolean, IsEnum, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { StageType } from '@prisma/client';
 
 export class CreateStageDto {
   @ApiProperty({ description: 'Stage name' })
@@ -21,9 +22,8 @@ export class CreateStageDto {
   @IsBoolean()
   isDefault?: boolean;
 
-  @ApiPropertyOptional({ description: 'Whether this is a closed stage (won/lost)', default: false })
+  @ApiPropertyOptional({ description: 'Stage type: OPEN, WON, or LOST', enum: StageType, default: 'OPEN' })
   @IsOptional()
-  @IsBoolean()
-  isClosed?: boolean;
+  @IsEnum(StageType)
+  type?: StageType;
 }
-

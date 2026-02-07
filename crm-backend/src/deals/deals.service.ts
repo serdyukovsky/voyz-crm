@@ -190,7 +190,7 @@ export class DealsService {
           name: deal.stage.name || 'Unknown Stage',
           color: deal.stage.color || '#6B7280',
           order: deal.stage.order || 0,
-          isClosed: deal.stage.isClosed || false,
+          type: deal.stage.type || 'OPEN',
         } : null,
         pipeline: deal.pipeline ? {
           id: deal.pipeline.id,
@@ -309,7 +309,7 @@ export class DealsService {
 
     // Add complex filters to andFilters (these need special handling)
     if (filters?.activeStagesOnly) {
-      andFilters.push({ stage: { isClosed: false } });
+      andFilters.push({ stage: { type: 'OPEN' } });
     }
 
     const contactFilter: Prisma.ContactWhereInput = {};
@@ -655,7 +655,7 @@ export class DealsService {
             name: true,
             color: true,
             order: true,
-            isClosed: true,
+            type: true,
           },
         },
         assignedTo: {
@@ -806,7 +806,7 @@ export class DealsService {
             name: true,
             color: true,
             order: true,
-            isClosed: true,
+            type: true,
           },
         },
         pipeline: {
@@ -826,7 +826,7 @@ export class DealsService {
                 order: true,
                 color: true,
                 isDefault: true,
-                isClosed: true,
+                type: true,
                 createdAt: true,
                 updatedAt: true,
               },
@@ -983,7 +983,7 @@ export class DealsService {
         name: deal.stage.name || 'Unknown Stage',
         color: deal.stage.color || '#6B7280',
         order: deal.stage.order || 0,
-        isClosed: deal.stage.isClosed || false,
+        type: deal.stage.type || 'OPEN',
       } : null,
       assignedTo: deal.assignedTo ? {
         id: deal.assignedTo.id,
@@ -1155,7 +1155,7 @@ export class DealsService {
           name: result.stage.name || 'Unknown Stage',
           color: result.stage.color || '#6B7280',
           order: result.stage.order || 0,
-          isClosed: result.stage.isClosed || false,
+          type: result.stage.type || 'OPEN',
         };
       }
 
@@ -1174,7 +1174,7 @@ export class DealsService {
             order: stage.order || 0,
             color: stage.color || '#6B7280',
             isDefault: stage.isDefault || false,
-            isClosed: stage.isClosed || false,
+            type: stage.type || 'OPEN',
             createdAt: stage.createdAt || null,
             updatedAt: stage.updatedAt || null,
           })) : [],

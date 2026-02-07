@@ -16,8 +16,8 @@ export class StageResponseDto {
   @ApiProperty()
   isDefault: boolean;
 
-  @ApiProperty()
-  isClosed: boolean;
+  @ApiProperty({ enum: ['OPEN', 'WON', 'LOST'], default: 'OPEN' })
+  type: string;
 
   @ApiProperty()
   createdAt: Date;

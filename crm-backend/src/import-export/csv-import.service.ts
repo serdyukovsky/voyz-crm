@@ -374,7 +374,7 @@ export class CsvImportService {
         order: stage.order,
         color: stage.color || undefined,
         isDefault: stage.isDefault || false,
-        isClosed: stage.isClosed || false,
+        type: stage.type || 'OPEN',
       })),
     }));
     } catch (error) {
@@ -1154,7 +1154,7 @@ export class CsvImportService {
                         pipelineId: pipelineId,
                         color: '#6B7280',
                         isDefault: false,
-                        isClosed: false,
+                        type: 'OPEN',
                       },
                     });
                     console.log('[IMPORT DEALS] Stage created:', {

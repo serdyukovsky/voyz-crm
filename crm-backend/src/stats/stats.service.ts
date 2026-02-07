@@ -40,7 +40,7 @@ export class StatsService {
     const totalRevenueResult = await this.prisma.deal.aggregate({
       where: {
         stage: {
-          isClosed: true,
+          type: { in: ['WON', 'LOST'] },
         },
       },
       _sum: {
@@ -175,7 +175,7 @@ export class StatsService {
         DATE(COALESCE("closedAt", "updatedAt")) as date,
         SUM("amount")::numeric as revenue
       FROM "deals"
-      WHERE "stageId" IN (SELECT id FROM "stages" WHERE "isClosed" = true)
+      WHERE "stageId" IN (SELECT id FROM "stages" WHERE "type" IN ('WON', 'LOST'))
         AND (COALESCE("closedAt", "updatedAt") >= ${sevenDaysAgoForTrend}::timestamp)
       GROUP BY DATE(COALESCE("closedAt", "updatedAt"))
       ORDER BY date

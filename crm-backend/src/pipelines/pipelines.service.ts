@@ -39,18 +39,32 @@ export class PipelinesService {
           stages: {
             create: [
               {
+                name: 'Новый',
+                order: 0,
+                color: '#94A3B8',
+                isDefault: true,
+                type: 'OPEN',
+              },
+              {
+                name: 'В работе',
+                order: 1,
+                color: '#3B82F6',
+                isDefault: false,
+                type: 'OPEN',
+              },
+              {
                 name: 'Выиграно',
                 order: 9998,
-                color: '#10B981', // green
+                color: '#10B981',
                 isDefault: false,
-                isClosed: true,
+                type: 'WON',
               },
               {
                 name: 'Проиграно',
                 order: 9999,
-                color: '#EF4444', // red
+                color: '#EF4444',
                 isDefault: false,
-                isClosed: true,
+                type: 'LOST',
               },
             ],
           },
@@ -147,13 +161,23 @@ export class PipelinesService {
       throw new BadRequestException(`Stage with order ${createStageDto.order} already exists in this pipeline`);
     }
 
+    const stageType = createStageDto.type || 'OPEN';
+
+    // Enforce one WON and one LOST per pipeline: reset previous stage of same type to OPEN
+    if (stageType === 'WON' || stageType === 'LOST') {
+      await this.prisma.stage.updateMany({
+        where: { pipelineId, type: stageType },
+        data: { type: 'OPEN' },
+      });
+    }
+
     return this.prisma.stage.create({
       data: {
         ...createStageDto,
         pipelineId,
         color: createStageDto.color || '#6B7280',
         isDefault: createStageDto.isDefault || false,
-        isClosed: createStageDto.isClosed || false,
+        type: stageType,
       },
       include: {
         pipeline: true,
@@ -184,6 +208,14 @@ export class PipelinesService {
       if (existingStage) {
         throw new BadRequestException(`Stage with order ${updateStageDto.order} already exists in this pipeline`);
       }
+    }
+
+    // Enforce one WON and one LOST per pipeline: reset previous stage of same type to OPEN
+    if (updateStageDto.type && (updateStageDto.type === 'WON' || updateStageDto.type === 'LOST') && updateStageDto.type !== stage.type) {
+      await this.prisma.stage.updateMany({
+        where: { pipelineId: stage.pipelineId, type: updateStageDto.type, id: { not: id } },
+        data: { type: 'OPEN' },
+      });
     }
 
     return this.prisma.stage.update({
