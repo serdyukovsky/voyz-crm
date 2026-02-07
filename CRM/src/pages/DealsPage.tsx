@@ -1171,7 +1171,7 @@ function DealsPageContent() {
 
   return (
       <div className="h-[calc(100vh-3rem)] flex flex-col px-6 py-6">
-        <div className="flex-shrink-0 pb-2 pt-2 mb-3">
+        <div className="flex-shrink-0 mb-6">
           {isEditMode ? (
             <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

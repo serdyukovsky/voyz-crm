@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Contact as ContactIcon } from "lucide-react"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
@@ -23,6 +24,7 @@ interface Task {
   dueDate: string
   assignee: string
   assigneeId?: string
+  assigneeAvatar?: string | null
   completed: boolean
   status: string
   description?: string
@@ -73,6 +75,7 @@ function TasksListView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }
             dueDate: task.deadline || '',
             assignee: task.assignedTo?.name || t('tasks.unassigned'),
             assigneeId: task.assignedTo?.id || undefined,
+            assigneeAvatar: task.assignedTo?.avatar || null,
             completed: task.status === 'DONE',
             status: task.status?.toLowerCase() || 'todo',
             description: task.description,
@@ -174,6 +177,7 @@ function TasksListView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }
         dueDate: apiTask?.deadline || updatedTask.dueDate,
         assigneeId: apiTask?.assignedTo?.id || updatedTask.assigneeId,
         assignee: apiTask?.assignedTo?.name || updatedTask.assignee || t('tasks.unassigned'),
+        assigneeAvatar: apiTask?.assignedTo?.avatar || updatedTask.assigneeAvatar || null,
         dealId: apiTask?.deal?.id || updatedTask.dealId || null,
         dealName: apiTask?.deal?.title || updatedTask.dealName || null,
         contactId: apiTask?.contact?.id || updatedTask.contactId,
@@ -326,7 +330,22 @@ function TasksListView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }
                 </span>
               </td>
                 <td className="p-3">
-                  <span className="text-sm text-muted-foreground">{task.assignee}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Avatar className="h-5 w-5">
+                      {task.assigneeAvatar && (
+                        <AvatarImage src={task.assigneeAvatar} alt={task.assignee} />
+                      )}
+                      <AvatarFallback className="text-[10px] font-medium">
+                        {task.assignee
+                          .split(' ')
+                          .map(n => n[0])
+                          .join('')
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm text-muted-foreground">{task.assignee}</span>
+                  </div>
                 </td>
                 <td className="p-3">
                   <span className={`text-sm ${task.completed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
