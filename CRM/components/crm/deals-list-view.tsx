@@ -4,6 +4,7 @@ import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { Trash2, MoveRight, Link as LinkIcon, Users, Hash, Loader2 } from 'lucide-react'
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -359,9 +360,18 @@ export function DealsListView({
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
-                        {deal.assignedTo.avatar}
-                      </div>
+                      <Avatar className="h-5 w-5">
+                        {deal.assignedTo.avatar && (
+                          <AvatarImage src={deal.assignedTo.avatar} alt={deal.assignedTo.name} />
+                        )}
+                        <AvatarFallback className="text-[10px] font-medium">
+                          {deal.assignedTo.name
+                            .split(' ')
+                            .map(n => n[0])
+                            .join('')
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                       <span className="text-xs text-muted-foreground truncate">{deal.assignedTo.name}</span>
                     </div>
                   </td>

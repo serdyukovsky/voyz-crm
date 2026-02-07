@@ -18,6 +18,7 @@ interface Task {
   dueDate: string
   assignee: string
   assigneeId?: string
+  assigneeAvatar?: string | null
   completed: boolean
   status: string
   description?: string
@@ -173,6 +174,7 @@ export function TasksKanbanView({ searchQuery, userFilter, selectedTaskId, onTas
           dueDate: task.deadline || '',
           assignee: task.assignedTo?.name || t('tasks.unassigned'),
           assigneeId: task.assignedTo?.id || undefined,
+          assigneeAvatar: task.assignedTo?.avatar || null,
           completed,
           status,
           description: task.description,
@@ -271,6 +273,7 @@ export function TasksKanbanView({ searchQuery, userFilter, selectedTaskId, onTas
         dueDate: apiTask?.deadline || updatedTask.dueDate,
         assigneeId: apiTask?.assignedTo?.id || updatedTask.assigneeId,
         assignee: apiTask?.assignedTo?.name || updatedTask.assignee || t('tasks.unassigned'),
+        assigneeAvatar: apiTask?.assignedTo?.avatar || updatedTask.assigneeAvatar || null,
         dealId: apiTask?.deal?.id || updatedTask.dealId || null,
         dealName: apiTask?.deal?.title || updatedTask.dealName || null,
         contactId: apiTask?.contact?.id || updatedTask.contactId,

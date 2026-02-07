@@ -14,6 +14,7 @@ import { ChevronLeft, Upload, X } from 'lucide-react'
 import Link from "next/link"
 import { getMyProfile, updateMyProfile, type User } from "@/lib/api/users"
 import { useToastNotification } from "@/hooks/use-toast-notification"
+import { AvatarCropModal } from "@/components/crm/avatar-crop-modal"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -27,6 +28,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [cropModalOpen, setCropModalOpen] = useState(false)
+  const [rawImageSrc, setRawImageSrc] = useState<string | null>(null)
   
   // Form state
   const [firstName, setFirstName] = useState("")
@@ -161,30 +164,17 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      showError('Please select an image file')
+      showError('Выберите файл изображения')
       return
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showError('Image size should be less than 5MB')
+      showError('Размер изображения не должен превышать 5 МБ')
       return
     }
 
     try {
-      setIsUploadingAvatar(true)
-      
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-
-      // Upload to server (you'll need to implement this endpoint)
-      // For now, we'll convert to base64 and save as avatar URL
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as string)
@@ -192,18 +182,24 @@ export default function ProfilePage() {
         reader.readAsDataURL(file)
       })
 
-      // Save avatar URL (base64 for now, but should be uploaded to server)
-      setAvatar(base64)
-      showSuccess('Avatar uploaded successfully')
+      setRawImageSrc(base64)
+      setCropModalOpen(true)
     } catch (error) {
-      console.error('Failed to upload avatar:', error)
-      showError('Failed to upload avatar')
+      console.error('Failed to read image file:', error)
+      showError('Не удалось загрузить изображение')
     } finally {
-      setIsUploadingAvatar(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
     }
+  }
+
+  const handleCropComplete = (croppedBase64: string) => {
+    setAvatar(croppedBase64)
+    setAvatarPreview(croppedBase64)
+    setRawImageSrc(null)
+    setCropModalOpen(false)
+    showSuccess('Фото профиля обновлено')
   }
 
   const handleRemoveAvatar = () => {
@@ -496,6 +492,17 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      {rawImageSrc && (
+        <AvatarCropModal
+          isOpen={cropModalOpen}
+          onClose={() => {
+            setCropModalOpen(false)
+            setRawImageSrc(null)
+          }}
+          imageSrc={rawImageSrc}
+          onCropComplete={handleCropComplete}
+        />
+      )}
     </CRMLayout>
   )
 }

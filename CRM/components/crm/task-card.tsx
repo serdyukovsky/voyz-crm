@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar, User, Link as LinkIcon } from 'lucide-react'
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
@@ -15,6 +16,7 @@ interface Task {
   dealName: string | null
   dueDate: string
   assignee: string
+  assigneeAvatar?: string | null
   completed: boolean
   status: string
   description?: string
@@ -134,14 +136,14 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onT
           {/* Footer */}
           <div className="flex items-center justify-between pt-1">
             {/* Assignee Avatar */}
-            <div 
-              className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20"
-              title={task.assignee}
-            >
-              <span className="text-[10px] font-medium text-primary">
+            <Avatar className="h-6 w-6" title={task.assignee}>
+              {task.assigneeAvatar && (
+                <AvatarImage src={task.assigneeAvatar} alt={task.assignee} />
+              )}
+              <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
                 {getInitials(task.assignee)}
-              </span>
-            </div>
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
       </Card>

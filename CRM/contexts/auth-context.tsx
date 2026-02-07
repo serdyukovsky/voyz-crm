@@ -4,8 +4,23 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getCurrentUser, logout as logoutApi, type User } from '@/lib/api/auth'
+import { getCurrentUser, logout as logoutApi, refreshToken, type User } from '@/lib/api/auth'
 import { UnauthorizedError, NetworkError, setGlobalBackendUnavailableHandler } from '@/lib/api/api-client'
+
+/** Decode JWT payload without external library */
+function parseJwtExp(token: string): number | null {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    return decoded.exp ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Milliseconds to refresh before token expires */
+const REFRESH_BEFORE_MS = 2 * 60 * 1000 // 2 minutes
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -27,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [isBackendUnavailable, setIsBackendUnavailable] = useState(false)
   const isLoggingOutRef = useRef(false)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -60,6 +76,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toastShownRef.current = false
     }
   }, [isBackendUnavailable, authStatus])
+
+  // Schedule proactive token refresh before expiry
+  const scheduleTokenRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+
+    const token = localStorage.getItem('access_token')
+    if (!token) return
+
+    const exp = parseJwtExp(token)
+    if (!exp) return
+
+    const now = Date.now()
+    const expiresAt = exp * 1000
+    const refreshAt = expiresAt - REFRESH_BEFORE_MS
+    const delay = refreshAt - now
+
+    if (delay <= 0) {
+      // Token already expired or about to expire — refresh immediately
+      refreshToken()
+        .then(() => {
+          console.log('[Auth] Proactive refresh: token renewed')
+          scheduleTokenRefresh() // schedule next refresh
+        })
+        .catch((err) => {
+          console.warn('[Auth] Proactive refresh failed:', err)
+        })
+      return
+    }
+
+    console.log(`[Auth] Next token refresh in ${Math.round(delay / 1000)}s`)
+    refreshTimerRef.current = setTimeout(async () => {
+      try {
+        await refreshToken()
+        console.log('[Auth] Proactive refresh: token renewed')
+        scheduleTokenRefresh() // schedule next refresh with new token
+      } catch (err) {
+        console.warn('[Auth] Proactive refresh failed:', err)
+      }
+    }, delay)
+  }, [])
+
+  // Refresh token when user returns to the tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && authStatus === 'authenticated') {
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+
+        const exp = parseJwtExp(token)
+        if (!exp) return
+
+        const remaining = exp * 1000 - Date.now()
+        // If less than 2 min remaining or already expired, refresh now
+        if (remaining < REFRESH_BEFORE_MS) {
+          console.log('[Auth] Tab focused — token expiring soon, refreshing')
+          refreshToken()
+            .then(() => scheduleTokenRefresh())
+            .catch((err) => console.warn('[Auth] Focus refresh failed:', err))
+        } else {
+          // Reschedule timer (it may have drifted while tab was hidden)
+          scheduleTokenRefresh()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [authStatus, scheduleTokenRefresh])
+
+  // Clear refresh timer on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+    }
+  }, [])
 
   // Check auth status on mount
   useEffect(() => {
@@ -101,6 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('user', JSON.stringify(userData))
       // Notify other components about user change
       window.dispatchEvent(new Event('user-changed'))
+      // Start proactive token refresh timer
+      scheduleTokenRefresh()
     } catch (error) {
       // Distinguish between auth failures and network errors
       if (error instanceof NetworkError) {
@@ -210,7 +309,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthStatus('authenticated')
     // Notify other components about user change
     window.dispatchEvent(new Event('user-changed'))
-  }, [])
+    // Start proactive token refresh timer
+    scheduleTokenRefresh()
+  }, [scheduleTokenRefresh])
 
   const logout = useCallback(async () => {
     // Idempotent guard: prevent multiple simultaneous logout calls
@@ -220,6 +321,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     isLoggingOutRef.current = true
+
+    // Clear proactive refresh timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
 
     try {
       // Only call logout API if we have a token (avoid unnecessary calls)
