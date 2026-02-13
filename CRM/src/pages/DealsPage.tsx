@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useNavigate } from 'react-router-dom'
 import { CRMLayout } from "@/components/crm/layout"
 import { KanbanBoard, Deal, Stage } from "@/components/crm/kanban-board"
@@ -10,13 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Plus, Filter, LayoutGrid, List, Settings, ChevronDown, ArrowLeft, CheckCircle2, ArrowUpDown, X, Building2, User, Trash2, Loader2 } from 'lucide-react'
-import { PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeleton"
+import { PageSkeleton } from "@/components/shared/loading-skeleton"
 import { RedirectOldDealUrl } from "@/components/shared/redirect-old-deal-url"
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { usePipelines } from "@/hooks/use-pipelines"
 import { useCreateDeal } from "@/hooks/use-deals"
-import { useCompanies } from "@/hooks/use-companies"
-import { useContacts } from "@/hooks/use-contacts"
 import { getDeals, deleteDeal, updateDeal, bulkDeleteDeals, bulkAssignDeals, getDealsCount, type Deal as APIDeal } from "@/lib/api/deals"
 import { getUsers, type User as APIUser } from "@/lib/api/users"
 import { useSelectionState } from "@/hooks/use-selection-state"
@@ -35,11 +33,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// Lazy load heavy kanban board component
-const DealsKanbanBoard = lazy(() =>
-  import("@/components/crm/deals-kanban-board")
-    .then(module => ({ default: module.DealsKanbanBoard }))
-)
+// Import kanban board directly (already lazy-loaded at route level via App.tsx)
+import { DealsKanbanBoard } from "@/components/crm/deals-kanban-board"
 
 const defaultStages: Stage[] = [
   { 
@@ -274,7 +269,6 @@ function DealsPageContent() {
   // Используем React Query для загрузки пайплайнов
   const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = usePipelines()
   const createDealMutation = useCreateDeal()
-  const { data: companies = [] } = useCompanies()
 
   // Загружаем stages из выбранного pipeline
   useEffect(() => {
@@ -292,7 +286,6 @@ function DealsPageContent() {
       }
     }
   }, [currentFunnelId, pipelines])
-  const { data: contacts = [] } = useContacts()
 
   // Преобразуем пайплайны в воронки
   const funnelsList = pipelines.map(p => ({
@@ -631,7 +624,6 @@ function DealsPageContent() {
   // Обновляем фильтры при изменении поиска или панели
   useEffect(() => {
     const newTitle = searchValue.trim() || dealFilters?.title?.trim() || undefined
-    console.log('🔍 DealsPage: Search value changed:', { searchValue, newTitle, dealFilters })
     setFilters(prev => {
       const newFilters = {
         ...prev,
@@ -646,7 +638,6 @@ function DealsPageContent() {
         updatedBefore: dealFilters?.dateTo,
         taskStatuses: dealFilters?.taskStatuses,
       }
-      console.log('🔍 DealsPage: New filters:', newFilters)
       return newFilters
     })
   }, [searchValue, dealFilters])
@@ -654,7 +645,6 @@ function DealsPageContent() {
   // Sync selectedPipelineForList with currentFunnelId when switching to list view
   useEffect(() => {
     if (viewMode === 'list' && currentFunnelId && currentFunnelId !== '') {
-      console.log('📋 DealsPage: Syncing selectedPipelineForList with currentFunnelId:', currentFunnelId)
       setSelectedPipelineForList(currentFunnelId)
     }
   }, [viewMode, currentFunnelId])
@@ -662,18 +652,15 @@ function DealsPageContent() {
   // Get default pipeline ID for list view if no pipeline is selected
   useEffect(() => {
     if (viewMode === 'list' && !selectedPipelineForList && (!currentFunnelId || currentFunnelId === '')) {
-      console.log('📋 DealsPage: No pipeline selected for list view, loading default pipeline')
       getPipelines()
         .then((pipelines) => {
           const defaultPipeline = pipelines.find(p => p.isDefault) || pipelines[0]
           if (defaultPipeline) {
-            console.log('📋 DealsPage: Setting default pipeline for list view:', defaultPipeline.id)
             setSelectedPipelineForList(defaultPipeline.id)
             if (!currentFunnelId || currentFunnelId === '') {
               setCurrentFunnelId(defaultPipeline.id)
             }
           } else {
-            console.log('📋 DealsPage: No pipelines available')
           }
         })
         .catch((error) => {
@@ -686,7 +673,6 @@ function DealsPageContent() {
   useEffect(() => {
     if (viewMode === 'list') {
       if (selectedPipelineForList) {
-        console.log('📋 DealsPage: Loading deals for list view, pipelineId:', selectedPipelineForList, 'filters:', filters)
         setListLoading(true)
         const listParams = {
           pipelineId: selectedPipelineForList,
@@ -698,11 +684,9 @@ function DealsPageContent() {
           stageIds: effectiveStageIds,
           limit: 50,
         }
-        console.log('🔍 DealsPage: Calling getDeals with params:', listParams)
         getDeals(listParams)
           .then((response) => {
             // API now always returns paginated response
-            console.log('📋 DealsPage: Loaded deals for list:', response.data.length, 'deals (paginated format)')
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
@@ -724,7 +708,6 @@ function DealsPageContent() {
             setListLoading(false)
           })
       } else {
-        console.log('📋 DealsPage: List view but no pipeline selected yet')
         // Try to load all deals if no pipeline is selected
         setListLoading(true)
         const listParams = {
@@ -739,7 +722,6 @@ function DealsPageContent() {
         getDeals(listParams)
           .then((response) => {
             // API now always returns paginated response
-            console.log('📋 DealsPage: Loaded all deals for list view:', response.data.length, 'deals (paginated format)')
             setListDeals(response.data)
             setNextCursor(response.nextCursor)
             setHasMore(response.hasMore)
@@ -878,9 +860,7 @@ function DealsPageContent() {
         params.pipelineId = selectedPipelineForList
       }
       
-      console.log('📋 Loading more deals with cursor:', nextCursor.substring(0, 20) + '...')
       const response = await getDeals(params)
-      console.log('📋 Loaded more deals:', response.data.length, 'hasMore:', response.hasMore)
 
       // API now always returns paginated response
       if (response && response.data) {
@@ -1180,11 +1160,6 @@ function DealsPageContent() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('deals.allCompanies')}</SelectItem>
-                      {companies.map(company => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1201,11 +1176,6 @@ function DealsPageContent() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('deals.allContacts')}</SelectItem>
-                      {contacts.map(contact => (
-                        <SelectItem key={contact.id} value={contact.id}>
-                          {contact.fullName}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1291,7 +1261,6 @@ function DealsPageContent() {
                   isEditMode={isEditMode}
                 />
               ) : (
-                <Suspense fallback={<CardSkeleton className="h-[600px]" />}>
                   <DealsKanbanBoard
                     key={kanbanRefreshKey}
                     pipelineId={currentFunnelId && currentFunnelId !== "" ? currentFunnelId : undefined}
@@ -1303,7 +1272,6 @@ function DealsPageContent() {
                     onAddDeal={handleCreateNewDeal}
                     onDealsCountChange={handleDealsCountChange}
                   />
-                </Suspense>
               )}
             </div>
           </div>
@@ -1312,7 +1280,6 @@ function DealsPageContent() {
             <PageSkeleton />
           ) : (
             <>
-              {console.log('📋 DealsPage: Rendering list view, deals:', listDeals.length, 'searchValue:', searchValue)}
               <DealsListView
                 deals={filteredListDeals.map(deal => {
                   if (!deal || !deal.id) return null // Safety check

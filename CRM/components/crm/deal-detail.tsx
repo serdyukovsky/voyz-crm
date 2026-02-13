@@ -300,7 +300,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             order: s.order || 0,
             color: s.color || '#6B7280',
             isDefault: s.isDefault || false,
-            isClosed: s.isClosed || false,
+            type: s.type || 'OPEN',
             createdAt: s.createdAt || '',
             updatedAt: s.updatedAt || '',
           })),

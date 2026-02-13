@@ -149,7 +149,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
   // Пресеты фильтров
   const presets: DealSearchPreset[] = useMemo(() => {
     const activeStages = pipelines.flatMap(p => 
-      p.stages.filter(s => !s.isClosed)
+      p.stages.filter(s => s.type === 'OPEN')
     )
 
     return [
@@ -186,7 +186,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
         icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
         filters: {
           stageIds: pipelines.flatMap(p => 
-            p.stages.filter(s => s.isClosed && s.name.toLowerCase().includes('won'))
+            p.stages.filter(s => s.type === 'WON')
           ).map(s => s.id)
         }
       },
@@ -196,7 +196,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
         icon: <XCircle className="h-4 w-4 text-red-500" />,
         filters: {
           stageIds: pipelines.flatMap(p => 
-            p.stages.filter(s => s.isClosed && s.name.toLowerCase().includes('lost'))
+            p.stages.filter(s => s.type === 'LOST')
           ).map(s => s.id)
         }
       },
@@ -214,7 +214,7 @@ export function DealSearchPanel({ open, onClose, onApplyFilters }: DealSearchPan
 
   // Используем дефолтную воронку или первую доступную
   const selectedPipeline = pipelines.find(p => p.isDefault) || pipelines[0] || null
-  const activeStages = selectedPipeline?.stages.filter(s => !s.isClosed) || []
+  const activeStages = selectedPipeline?.stages.filter(s => s.type === 'OPEN') || []
   const allStages = selectedPipeline?.stages || []
 
   const handlePresetClick = (preset: DealSearchPreset) => {
