@@ -259,7 +259,7 @@ export function SignupForm() {
 
           <p className="text-center text-xs text-muted-foreground">
             {t('auth.haveAccount')}{" "}
-            <a href="/login" className="text-primary hover:underline">
+            <a href="/app/login" className="text-primary hover:underline">
               {t('auth.signIn')}
             </a>
           </p>

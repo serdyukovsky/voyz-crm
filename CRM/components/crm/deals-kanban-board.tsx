@@ -1825,7 +1825,7 @@ export function DealsKanbanBoard({
           // If unauthorized, stop and redirect to login
           if (errorMessage === 'UNAUTHORIZED') {
             if (typeof window !== 'undefined') {
-              window.location.href = '/login'
+              window.location.href = '/app/login'
             }
             return
           }
@@ -1846,7 +1846,7 @@ export function DealsKanbanBoard({
       // If unauthorized, redirect to login
       if (errorMessage === 'UNAUTHORIZED') {
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         return
       }
@@ -2092,7 +2092,7 @@ export function DealsKanbanBoard({
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground mb-4">Please log in to view deals</p>
-        <Button onClick={() => window.location.href = '/login'}>
+        <Button onClick={() => window.location.href = '/app/login'}>
           Go to Login
         </Button>
       </div>

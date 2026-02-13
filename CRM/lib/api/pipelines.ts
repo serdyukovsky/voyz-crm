@@ -85,7 +85,7 @@ export async function getPipelines(): Promise<Pipeline[]> {
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component
@@ -240,7 +240,7 @@ export async function createStage(pipelineId: string, data: CreateStageDto): Pro
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component
@@ -311,7 +311,7 @@ export async function updateStage(id: string, data: UpdateStageDto): Promise<Sta
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component
@@ -379,7 +379,7 @@ export async function deleteStage(id: string): Promise<void> {
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component
@@ -460,7 +460,7 @@ export async function reorderStages(
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component

@@ -35,7 +35,7 @@ export async function getCompanies(params?: {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     return []
@@ -62,7 +62,7 @@ export async function getCompanies(params?: {
         localStorage.removeItem('user')
         
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         return []

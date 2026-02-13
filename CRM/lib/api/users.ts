@@ -51,7 +51,7 @@ export async function getUsers(): Promise<User[]> {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     return []
@@ -72,7 +72,7 @@ export async function getUsers(): Promise<User[]> {
       localStorage.removeItem('user')
       
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/app/login'
       }
       
       throw new Error('UNAUTHORIZED')
@@ -110,7 +110,7 @@ export async function getMyProfile(): Promise<User> {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     throw new Error('UNAUTHORIZED')
@@ -133,7 +133,7 @@ export async function getMyProfile(): Promise<User> {
       localStorage.removeItem('user')
       
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/app/login'
       }
       
       throw new Error('UNAUTHORIZED')
@@ -197,7 +197,7 @@ export async function updateMyProfile(data: UpdateUserDto): Promise<User> {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     throw new Error('UNAUTHORIZED')
@@ -222,7 +222,7 @@ export async function updateMyProfile(data: UpdateUserDto): Promise<User> {
       localStorage.removeItem('user')
       
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/app/login'
       }
       
       throw new Error('UNAUTHORIZED')
