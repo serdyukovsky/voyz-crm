@@ -165,6 +165,9 @@ jobs:
           git checkout ${BRANCH}
           git reset --hard origin/${BRANCH}
 
+          echo "--- Syncing backend source from monorepo ---"
+          rsync -a --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=prisma/migrations crm-backend/ ./
+
           echo "--- Installing dependencies ---"
           npm install --legacy-peer-deps
 
