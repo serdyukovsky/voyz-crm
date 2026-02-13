@@ -12,16 +12,42 @@ import { AuthProvider, useAuth } from '@/contexts/auth-context'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { setGlobalUnauthorizedHandler } from '@/lib/api/api-client'
 import { SearchProvider } from '@/components/crm/search-context'
+import { dealKeys } from '@/hooks/use-deals'
+import { pipelineKeys } from '@/hooks/use-pipelines'
+import { getDeals } from '@/lib/api/deals'
+import { getPipelines } from '@/lib/api/pipelines'
 // Temporarily disabled Analytics to debug white screen
 // import { Analytics } from '@vercel/analytics/react'
+
+// Prefetch critical data IMMEDIATELY (before React renders, in parallel with /me auth check)
+// This eliminates the waterfall: /me (578ms) → mount → /deals (3.4s)
+// Now: /me + /deals + /pipelines all fire at t=0
+;(() => {
+  const token = localStorage.getItem('access_token')
+  if (!token) return
+  const pipelineId = localStorage.getItem('lastSelectedFunnelId')
+  if (pipelineId) {
+    queryClient.prefetchQuery({
+      queryKey: dealKeys.list({ pipelineId, limit: 1000, view: 'kanban' as const }),
+      queryFn: () => getDeals({ pipelineId, limit: 1000, view: 'kanban' }),
+    })
+  }
+  queryClient.prefetchQuery({
+    queryKey: pipelineKeys.list(),
+    queryFn: () => getPipelines(),
+  })
+})()
 
 // Auth pages - load immediately (no skeleton needed)
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 
+// Eagerly start loading DealsPage chunk (don't wait for auth to complete)
+const dealsPageImport = import('./pages/DealsPage')
+
 // Lazy load pages for code splitting
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const DealsPage = lazy(() => import('./pages/DealsPage'))
+const DealsPage = lazy(() => dealsPageImport)
 const DealDetailPage = lazy(() => import('./pages/DealDetailPage'))
 const TasksPage = lazy(() => import('./pages/TasksPage'))
 const ContactsPage = lazy(() => import('./pages/ContactsPage'))
@@ -62,14 +88,14 @@ function AppRoutes() {
       <Route path="/register" element={<RegisterPage />} />
       
       {/* Protected routes - all require authentication */}
-      <Route path="/" element={
+      <Route path="/" element={<Navigate to="/deals" replace />} />
+      <Route path="/dashboard" element={
         <ProtectedRoute>
           <Suspense fallback={<PageSkeleton />}>
             <DashboardPage />
           </Suspense>
         </ProtectedRoute>
       } />
-      <Route path="/dashboard" element={<Navigate to="/" replace />} />
       <Route path="/deals" element={
         <ProtectedRoute>
           <Suspense fallback={<PageSkeleton />}>

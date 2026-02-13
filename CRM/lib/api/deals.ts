@@ -81,6 +81,7 @@ export async function getDeals(params?: {
   taskStatuses?: string[]
   limit?: number
   cursor?: string
+  view?: 'kanban' | 'list'
 }): Promise<PaginatedDealsResponse> {
   // Check if we're on the client side
   if (typeof window === 'undefined') {
@@ -131,6 +132,7 @@ export async function getDeals(params?: {
   if (params?.taskStatuses?.length) queryParams.append('taskStatuses', params.taskStatuses.join(','))
   if (params?.limit) queryParams.append('limit', String(params.limit))
   if (params?.cursor) queryParams.append('cursor', params.cursor)
+  if (params?.view) queryParams.append('view', params.view)
 
   try {
     const API_BASE_URL = getApiBaseUrl()

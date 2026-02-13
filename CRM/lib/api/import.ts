@@ -20,7 +20,7 @@ export interface PipelineStage {
   order: number
   color?: string
   isDefault?: boolean
-  isClosed?: boolean
+  type?: string
 }
 
 export interface Pipeline {

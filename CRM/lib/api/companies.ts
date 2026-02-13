@@ -1,28 +1,5 @@
 import { getApiBaseUrl } from '@/lib/config'
 
-// Check if backend is available
-async function checkBackendAvailable(): Promise<boolean> {
-  if (typeof window === 'undefined') {
-    return false
-  }
-  
-  try {
-    const API_BASE_URL = getApiBaseUrl()
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
-    
-    const response = await fetch(`${API_BASE_URL}/health`, { 
-      method: 'GET',
-      signal: controller.signal,
-    })
-    
-    clearTimeout(timeoutId)
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
 export interface Company {
   id: string
   name: string
@@ -47,14 +24,6 @@ export async function getCompanies(params?: {
 }): Promise<Company[]> {
   // Check if we're on the client side
   if (typeof window === 'undefined') {
-    return []
-  }
-
-  const backendAvailable = await checkBackendAvailable()
-  
-  if (!backendAvailable) {
-    // Return empty array if backend is not available (filters will be empty)
-    console.warn('Backend not available, returning empty companies list')
     return []
   }
 

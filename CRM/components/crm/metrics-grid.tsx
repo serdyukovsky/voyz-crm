@@ -1,67 +1,53 @@
 import { Card, CardContent } from "@/components/ui/card"
-import { Target, TrendingUp, TrendingDown, Percent, CheckCircle2, Clock, DollarSign } from 'lucide-react'
+import { Target, DollarSign, CheckCircle2, UserPlus } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import type { GlobalStats } from '@/lib/api/stats'
 
-export function MetricsGrid() {
+interface MetricsGridProps {
+  stats: GlobalStats
+}
+
+function formatRevenue(amount: number): string {
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}M ₽`
+  }
+  if (amount >= 1_000) {
+    return `${(amount / 1_000).toLocaleString('ru-RU', { maximumFractionDigits: 0 })}K ₽`
+  }
+  return `${amount.toLocaleString('ru-RU')} ₽`
+}
+
+export function MetricsGrid({ stats }: MetricsGridProps) {
   const { t } = useTranslation()
-  
+
   const metrics = [
     {
       label: t('dashboard.totalDeals'),
-      value: "248",
-      change: "+12",
-      trend: "up" as const,
+      value: stats.totalDeals.toLocaleString('ru-RU'),
       icon: Target,
     },
     {
-      label: t('dashboard.wonDeals'),
-      value: "156",
-      change: "+8",
-      trend: "up" as const,
-      icon: TrendingUp,
+      label: t('dashboard.totalRevenue'),
+      value: formatRevenue(stats.totalRevenue),
+      icon: DollarSign,
     },
     {
-      label: t('dashboard.lostDeals'),
-      value: "34",
-      change: "-3",
-      trend: "down" as const,
-      icon: TrendingDown,
-    },
-    {
-      label: t('dashboard.conversionPercent'),
-      value: "62.9%",
-      change: "+2.1%",
-      trend: "up" as const,
-      icon: Percent,
-    },
-    {
-      label: t('dashboard.activeTasks'),
-      value: "89",
-      change: "+15",
-      trend: "up" as const,
+      label: t('dashboard.tasksToday'),
+      value: stats.tasksToday.toLocaleString('ru-RU'),
       icon: CheckCircle2,
     },
     {
-      label: t('dashboard.avgTimePerStage'),
-      value: "4.2d",
-      change: "-0.3d",
-      trend: "down" as const,
-      icon: Clock,
-    },
-    {
-      label: t('dashboard.revenueThisMonth'),
-      value: "$284k",
-      change: "+18%",
-      trend: "up" as const,
-      icon: DollarSign,
+      label: t('dashboard.newContacts'),
+      value: stats.newContacts.toLocaleString('ru-RU'),
+      icon: UserPlus,
     },
   ]
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {metrics.map((metric) => {
         const Icon = metric.icon
-        const isPositive = metric.trend === "up"
-        
+
         return (
           <Card key={metric.label} className="border-border/50 bg-card">
             <CardContent className="p-4">
@@ -75,12 +61,6 @@ export function MetricsGrid() {
                 <div className="rounded-md bg-primary/10 p-2">
                   <Icon className="h-4 w-4 text-primary" />
                 </div>
-              </div>
-              <div className="mt-3 flex items-center gap-1 text-xs">
-                <span className={isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                  {metric.change}
-                </span>
-                <span className="text-muted-foreground">{t('dashboard.vsLastMonth')}</span>
               </div>
             </CardContent>
           </Card>

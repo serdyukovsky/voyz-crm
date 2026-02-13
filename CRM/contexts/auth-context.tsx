@@ -158,17 +158,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Check auth status on mount
+  // Check auth status on mount (guard against StrictMode double-mount)
+  const checkAuthCalledRef = useRef(false)
   useEffect(() => {
+    if (checkAuthCalledRef.current) return
+    checkAuthCalledRef.current = true
     checkAuth()
   }, [])
 
   const checkAuth = async () => {
-    // Set status to loading during check
     setAuthStatus('loading')
-    
+
     const token = localStorage.getItem('access_token')
-    
+
     if (!token) {
       setUser(null)
       setAuthStatus('unauthenticated')
@@ -176,9 +178,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Verify token is valid by calling GET /auth/me
       const userData = await getCurrentUser()
-      
+
       // On 200 → authenticated
       setUser(userData)
       setAuthStatus('authenticated')
