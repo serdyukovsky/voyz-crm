@@ -202,7 +202,7 @@ jobs:
           git reset --hard origin/${BRANCH}
 
           echo "--- Syncing backend source from monorepo ---"
-          rsync -a --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=prisma/migrations crm-backend/ ./
+          rsync -a --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=prisma/migrations crm-backend/ ./ || [ $? -eq 24 ]
 
           echo "--- Installing dependencies ---"
           npm install --legacy-peer-deps
