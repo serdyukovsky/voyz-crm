@@ -1303,7 +1303,9 @@ export function DealsKanbanBoard({
       assignedTo: deal.assignedTo ? {
         id: deal.assignedTo.id,
         name: deal.assignedTo.name || 'Unknown User',
-        avatar: deal.assignedTo.avatar,
+        avatar: deal.assignedTo.name
+          ? deal.assignedTo.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+          : '?',
       } : undefined,
       createdById: deal.createdById,
       tags: deal.tags || [],
