@@ -22,7 +22,7 @@ export async function getContacts(params?: {
   const token = localStorage.getItem('access_token')
   if (!token) {
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     return []
   }
@@ -53,7 +53,7 @@ export async function getContacts(params?: {
         localStorage.removeItem('user')
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         return []
       }

@@ -168,8 +168,8 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
         } else {
           // Fallback: redirect to login if no handler is set
           // Only redirect if not already on /login
-          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            window.location.href = '/login'
+          if (typeof window !== 'undefined' && window.location.pathname !== '/app/login') {
+            window.location.href = '/app/login'
           }
         }
         
