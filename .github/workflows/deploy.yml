@@ -1,0 +1,189 @@
+name: Deploy CRM
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deploy target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+# Cancel in-progress runs on the same branch
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Determine environment, paths, branch
+  # ──────────────────────────────────────────────
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      backend_path: ${{ steps.env.outputs.backend_path }}
+      pm2_name: ${{ steps.env.outputs.pm2_name }}
+      branch: ${{ steps.env.outputs.branch }}
+      frontend_dist_path: ${{ steps.env.outputs.frontend_dist_path }}
+    steps:
+      - id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TARGET="${{ inputs.deploy_target }}"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            TARGET="prod"
+          else
+            TARGET="dev"
+          fi
+
+          echo "environment=${TARGET}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$TARGET" == "prod" ]]; then
+            echo "backend_path=/root/crm-backend-prod" >> "$GITHUB_OUTPUT"
+            echo "pm2_name=crm-backend-prod" >> "$GITHUB_OUTPUT"
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+            echo "frontend_dist_path=/var/www/crm-prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend_path=/root/crm-backend-dev" >> "$GITHUB_OUTPUT"
+            echo "pm2_name=crm-backend-dev" >> "$GITHUB_OUTPUT"
+            echo "branch=develop" >> "$GITHUB_OUTPUT"
+            echo "frontend_dist_path=/var/www/crm-dev" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ──────────────────────────────────────────────
+  # Build frontend in GitHub Actions
+  # ──────────────────────────────────────────────
+  build-frontend:
+    runs-on: ubuntu-latest
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: CRM
+        run: npm install --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: CRM
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_WS_URL: ${{ vars.VITE_WS_URL }}
+        run: npx vite build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: CRM/dist/
+          retention-days: 3
+
+  # ──────────────────────────────────────────────
+  # Deploy frontend to server via rsync
+  # ──────────────────────────────────────────────
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: [setup, build-frontend]
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+      - name: Deploy frontend via rsync
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          FRONTEND_DIST_PATH: ${{ needs.setup.outputs.frontend_dist_path }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Create target dir if needed
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SERVER_USER}@${SERVER_HOST}" \
+            "mkdir -p ${FRONTEND_DIST_PATH}"
+
+          # Sync dist/ to server (delete old files)
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            dist/ \
+            "${SERVER_USER}@${SERVER_HOST}:${FRONTEND_DIST_PATH}/"
+
+          echo "✅ Frontend deployed to ${FRONTEND_DIST_PATH}"
+
+  # ──────────────────────────────────────────────
+  # Deploy backend on server via SSH
+  # ──────────────────────────────────────────────
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
+    steps:
+      - name: Deploy backend via SSH
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          BACKEND_PATH: ${{ needs.setup.outputs.backend_path }}
+          PM2_NAME: ${{ needs.setup.outputs.pm2_name }}
+          BRANCH: ${{ needs.setup.outputs.branch }}
+          ENV_NAME: ${{ needs.setup.outputs.environment }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SERVER_USER}@${SERVER_HOST}" << DEPLOY_SCRIPT
+          set -e
+
+          echo "=== Deploying backend to ${ENV_NAME} ==="
+          cd ${BACKEND_PATH}
+
+          echo "--- Git pull (branch: ${BRANCH}) ---"
+          git fetch origin
+          git checkout ${BRANCH}
+          git reset --hard origin/${BRANCH}
+
+          echo "--- Installing dependencies ---"
+          npm install --legacy-peer-deps
+
+          echo "--- Generating Prisma client ---"
+          npx prisma generate
+
+          echo "--- Building application ---"
+          npm run build
+
+          echo "--- Running database migrations ---"
+          npx prisma migrate deploy
+
+          echo "--- Restarting PM2: ${PM2_NAME} ---"
+          pm2 restart ${PM2_NAME} || pm2 start dist/main.js --name ${PM2_NAME}
+          pm2 save
+
+          echo "--- Verifying ---"
+          sleep 3
+          pm2 show ${PM2_NAME} | head -15
+
+          echo "=== ✅ Backend deployed to ${ENV_NAME} ==="
+          DEPLOY_SCRIPT
