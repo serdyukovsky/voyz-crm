@@ -6,7 +6,7 @@ export interface Stage {
   order: number
   color: string
   isDefault: boolean
-  isClosed: boolean
+  type: 'OPEN' | 'WON' | 'LOST'
   createdAt: string
   updatedAt: string
 }
@@ -42,7 +42,7 @@ export interface CreateStageDto {
   order: number
   color?: string
   isDefault?: boolean
-  isClosed?: boolean
+  type?: 'OPEN' | 'WON' | 'LOST'
 }
 
 export interface UpdateStageDto {
@@ -50,7 +50,7 @@ export interface UpdateStageDto {
   order?: number
   color?: string
   isDefault?: boolean
-  isClosed?: boolean
+  type?: 'OPEN' | 'WON' | 'LOST'
 }
 
 export async function getPipelines(): Promise<Pipeline[]> {

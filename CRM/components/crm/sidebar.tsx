@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const navItemsConfig = [
-  { href: "/", icon: LayoutDashboard, key: "common.dashboard", adminOnly: false },
+  { href: "/dashboard", icon: LayoutDashboard, key: "common.dashboard", adminOnly: false },
   { href: "/deals", icon: Target, key: "common.deals", adminOnly: false },
   { href: "/tasks", icon: CheckSquare, key: "common.tasks", adminOnly: false },
   { href: "/contacts", icon: Contact, key: "common.contacts", adminOnly: false },
