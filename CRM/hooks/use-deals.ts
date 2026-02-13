@@ -43,17 +43,18 @@ export function useDeals(params?: {
   taskStatuses?: string[]
   limit?: number
   cursor?: string
+  view?: 'kanban' | 'list'
   enabled?: boolean
+  structuralSharing?: boolean
 }) {
-  const { enabled = true, ...queryParams } = params || {}
+  const { enabled = true, structuralSharing, ...queryParams } = params || {}
 
   return useQuery({
     queryKey: dealKeys.list(queryParams),
     queryFn: () => getDeals(queryParams),
-    // Кэширование на 5 минут (как в query-client default)
     staleTime: 5 * 60 * 1000,
-    // Можно отключить запрос условно (например, если нет выбранного pipeline)
     enabled,
+    ...(structuralSharing !== undefined && { structuralSharing }),
   })
 }
 

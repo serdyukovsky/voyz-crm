@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, memo, startTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -47,12 +47,11 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
 import { getPipelines, createStage, updateStage, deleteStage, reorderStages, type Pipeline, type Stage, type CreateStageDto } from "@/lib/api/pipelines"
-import { getCompanies, type Company } from "@/lib/api/companies"
-import { getContacts, type Contact } from "@/lib/api/contacts"
 import { CompanyBadge } from "@/components/shared/company-badge"
 import { DealDetail } from './deal-detail'
 import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useDeals, dealKeys } from "@/hooks/use-deals"
+import { usePipelines, pipelineKeys } from "@/hooks/use-pipelines"
 import { useDebouncedValue } from "@/lib/utils/debounce"
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from "@/lib/utils"
@@ -183,47 +182,25 @@ interface DealCardProps {
   onMarkAsLost: (dealId: string) => void
   onReassignContact: (dealId: string) => void
   onOpenInSidebar: (dealId: string) => void
-  onDeleteDeal?: (dealId: string) => void
-  availableContacts: Contact[]
+  onRequestDelete?: (dealId: string) => void
+  searchQuery?: string
 }
 
-function DealCard({ 
-  deal, 
-  stage, 
-  onDragStart, 
+const DealCard = memo(function DealCard({
+  deal,
+  stage,
+  onDragStart,
   onDragEnd,
   onMarkAsWon,
   onMarkAsLost,
   onReassignContact,
   onOpenInSidebar,
-  onDeleteDeal,
-  availableContacts,
+  onRequestDelete,
   searchQuery
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const navigate = useNavigate()
+  const [menuReady, setMenuReady] = useState(false)
   const { t } = useTranslation()
-  const { showSuccess, showError } = useToastNotification()
-
-  const handleDelete = async () => {
-    if (!onDeleteDeal) return
-    setIsDeleting(true)
-    try {
-      await onDeleteDeal(deal.id)
-      showSuccess('Сделка удалена')
-      setShowDeleteDialog(false)
-    } catch (error: any) {
-      if (error?.status === 403) {
-        showError('Недостаточно прав', 'У вас нет прав для удаления сделок')
-      } else {
-        showError('Не удалось удалить сделку', error instanceof Error ? error.message : 'Неизвестная ошибка')
-      }
-    } finally {
-      setIsDeleting(false)
-    }
-  }
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation()
@@ -241,31 +218,21 @@ function DealCard({
   }
 
   const handleCardClick = (e: React.MouseEvent) => {
-    console.log('handleCardClick called', { 
-      isDragging, 
-      target: (e.target as HTMLElement).tagName,
-      closestNoNavigate: !!(e.target as HTMLElement).closest('[data-no-navigate]'),
-      dealId: deal.id
-    })
-    
     // Don't navigate if clicking on dropdown, badges, or during drag
     if (isDragging) {
-      console.log('Navigation prevented: isDragging')
       e.preventDefault()
       e.stopPropagation()
       return
     }
-    
+
     const noNavigateElement = (e.target as HTMLElement).closest('[data-no-navigate]')
     if (noNavigateElement) {
-      console.log('Navigation prevented: clicked on no-navigate element', noNavigateElement)
       e.preventDefault()
       e.stopPropagation()
       return
     }
-    
-    // Open deal in modal instead of navigating
-    console.log('Opening deal in modal:', deal.id)
+
+    // Open deal in modal
     e.preventDefault()
     e.stopPropagation()
     onOpenInSidebar(deal.id)
@@ -274,12 +241,12 @@ function DealCard({
   const isHighlighted = searchQuery && deal.title.toLowerCase().includes(searchQuery.toLowerCase())
 
   return (
-    <>
       <Card
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleCardClick}
+        onMouseEnter={() => { if (!menuReady) setMenuReady(true) }}
         className={cn(
           "mb-2 cursor-pointer transition-all group shadow-none",
           isDragging && "opacity-50",
@@ -288,51 +255,55 @@ function DealCard({
       >
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
-          <div 
+          <div
             className="font-medium text-sm line-clamp-2 flex-1 hover:text-primary transition-colors cursor-pointer"
             onClick={handleCardClick}
           >
             {deal.title}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild data-no-navigate>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-              >
-                <MoreVertical className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onClick={() => onReassignContact(deal.id)}>
-                <UserPlus className="h-4 w-4" />
-                Сменить ответственного
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onMarkAsWon(deal.id)}>
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                {t('dealCard.markAsWon')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onMarkAsLost(deal.id)}>
-                <XCircle className="h-4 w-4 text-red-500" />
-                {t('dealCard.markAsLost')}
-              </DropdownMenuItem>
-              {onDeleteDeal && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                    Удалить сделку
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {menuReady ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild data-no-navigate>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => onReassignContact(deal.id)}>
+                  <UserPlus className="h-4 w-4" />
+                  Сменить ответственного
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onMarkAsWon(deal.id)}>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  {t('dealCard.markAsWon')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMarkAsLost(deal.id)}>
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  {t('dealCard.markAsLost')}
+                </DropdownMenuItem>
+                {onRequestDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onRequestDelete(deal.id)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                      Удалить сделку
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="h-6 w-6 shrink-0" />
+          )}
         </div>
 
         {/* Responsible */}
@@ -412,30 +383,8 @@ function DealCard({
         </div>
       </CardContent>
     </Card>
-
-    {/* Delete Confirmation Dialog */}
-    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Удалить сделку?</DialogTitle>
-          <DialogDescription>
-            Вы уверены, что хотите удалить сделку "{deal.title}"? Это действие нельзя отменить.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            {isDeleting ? 'Удаление...' : 'Удалить'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    </>
   )
-}
+})
 
 interface KanbanColumnProps {
   stage: Stage
@@ -460,7 +409,6 @@ interface KanbanColumnProps {
   onStageDropAndSave?: (targetStageId: string) => void
   isStageDragged?: boolean
   isAnyStageDragging?: boolean
-  availableContacts: Contact[]
   pipelineId: string
   searchQuery?: string
 }
@@ -474,7 +422,10 @@ function isWonOrLostStage(stageName: string): boolean {
          name === 'closed won' || name === 'closed lost'
 }
 
-function KanbanColumn({
+const INITIAL_VISIBLE_CARDS = 5
+const CARDS_PER_BATCH = 20
+
+const KanbanColumn = memo(function KanbanColumn({
   stage,
   deals,
   isDraggedOver,
@@ -497,7 +448,6 @@ function KanbanColumn({
   onStageDropAndSave,
   isStageDragged = false,
   isAnyStageDragging = false,
-  availableContacts,
   pipelineId,
   searchQuery
 }: KanbanColumnProps) {
@@ -513,6 +463,28 @@ function KanbanColumn({
   const isDeletingRef = useRef(false)
   const colorPickerRef = useRef<HTMLDivElement>(null)
   const isDraggingStageRef = useRef(false)
+
+  // Progressive rendering: first batch is urgent, rest is low-priority via startTransition
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_CARDS)
+
+  // Reset when deals list changes (filter/pipeline switch)
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_CARDS)
+  }, [deals.length])
+
+  // After first paint, render remaining cards in batches of CARDS_PER_BATCH per frame
+  useEffect(() => {
+    if (visibleCount >= deals.length) return
+    const id = requestAnimationFrame(() => {
+      startTransition(() => {
+        setVisibleCount(prev => Math.min(prev + CARDS_PER_BATCH, deals.length))
+      })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [visibleCount, deals.length])
+
+  const visibleDeals = visibleCount < deals.length ? deals.slice(0, visibleCount) : deals
+  const hasMore = visibleCount < deals.length
 
   // Reset editing state when stage changes
   useEffect(() => {
@@ -612,7 +584,6 @@ function KanbanColumn({
         showSuccess('Stage color updated')
         setIsColorPickerOpen(false)
       } catch (error) {
-        console.error('Failed to update stage color:', error)
         showError('Failed to update stage color', error instanceof Error ? error.message : 'Unknown error')
       }
     }
@@ -659,18 +630,8 @@ function KanbanColumn({
   const handleAddDeal = (e?: React.MouseEvent) => {
     e?.preventDefault()
     e?.stopPropagation()
-    console.log('handleAddDeal called for stage:', stage.id, 'onAddDeal:', !!onAddDeal, 'onAddDeal type:', typeof onAddDeal)
-    if (!onAddDeal) {
-      console.error('onAddDeal callback is not provided! This should not happen.')
-      return
-    }
-    console.log('Calling onAddDeal with stage.id:', stage.id)
-    try {
-      onAddDeal(stage.id)
-      console.log('onAddDeal called successfully')
-    } catch (error) {
-      console.error('Error calling onAddDeal:', error)
-    }
+    if (!onAddDeal) return
+    onAddDeal(stage.id)
   }
 
   const handleDoubleClick = () => {
@@ -700,7 +661,6 @@ function KanbanColumn({
       }
       setIsEditing(false)
     } catch (error) {
-      console.error('Failed to update stage:', error)
       showError('Failed to update stage', error instanceof Error ? error.message : 'Unknown error')
       setEditedName(stage.name) // Revert on error
     } finally {
@@ -729,14 +689,6 @@ function KanbanColumn({
   }
 
   const handleDelete = async (e?: React.MouseEvent) => {
-    console.log('🗑️ handleDelete called', { 
-      stageId: stage.id, 
-      stageName: stage.name,
-      hasOnDeleteStage: !!onDeleteStage,
-      dealsCount: deals.length,
-      isEditing
-    })
-    
     if (e) {
       e.preventDefault()
       e.stopPropagation()
@@ -746,7 +698,6 @@ function KanbanColumn({
     isDeletingRef.current = true
     
     if (!onDeleteStage) {
-      console.error('🗑️ handleDelete: onDeleteStage is not provided!')
       isDeletingRef.current = false
       return
     }
@@ -763,13 +714,10 @@ function KanbanColumn({
     }
 
     try {
-      console.log('🗑️ handleDelete: Calling onDeleteStage with stageId:', stage.id)
       await onDeleteStage(stage.id)
-      console.log('🗑️ handleDelete: Stage deleted successfully')
       showSuccess('Stage deleted')
       // Don't reset flag here - component will be unmounted
     } catch (error) {
-      console.error('🗑️ handleDelete: Failed to delete stage:', error)
       isDeletingRef.current = false
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       if (errorMessage.includes('deal(s)')) {
@@ -798,7 +746,6 @@ function KanbanColumn({
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
-      console.log('🔥 KanbanColumn handleStageDragOver: Stage drag detected, calling onStageDragOver for stage:', stage.id)
       onStageDragOver?.(e, stage.id)
       return
     }
@@ -815,10 +762,7 @@ function KanbanColumn({
     const dragType = e.dataTransfer.getData('drag-type')
     
     if (dragType === 'stage') {
-      // For stage drags, we just mark the drop target
-      // The actual save will happen in handleStageDragEnd
-      console.log('handleStageDrop: Stage drag dropped on:', stage.id)
-      // Don't call onStageDropAndSave here - let dragEnd handle it
+      // For stage drags, let dragEnd handle the save
       return
     }
     
@@ -831,11 +775,6 @@ function KanbanColumn({
 
   const handleStageDragEnd = (e: React.DragEvent) => {
     isDraggingStageRef.current = false
-    console.log('🔥🔥🔥 KanbanColumn handleStageDragEnd CALLED', { 
-      stageId: stage.id,
-      hasOnStageDragEnd: !!onStageDragEnd,
-      hasOnStageDropAndSave: !!onStageDropAndSave
-    })
     e.preventDefault()
     e.stopPropagation()
     
@@ -843,12 +782,7 @@ function KanbanColumn({
     dragStartedRef.current = false
     
     // Call parent handler
-    if (onStageDragEnd) {
-      console.log('🔥 Calling onStageDragEnd from parent')
-      onStageDragEnd()
-    } else {
-      console.error('🔥 ERROR: onStageDragEnd is not provided!')
-    }
+    onStageDragEnd?.()
   }
 
   // Calculate deals count and total amount for this stage
@@ -1016,7 +950,6 @@ function KanbanColumn({
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-foreground flex-shrink-0"
                 onClick={(e) => {
-                  console.log('🗑️ Delete button clicked!', { stageId: stage.id, isEditing })
                   e.preventDefault()
                   e.stopPropagation()
                   handleDelete(e)
@@ -1185,11 +1118,10 @@ function KanbanColumn({
         }}
       >
         <CardContent className="p-3">
-          {!stage.isClosed && (
+          {stage.type === 'OPEN' && (
             <button
               className="w-full flex items-center gap-2 mb-3 text-sm text-muted-foreground hover:text-foreground transition-colors font-normal cursor-pointer"
               onClick={(e) => {
-                console.log('Button clicked! Stage:', stage.id, 'onAddDeal exists:', !!onAddDeal)
                 handleAddDeal(e)
               }}
               type="button"
@@ -1204,28 +1136,34 @@ function KanbanColumn({
               {t('dealCard.noDeals')}
             </div>
           ) : (
-            deals.map((deal) => (
-              <DealCard
-                key={deal.id}
-                deal={deal}
-                stage={stage}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onMarkAsWon={onMarkAsWon}
-                onMarkAsLost={onMarkAsLost}
-                onReassignContact={onReassignContact}
-                onOpenInSidebar={onOpenInSidebar}
-                onDeleteDeal={onDeleteDeal}
-                availableContacts={availableContacts}
-                searchQuery={searchQuery}
-              />
-            ))
+            <>
+              {visibleDeals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  stage={stage}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  onMarkAsWon={onMarkAsWon}
+                  onMarkAsLost={onMarkAsLost}
+                  onReassignContact={onReassignContact}
+                  onOpenInSidebar={onOpenInSidebar}
+                  onRequestDelete={onDeleteDeal}
+                  searchQuery={searchQuery}
+                />
+              ))}
+              {hasMore && (
+                <div className="py-2 text-center text-xs text-muted-foreground">
+                  Загрузка {deals.length - visibleCount} карточек...
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
     </div>
   )
-}
+})
 
 export function DealsKanbanBoard({
   pipelineId,
@@ -1243,18 +1181,32 @@ export function DealsKanbanBoard({
   const { isCollapsed } = useSidebar()
   const { showSuccess, showError } = useToastNotification()
   const queryClient = useQueryClient()
-  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+
+  // Pipelines через React Query (один запрос, кеширование, без каскадов)
+  const { data: pipelinesData, isLoading: pipelinesLoading } = usePipelines()
+  const pipelines = pipelinesData || []
+
+  // Helpers для обратной совместимости со stage management кодом
+  const loadPipelines = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: pipelineKeys.list() })
+  }, [queryClient])
+  const setPipelines = useCallback((updater: Pipeline[] | ((prev: Pipeline[]) => Pipeline[])) => {
+    queryClient.setQueryData(pipelineKeys.list(), (old: Pipeline[] | undefined) => {
+      return typeof updater === 'function' ? updater(old || []) : updater
+    })
+  }, [queryClient])
+
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
-  const [deals, setDeals] = useState<DealCardData[]>([])
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
+
   const [draggedDeal, setDraggedDeal] = useState<DealCardData | null>(null)
+  const draggedDealRef = useRef<DealCardData | null>(null)
   const [draggedStageId, setDraggedStageId] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [isAddStageModalOpen, setIsAddStageModalOpen] = useState(false)
   const [afterStageId, setAfterStageId] = useState<string | null>(null)
+  const [dealToDelete, setDealToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
   const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
@@ -1266,15 +1218,9 @@ export function DealsKanbanBoard({
     }
   }, [externalSelectedDealId])
   
-  // Debug: отслеживаем изменения состояния модального окна
-  useEffect(() => {
-    console.log('Modal state changed:', { isCreateModalOpen, selectedStageId, hasPipeline: !!selectedPipeline })
-  }, [isCreateModalOpen, selectedStageId, selectedPipeline])
-  
   // Синхронизация: если selectedStageId установлен, но модальное окно закрыто - открываем его
   useEffect(() => {
     if (selectedStageId && !isCreateModalOpen && selectedPipeline) {
-      console.log('Auto-opening modal because selectedStageId is set but modal is closed')
       setIsCreateModalOpen(true)
     }
   }, [selectedStageId, isCreateModalOpen, selectedPipeline])
@@ -1292,158 +1238,86 @@ export function DealsKanbanBoard({
   const setShowFilters = externalShowFilters !== undefined ? () => {} : setInternalShowFilters
   
   // Internal handler for opening create deal modal
-  const handleOpenCreateModal = (stageId: string) => {
-    console.log('handleOpenCreateModal called with stageId:', stageId)
-    console.log('Current state - selectedStageId:', selectedStageId, 'isCreateModalOpen:', isCreateModalOpen)
+  const handleAddDealClick = useCallback((stageId: string) => {
     setSelectedStageId(stageId)
     setIsCreateModalOpen(true)
-    console.log('State updated - selectedStageId set to:', stageId, 'isCreateModalOpen set to: true')
-  }
-  
-  // Always use internal handler to open modal
-  // External onAddDeal is not used here - we always open the modal internally
-  const handleAddDealClick = (stageId: string) => {
-    console.log('handleAddDealClick called with stageId:', stageId)
-    console.log('Opening create deal modal for stage:', stageId)
-    handleOpenCreateModal(stageId)
-  }
+  }, [])
   
   const socketRef = useRef<Socket | null>(null)
 
-  const loadPipelines = useCallback(async () => {
-    try {
-      console.log('Loading pipelines...')
-      const data = await getPipelines()
-      console.log('Loaded pipelines:', data.length, 'pipelines')
-      setPipelines(data)
-      
-      if (data.length === 0) {
-        console.warn('No pipelines found')
-        setLoading(false) // Ensure loading is false if no pipelines
-        return
-      }
-      
-      // Preserve currently selected pipeline if it exists
-      const currentPipelineId = selectedPipeline?.id || pipelineId
-      
-      if (currentPipelineId) {
-        const pipeline = data.find(p => p.id === currentPipelineId)
-        if (pipeline) {
-          console.log('Updating selected pipeline:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
-          setSelectedPipeline(pipeline)
-          return
-        }
-      }
-      
-      // Fallback to default or first pipeline
-      const defaultPipeline = data.find(p => p.isDefault) || data[0]
-      if (defaultPipeline) {
-        console.log('Setting default pipeline:', defaultPipeline.id, defaultPipeline.name)
-        setSelectedPipeline(defaultPipeline)
-      }
-    } catch (error) {
-      // Handle unauthorized error - redirect to login
-      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
-        console.warn('Unauthorized - redirecting to login')
-        // Token already cleared in API function
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login'
-        }
-        return
-      }
-      // Only show error if it's not a network/empty response issue
-      if (error instanceof Error && !error.message.includes('Network error') && !error.message.includes('Unauthorized')) {
-        showError('Failed to load pipelines', error.message)
-      } else {
-        console.warn('Pipelines not available:', error instanceof Error ? error.message : 'Unknown error')
-      }
-      setLoading(false) // Ensure loading is false on error
+  // Автоматический выбор pipeline когда данные загружены
+  useEffect(() => {
+    if (!pipelines.length) return
+    const targetId = pipelineId || selectedPipeline?.id
+    const target = targetId
+      ? pipelines.find(p => p.id === targetId)
+      : (pipelines.find(p => p.isDefault) || pipelines[0])
+    if (target && target.id !== selectedPipeline?.id) {
+      setSelectedPipeline(target)
     }
-  }, [selectedPipeline?.id, pipelineId])
+  }, [pipelines, pipelineId])
 
-  const loadCompanies = useCallback(async () => {
-    try {
-      console.log('Loading companies...')
-      const data = await getCompanies()
-      console.log('Loaded companies:', data.length)
-      setCompanies(data)
-    } catch (error) {
-      console.error('Failed to load companies:', error)
-      setCompanies([]) // Set empty array on error
-      // Don't show error toast for companies/contacts as they're optional for filters
-    }
-  }, [])
-
-  const loadContacts = useCallback(async () => {
-    try {
-      console.log('Loading contacts...')
-      const data = await getContacts()
-      console.log('Loaded contacts:', data.length)
-      setContacts(data)
-    } catch (error) {
-      console.error('Failed to load contacts:', error)
-      setContacts([]) // Set empty array on error
-    }
-  }, [])
-
-  // Дебаунс для фильтров (500ms задержка перед запросом)
-  // Это предотвращает множественные запросы при быстром изменении фильтров
-  const debouncedFilters = useDebouncedValue(filters, 500)
+  // Дебаунс для фильтров (500ms задержка, но НЕ на первый рендер)
+  // На первый рендер filters = {} — используем сразу, без задержки
+  const hasFiltersChanged = useRef(false)
+  const debouncedFilters = useDebouncedValue(filters, hasFiltersChanged.current ? 500 : 0)
+  useEffect(() => {
+    // После первого рендера включаем дебаунс для последующих изменений
+    hasFiltersChanged.current = true
+  }, [filters])
 
   // Используем React Query hook для загрузки deals с автоматическим кэшированием
+  // Начинаем загрузку deals СРАЗУ если есть pipelineId (не ждём загрузки полного Pipeline объекта)
+  const effectivePipelineId = selectedPipeline?.id || pipelineId
   const { data: dealsResponse, isLoading, error: dealsError } = useDeals({
     ...debouncedFilters,
-    pipelineId: selectedPipeline?.id,
-    limit: 1000, // Оптимизировано: вместо 10000
-    enabled: !!selectedPipeline, // Запрос только если выбран pipeline
+    pipelineId: effectivePipelineId,
+    limit: 1000,
+    view: 'kanban',
+    enabled: !!effectivePipelineId,
+    structuralSharing: false, // Отключаем глубокое сравнение 304 объектов — экономим ~200ms на каждом ре-рендере
   })
 
-  // Синхронизируем React Query данные с локальным state
-  useEffect(() => {
-    if (dealsResponse?.data) {
-      const transformedDeals: DealCardData[] = dealsResponse.data.map((deal) => {
-        return {
-          id: deal.id,
-          number: deal.number ?? null,
-          title: deal.title || 'Untitled Deal',
-          amount: deal.amount || 0,
-          budget: deal.budget ?? null,
-          description: deal.description ?? null,
-          contact: deal.contact ? {
-            id: deal.contact.id,
-            fullName: deal.contact.fullName || 'Unknown Contact',
-            link: deal.contact.link,
-            subscriberCount: deal.contact.subscriberCount,
-            directions: deal.contact.directions,
-          } : undefined,
-          company: deal.company ? {
-            id: deal.company.id,
-            name: deal.company.name || 'Unknown Company',
-            industry: deal.company.industry,
-          } : undefined,
-          assignedTo: deal.assignedTo ? {
-            id: deal.assignedTo.id,
-            name: deal.assignedTo.name || 'Unknown User',
-            avatar: deal.assignedTo.avatar,
-          } : undefined,
-          createdById: deal.createdById,
-          tags: deal.tags || [],
-          rejectionReasons: deal.rejectionReasons || [],
-          updatedAt: deal.updatedAt || new Date().toISOString(),
-          createdAt: deal.createdAt,
-          expectedCloseAt: deal.expectedCloseAt ?? null,
-          closedAt: deal.closedAt ?? null,
-          stageId: deal.stage?.id || '',
-          stageIsClosed: deal.stage?.isClosed,
-          status: deal.status,
-          tasks: (deal as any).tasks || [],
-        }
-      })
-      setDeals(transformedDeals)
-      console.log('📦 Deals loaded:', transformedDeals.length, 'deals')
-    } else {
-      setDeals([])
-    }
+  // Трансформируем данные из React Query
+  const queryDeals = useMemo<DealCardData[]>(() => {
+    if (!dealsResponse?.data) return []
+    const result = dealsResponse.data.map((deal) => ({
+      id: deal.id,
+      number: deal.number ?? null,
+      title: deal.title || 'Untitled Deal',
+      amount: deal.amount || 0,
+      budget: deal.budget ?? null,
+      description: deal.description ?? null,
+      contact: deal.contact ? {
+        id: deal.contact.id,
+        fullName: deal.contact.fullName || 'Unknown Contact',
+        link: deal.contact.link,
+        subscriberCount: deal.contact.subscriberCount,
+        directions: deal.contact.directions,
+      } : undefined,
+      company: deal.company ? {
+        id: deal.company.id,
+        name: deal.company.name || 'Unknown Company',
+        industry: deal.company.industry,
+      } : undefined,
+      assignedTo: deal.assignedTo ? {
+        id: deal.assignedTo.id,
+        name: deal.assignedTo.name || 'Unknown User',
+        avatar: deal.assignedTo.avatar,
+      } : undefined,
+      createdById: deal.createdById,
+      tags: deal.tags || [],
+      rejectionReasons: deal.rejectionReasons || [],
+      updatedAt: deal.updatedAt || new Date().toISOString(),
+      createdAt: deal.createdAt,
+      expectedCloseAt: deal.expectedCloseAt ?? null,
+      closedAt: deal.closedAt ?? null,
+      stageId: deal.stage?.id || deal.stageId || '',
+      stageIsClosed: deal.stage?.type !== 'OPEN',
+      status: deal.status,
+      tasks: (deal as any).tasks || [],
+    }))
+    return result
   }, [dealsResponse])
 
   // Обработка ошибок загрузки deals
@@ -1451,65 +1325,13 @@ export function DealsKanbanBoard({
     if (dealsError) {
       if (dealsError instanceof Error && !dealsError.message.includes('Network error') && !dealsError.message.includes('Unauthorized')) {
         showError('Failed to load deals', dealsError.message)
-      } else {
-        console.warn('Deals not available:', dealsError instanceof Error ? dealsError.message : 'Unknown error')
       }
     }
   }, [dealsError, showError])
 
-  // Синхронизируем loading state
-  useEffect(() => {
-    setLoading(isLoading)
-  }, [isLoading])
-
-  useEffect(() => {
-    loadPipelines()
-    loadCompanies()
-    loadContacts()
-  }, [])
-
-  // Reload pipelines when pipelineId prop changes (e.g., after creating a new pipeline)
-  useEffect(() => {
-    if (pipelineId) {
-      console.log('PipelineId prop changed, reloading pipelines:', pipelineId)
-      loadPipelines()
-    }
-  }, [pipelineId])
-
-  // Handle pipelineId prop changes - reload pipelines if pipeline not found
-  useEffect(() => {
-    if (!pipelineId) return
-
-    // If pipelines list is empty or doesn't contain the requested pipeline, reload
-    if (pipelines.length === 0 || !pipelines.find(p => p.id === pipelineId)) {
-      console.log('DealsKanbanBoard: Pipeline not in list, reloading pipelines for:', pipelineId)
-      loadPipelines()
-      return
-    }
-
-    // Find and set the pipeline
-    const pipeline = pipelines.find(p => p.id === pipelineId)
-    if (pipeline) {
-      if (pipeline.id !== selectedPipeline?.id) {
-        console.log('DealsKanbanBoard: Setting pipeline from prop:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
-        // Log pipeline info (minimal to save memory)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('DealsKanbanBoard: Pipeline set:', pipeline.id, pipeline.name, 'stages:', pipeline.stages?.length || 0)
-        }
-        setSelectedPipeline(pipeline)
-      }
-    } else {
-      console.warn('DealsKanbanBoard: Pipeline not found in list after reload:', pipelineId)
-    }
-  }, [pipelineId, pipelines, selectedPipeline?.id])
-
-  // Track selectedPipeline changes
-  useEffect(() => {
-    console.log('selectedPipeline changed:', selectedPipeline?.id, selectedPipeline?.name)
-  }, [selectedPipeline])
-
   // Note: useDeals hook уже реагирует на изменения selectedPipeline и фильтров
   // loadDeals больше не нужен - React Query сам справляется с кэшированием и переинициализацией
+  // Companies и contacts загружаются через React Query хуки выше (с дедупликацией)
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -1525,55 +1347,36 @@ export function DealsKanbanBoard({
       transports: ['websocket', 'polling'],
     })
 
-    socket.on('connect', () => {
-      console.log('WebSocket connected for Kanban board')
-    })
-
     socket.on('deal.stage.updated', (data: { dealId: string; stageId?: string; [key: string]: any }) => {
-      if (data.dealId) {
-        setDeals(prevDeals => {
-          const dealIndex = prevDeals.findIndex(d => d.id === data.dealId)
-          if (dealIndex >= 0 && data.stageId) {
-            const updated = [...prevDeals]
-            updated[dealIndex] = {
-              ...updated[dealIndex],
-              stageId: data.stageId,
-              updatedAt: new Date().toISOString(),
-            }
-            return updated
+      if (data.dealId && data.stageId) {
+        queryClient.setQueriesData({ queryKey: dealKeys.lists() }, (old: any) => {
+          if (!old?.data) return old
+          const idx = old.data.findIndex((d: any) => d.id === data.dealId)
+          if (idx < 0) {
+            queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+            return old
           }
-          // If deal not found, reload all deals
-          queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
-          return prevDeals
+          const updated = [...old.data]
+          updated[idx] = { ...updated[idx], stageId: data.stageId, updatedAt: new Date().toISOString() }
+          return { ...old, data: updated }
         })
       }
     })
 
     socket.on('deal.updated', (data: { dealId: string; [key: string]: any }) => {
       if (data.dealId) {
-        setDeals(prevDeals => {
-          const dealIndex = prevDeals.findIndex(d => d.id === data.dealId)
-          if (dealIndex >= 0) {
-            const updated = [...prevDeals]
-            updated[dealIndex] = {
-              ...updated[dealIndex],
-              ...data,
-              updatedAt: new Date().toISOString(),
-            }
-            return updated
+        queryClient.setQueriesData({ queryKey: dealKeys.lists() }, (old: any) => {
+          if (!old?.data) return old
+          const idx = old.data.findIndex((d: any) => d.id === data.dealId)
+          if (idx < 0) {
+            queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+            return old
           }
-          queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
-          return prevDeals
+          const updated = [...old.data]
+          updated[idx] = { ...updated[idx], ...data, updatedAt: new Date().toISOString() }
+          return { ...old, data: updated }
         })
       }
-    })
-
-    socket.on('disconnect', () => {
-      console.log('WebSocket disconnected')
-    })
-
-    socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error)
     })
 
     socketRef.current = socket
@@ -1583,9 +1386,9 @@ export function DealsKanbanBoard({
     }
   }, [selectedPipeline, queryClient])
 
-  // Filter and sort deals
+  // Filter and sort deals (queryDeals is the single source of truth, updated via React Query cache)
   const filteredAndSortedDeals = useMemo(() => {
-    let filtered = [...deals]
+    let filtered = [...queryDeals]
 
     if (filters.searchQuery) {
       const searchLower = filters.searchQuery.toLowerCase()
@@ -1812,56 +1615,77 @@ export function DealsKanbanBoard({
     })
 
     return filtered
-  }, [deals, filters, sort])
+  }, [queryDeals, filters, sort])
+
+  // Pre-compute deals by stage — stable array references for memoized KanbanColumn
+  const dealsByStage = useMemo(() => {
+    const map = new Map<string, DealCardData[]>()
+    for (const deal of filteredAndSortedDeals) {
+      const arr = map.get(deal.stageId)
+      if (arr) {
+        arr.push(deal)
+      } else {
+        map.set(deal.stageId, [deal])
+      }
+    }
+    return map
+  }, [filteredAndSortedDeals])
 
   // Notify parent component about deals count change
   useEffect(() => {
     onDealsCountChange?.(filteredAndSortedDeals.length)
   }, [filteredAndSortedDeals.length, onDealsCountChange])
 
-  const handleDragStart = (deal: DealCardData) => {
+  const handleDragStart = useCallback((deal: DealCardData) => {
+    draggedDealRef.current = deal
     setDraggedDeal(deal)
-  }
+  }, [])
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
+    draggedDealRef.current = null
     setDraggedDeal(null)
-  }
+  }, [])
 
-  const handleDrop = async (stageId: string) => {
-    if (!draggedDeal || draggedDeal.stageId === stageId) {
+  const handleDrop = useCallback(async (stageId: string) => {
+    const dragged = draggedDealRef.current
+    if (!dragged || dragged.stageId === stageId) {
+      draggedDealRef.current = null
       setDraggedDeal(null)
       return
     }
 
     try {
-      await updateDeal(draggedDeal.id, { stageId })
+      // Optimistic update via React Query cache
+      queryClient.setQueriesData({ queryKey: dealKeys.lists() }, (old: any) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: old.data.map((d: any) =>
+            d.id === dragged.id ? { ...d, stageId, updatedAt: new Date().toISOString() } : d
+          )
+        }
+      })
+
+      await updateDeal(dragged.id, { stageId })
       showSuccess(t('deals.dealMovedSuccess'))
 
-      // Оптимистично обновляем локальное состояние
-      setDeals(prevDeals => prevDeals.map(deal =>
-        deal.id === draggedDeal.id
-          ? { ...deal, stageId, updatedAt: new Date().toISOString() }
-          : deal
-      ))
-
-      // Инвалидируем кэш React Query для обновления других представлений
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
       queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
-      queryClient.invalidateQueries({ queryKey: dealKeys.detail(draggedDeal.id) })
+      queryClient.invalidateQueries({ queryKey: dealKeys.detail(dragged.id) })
     } catch (error) {
       showError(t('deals.failedToMoveDeal'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
       // При ошибке тоже инвалидируем чтобы откатить оптимистичное обновление
       queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
       queryClient.invalidateQueries({ queryKey: dealKeys.infiniteLists() })
     } finally {
+      draggedDealRef.current = null
       setDraggedDeal(null)
     }
-  }
+  }, [showSuccess, showError, t, queryClient])
 
-  const handleMarkAsWon = async (dealId: string) => {
+  const handleMarkAsWon = useCallback(async (dealId: string) => {
     try {
-      // Find closed-won stage
-      const closedWonStage = selectedPipeline?.stages.find(s => s.isClosed && s.name.toLowerCase().includes('won'))
+      const closedWonStage = selectedPipeline?.stages.find(s => s.type === 'WON')
       if (closedWonStage) {
         await updateDeal(dealId, { stageId: closedWonStage.id, status: 'closed' })
         showSuccess(t('deals.dealMarkedAsWon'))
@@ -1872,12 +1696,11 @@ export function DealsKanbanBoard({
     } catch (error) {
       showError(t('deals.failedToMarkAsWon'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
     }
-  }
+  }, [selectedPipeline, showSuccess, showError, t, queryClient])
 
-  const handleMarkAsLost = async (dealId: string) => {
+  const handleMarkAsLost = useCallback(async (dealId: string) => {
     try {
-      // Find closed-lost stage
-      const closedLostStage = selectedPipeline?.stages.find(s => s.isClosed && s.name.toLowerCase().includes('lost'))
+      const closedLostStage = selectedPipeline?.stages.find(s => s.type === 'LOST')
       if (closedLostStage) {
         await updateDeal(dealId, { stageId: closedLostStage.id, status: 'closed' })
         showSuccess(t('deals.dealMarkedAsLost'))
@@ -1888,96 +1711,88 @@ export function DealsKanbanBoard({
     } catch (error) {
       showError(t('deals.failedToMarkAsLost'), error instanceof Error ? error.message : t('messages.pleaseTryAgain'))
     }
-  }
+  }, [selectedPipeline, showSuccess, showError, t, queryClient])
 
-  const handleReassignContact = async (dealId: string) => {
-    // TODO: Implement contact reassignment modal
+  const handleReassignContact = useCallback(async (dealId: string) => {
     showError('Not implemented', 'Contact reassignment will be available soon')
-  }
+  }, [showError])
 
-  const handleDeleteDeal = async (dealId: string) => {
+  const handleRequestDeleteDeal = useCallback((dealId: string) => {
+    setDealToDelete(dealId)
+  }, [])
+
+  const handleConfirmDeleteDeal = async () => {
+    if (!dealToDelete) return
+    setIsDeleting(true)
     try {
       const { deleteDeal } = await import('@/lib/api/deals')
-      await deleteDeal(dealId)
-      // Remove deal from local state
-      setDeals(prevDeals => prevDeals.filter(d => d.id !== dealId))
+      await deleteDeal(dealToDelete)
+      // Remove from React Query cache for instant UI feedback
+      queryClient.setQueriesData({ queryKey: dealKeys.lists() }, (old: any) => {
+        if (!old?.data) return old
+        return { ...old, data: old.data.filter((d: any) => d.id !== dealToDelete) }
+      })
       showSuccess('Deal deleted successfully')
+      setDealToDelete(null)
     } catch (error) {
-      console.error('Failed to delete deal:', error)
-      // Reload deals on error
       await queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
-      throw error
+    } finally {
+      setIsDeleting(false)
     }
   }
 
   const handleOpenInSidebar = useCallback((dealId: string) => {
-    console.log('DealsKanbanBoard: handleOpenInSidebar called with dealId:', dealId)
-    console.log('DealsKanbanBoard: onDealClick prop:', onDealClick)
     // Save current scroll position before opening modal
     const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
     if (kanbanContainer) {
       scrollPositionRef.current = kanbanContainer.scrollLeft
-      console.log('Saved scroll position:', scrollPositionRef.current)
     }
     setInternalSelectedDealId(dealId)
-    console.log('DealsKanbanBoard: Calling onDealClick with dealId:', dealId, 'onDealClick exists:', !!onDealClick, 'type:', typeof onDealClick)
-    
-    // Update URL directly if onDealClick is not provided
+
     if (onDealClick) {
       onDealClick(dealId)
     } else {
-      console.warn('DealsKanbanBoard: onDealClick is not provided, updating URL directly')
-      // Update URL directly
+      // Update URL directly if onDealClick is not provided
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search)
         params.set('deal', dealId)
         const newUrl = `${window.location.pathname}?${params.toString()}`
-        console.log('DealsKanbanBoard: Updating URL directly to:', newUrl)
         window.history.pushState({}, '', newUrl)
-        console.log('DealsKanbanBoard: URL after pushState:', window.location.href)
       }
     }
   }, [onDealClick])
 
   const handleCloseDealModal = useCallback(() => {
-    console.log('DealsKanbanBoard: handleCloseDealModal called')
     setInternalSelectedDealId(null)
-    
-    // Call onDealClick to update URL - this should handle URL update
+
     if (onDealClick) {
-      console.log('DealsKanbanBoard: Calling onDealClick(null) to update URL')
       onDealClick(null)
     } else {
-      // Fallback: update URL directly if onDealClick is not provided
-      console.warn('DealsKanbanBoard: onDealClick not provided, updating URL directly')
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search)
         params.delete('deal')
         const queryString = params.toString()
         const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`
-        console.log('DealsKanbanBoard: Removing deal from URL:', newUrl)
         window.history.pushState({}, '', newUrl)
         window.dispatchEvent(new PopStateEvent('popstate'))
       }
     }
-    
+
     // Restore scroll position after modal closes
     requestAnimationFrame(() => {
       setTimeout(() => {
         const kanbanContainer = document.querySelector('[data-kanban-container]') as HTMLElement
         if (kanbanContainer) {
           kanbanContainer.scrollLeft = scrollPositionRef.current
-          console.log('Restored scroll position:', scrollPositionRef.current)
         }
       }, 50)
     })
   }, [onDealClick])
 
-  const handleAddStage = (afterStageId: string) => {
-    console.log('handleAddStage called for afterStageId:', afterStageId)
+  const handleAddStage = useCallback((afterStageId: string) => {
     setAfterStageId(afterStageId)
     setIsAddStageModalOpen(true)
-  }
+  }, [])
 
   const handleSaveNewStage = async (name: string, color: string) => {
     if (!selectedPipeline || !afterStageId) return
@@ -1998,24 +1813,12 @@ export function DealsKanbanBoard({
       // Find all stages that need to be shifted (order >= newOrder)
       const stagesToUpdate = stages.filter(s => s.order >= newOrder).sort((a, b) => b.order - a.order)
 
-      console.log('Creating new stage with data:', { 
-        name, 
-        color, 
-        order: newOrder, 
-        pipelineId: selectedPipeline.id,
-        afterStageId,
-        afterStageOrder: afterStage.order,
-        stagesToUpdate: stagesToUpdate.map(s => ({ id: s.id, name: s.name, order: s.order }))
-      })
-
       // Update stages in reverse order (from highest to lowest) to avoid conflicts
       for (const stage of stagesToUpdate) {
         try {
           await updateStage(stage.id, { order: stage.order + 1 })
-          console.log(`Updated stage ${stage.name} order from ${stage.order} to ${stage.order + 1}`)
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          console.error(`Failed to update stage ${stage.id}:`, errorMessage)
           
           // If unauthorized, stop and redirect to login
           if (errorMessage === 'UNAUTHORIZED') {
@@ -2036,7 +1839,6 @@ export function DealsKanbanBoard({
       setAfterStageId(null)
       await loadPipelines() // Reload pipelines to get updated stages
     } catch (error) {
-      console.error('Failed to create stage:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       
       // If unauthorized, redirect to login
@@ -2059,9 +1861,7 @@ export function DealsKanbanBoard({
       showSuccess('Stage color updated successfully')
       await loadPipelines()
     } catch (error) {
-      console.error('Failed to update stage color:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(errorMessage)
+      throw error instanceof Error ? error : new Error('Unknown error')
     }
   }
 
@@ -2093,7 +1893,6 @@ export function DealsKanbanBoard({
         } : null
       )
     } catch (error) {
-      console.error('Failed to update stage:', error)
       // Reload pipelines on error
       await loadPipelines()
       throw error
@@ -2108,16 +1907,13 @@ export function DealsKanbanBoard({
       showSuccess('Stage deleted successfully')
       await loadPipelines()
     } catch (error) {
-      console.error('Failed to delete stage:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      throw new Error(errorMessage)
+      throw error instanceof Error ? error : new Error('Unknown error')
     }
   }
 
   const [stageDropTargetId, setStageDropTargetId] = useState<string | null>(null)
 
   const handleStageDragStart = (stageId: string) => {
-    console.log('🔥 handleStageDragStart: Starting drag for stage:', stageId)
     setDraggedStageId(stageId)
     setStageDropTargetId(null)
   }
@@ -2129,15 +1925,7 @@ export function DealsKanbanBoard({
     e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
 
-    // Track the drop target - always set it when dragging over
-    // The draggedStageId should be set by handleStageDragStart
-    console.log('🔥 handleStageDragOver: Dragging over stage:', targetStageId, 'dragged:', draggedStageId)
-    
-    // If we don't have draggedStageId yet, skip reordering but still allow dragOver
-    if (!draggedStageId) {
-      console.log('🔥 handleStageDragOver: No draggedStageId yet, allowing dragOver but skipping reorder')
-      return
-    }
+    if (!draggedStageId) return
     
     // If dragging over the same stage, skip
     if (draggedStageId === targetStageId) {
@@ -2175,14 +1963,6 @@ export function DealsKanbanBoard({
   }
 
   const handleStageDragEnd = async () => {
-    console.log('🔥🔥🔥 handleStageDragEnd CALLED', { 
-      draggedStageId, 
-      stageDropTargetId,
-      hasPipeline: !!selectedPipeline,
-      pipelineStages: selectedPipeline?.stages?.length,
-      stagesOrder: selectedPipeline?.stages?.map(s => ({ id: s.id, name: s.name, order: s.order }))
-    })
-    
     // Save the current values to avoid stale closures
     const currentDraggedId = draggedStageId
     const currentTargetId = stageDropTargetId
@@ -2194,27 +1974,13 @@ export function DealsKanbanBoard({
     
     // If we have dragged stage and target, save the changes
     if (currentDraggedId && currentTargetId && currentDraggedId !== currentTargetId && currentPipeline) {
-      console.log('handleStageDragEnd: Saving stage reorder', {
-        dragged: currentDraggedId,
-        target: currentTargetId
-      })
       try {
         await handleStageDropAndSave(currentTargetId, currentDraggedId)
       } catch (error) {
-        console.error('handleStageDragEnd: Error saving:', error)
         await loadPipelines()
       }
     } else if (currentDraggedId && currentPipeline) {
-      // No explicit target, but check if order changed
-      // Use the current order from optimistically updated pipeline
       const currentStages = [...currentPipeline.stages].sort((a, b) => a.order - b.order)
-      
-      // Always save current order - if user dragged, order should be updated by dragOver
-      console.log('handleStageDragEnd: Saving current order (no explicit target)', {
-        dragged: currentDraggedId,
-        stagesCount: currentStages.length,
-        currentOrder: currentStages.map(s => ({ id: s.id, name: s.name, order: s.order }))
-      })
       
       try {
         const stageOrders = currentStages.map((stage, index) => ({
@@ -2222,18 +1988,7 @@ export function DealsKanbanBoard({
           order: index
         }))
         
-        console.log('handleStageDragEnd: Sending reorder request to API:', {
-          pipelineId: currentPipeline.id,
-          stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
-        })
-        
         const result = await reorderStages(currentPipeline.id, stageOrders)
-        console.log('handleStageDragEnd: API returned:', {
-          pipelineId: result.id,
-          stagesCount: result.stages?.length,
-          stagesOrder: result.stages?.map(s => ({ id: s.id, name: s.name, order: s.order }))
-        })
-        
         showSuccess('Stages reordered successfully')
         
         // Update state with result
@@ -2242,10 +1997,7 @@ export function DealsKanbanBoard({
         
         // Reload to ensure sync with server
         await loadPipelines()
-        
-        console.log('handleStageDragEnd: Save complete and pipelines reloaded')
       } catch (error) {
-        console.error('handleStageDragEnd: Error saving:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         showError('Failed to reorder stages', errorMessage)
         // Reload to revert optimistic update
@@ -2259,53 +2011,23 @@ export function DealsKanbanBoard({
     const currentDraggedStageId = draggedStageIdParam || draggedStageId
     const currentPipeline = selectedPipeline
     
-    console.log('handleStageDropAndSave called', {
-      targetStageId,
-      currentDraggedStageId,
-      draggedStageIdParam,
-      stateDraggedStageId: draggedStageId,
-      hasPipeline: !!currentPipeline
-    })
-    
     if (!currentDraggedStageId || !currentPipeline) {
-      console.error('handleStageDropAndSave: Missing required data', { 
-        currentDraggedStageId, 
-        hasPipeline: !!currentPipeline 
-      })
       return
     }
 
-    if (currentDraggedStageId === targetStageId) {
-      console.log('handleStageDropAndSave: Dropped on same stage, no change needed')
-      return
-    }
+    if (currentDraggedStageId === targetStageId) return
 
     try {
       // Get current order from the optimistically updated pipeline
       // handleStageDragOver already updated the order values, so we can use them directly
       // BUT we need to sort by the updated order values to get the correct sequence
       const stages = [...currentPipeline.stages].sort((a, b) => a.order - b.order)
-      console.log('handleStageDropAndSave: Current stages order (after optimistic update):', stages.map((s, i) => ({ 
-        id: s.id, 
-        name: s.name, 
-        order: s.order,
-        index: i 
-      })))
-      
+
       // Verify both stages exist
       const draggedIndex = stages.findIndex(s => s.id === currentDraggedStageId)
       const targetIndex = stages.findIndex(s => s.id === targetStageId)
       
-      if (draggedIndex === -1 || targetIndex === -1) {
-        console.error('handleStageDropAndSave: Could not find dragged or target stage', {
-          draggedIndex,
-          targetIndex,
-          draggedStageId: currentDraggedStageId,
-          targetStageId,
-          stageIds: stages.map(s => s.id)
-        })
-        return
-      }
+      if (draggedIndex === -1 || targetIndex === -1) return
 
       // The stages are already in the correct order from optimistic update
       // Just create stage orders with sequential indices (0, 1, 2, ...)
@@ -2314,48 +2036,7 @@ export function DealsKanbanBoard({
         order: index
       }))
       
-      console.log('handleStageDropAndSave: Final stage orders to save', {
-        stageOrders: stageOrders.map((so, i) => ({ 
-          id: so.id, 
-          order: so.order,
-          stageName: stages.find(s => s.id === so.id)?.name,
-          index: i
-        }))
-      })
-
-      console.log('handleStageDropAndSave: Sending reorder request:', {
-        pipelineId: currentPipeline.id,
-        draggedStageId: currentDraggedStageId,
-        targetStageId,
-        draggedIndex,
-        targetIndex,
-        stageOrders: stageOrders.map(so => ({ id: so.id, order: so.order }))
-      })
-
       const result = await reorderStages(currentPipeline.id, stageOrders)
-      console.log('✅ handleStageDropAndSave: Reorder successful, result:', result)
-      console.log('✅ handleStageDropAndSave: Result stages order:', result.stages?.map((s, i) => ({ 
-        id: s.id, 
-        name: s.name, 
-        order: s.order,
-        index: i 
-      })))
-      
-      // Verify the order was saved correctly
-      const savedOrder = result.stages?.map(s => s.order) || []
-      const expectedOrder = stageOrders.map(so => so.order)
-      const ordersMatch = JSON.stringify(savedOrder.sort()) === JSON.stringify(expectedOrder.sort())
-      console.log('✅ handleStageDropAndSave: Order verification', {
-        savedOrder,
-        expectedOrder,
-        ordersMatch,
-        savedStages: result.stages?.map((s, i) => ({ name: s.name, order: s.order, index: i }))
-      })
-      
-      if (!ordersMatch) {
-        console.error('❌ handleStageDropAndSave: Order mismatch! Saved order does not match expected order')
-      }
-      
       showSuccess('Stages reordered successfully')
       
       // Update pipelines list with the result
@@ -2368,40 +2049,10 @@ export function DealsKanbanBoard({
       // Update selected pipeline with the result
       setSelectedPipeline(result)
       
-      // Also reload to ensure we have the latest data from server
-      console.log('🔄 handleStageDropAndSave: Reloading pipelines to verify persistence...')
-      const reloadedData = await getPipelines()
-      
-      // After reload, check if order persisted
-      const reloadedPipeline = reloadedData.find(p => p.id === currentPipeline.id)
-      if (reloadedPipeline) {
-        const reloadedOrder = reloadedPipeline.stages?.map(s => s.order) || []
-        const persisted = JSON.stringify(reloadedOrder.sort()) === JSON.stringify(expectedOrder.sort())
-        console.log('🔄 handleStageDropAndSave: After reload verification', {
-          persisted,
-          reloadedOrder,
-          expectedOrder,
-          reloadedStages: reloadedPipeline.stages?.map((s, i) => ({ name: s.name, order: s.order, index: i }))
-        })
-        if (!persisted) {
-          console.error('❌ handleStageDropAndSave: Order did NOT persist after reload!')
-          console.error('❌ This indicates a backend/database issue - the order was not saved correctly')
-        } else {
-          console.log('✅ handleStageDropAndSave: Order persisted correctly after reload!')
-        }
-        
-        // Update state with reloaded data
-        setPipelines(reloadedData)
-        setSelectedPipeline(reloadedPipeline)
-      }
+      // Reload to ensure we have the latest data from server
+      await loadPipelines()
     } catch (error) {
-      console.error('handleStageDropAndSave: Failed to reorder stages:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('handleStageDropAndSave: Error details:', {
-        errorMessage,
-        errorStack: error instanceof Error ? error.stack : undefined
-      })
-      showError('Failed to reorder stages', errorMessage)
+      showError('Failed to reorder stages', error instanceof Error ? error.message : 'Unknown error')
       // Reload to revert optimistic update
       await loadPipelines()
     } finally {
@@ -2424,23 +2075,13 @@ export function DealsKanbanBoard({
   // Get unique assigned users from deals - MUST be called before any conditional returns
   const assignedUsers = useMemo(() => {
     const users = new Map<string, { id: string; name: string }>()
-    deals.forEach(deal => {
+    queryDeals.forEach(deal => {
       if (deal.assignedTo) {
         users.set(deal.assignedTo.id, deal.assignedTo)
       }
     })
     return Array.from(users.values())
-  }, [deals])
-
-  if (loading && deals.length === 0) {
-    return (
-      <div className="flex gap-4 overflow-x-auto pb-4 animate-in fade-in-50 duration-300">
-        {[1, 2, 3, 4].map((i) => (
-          <DealColumnSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
+  }, [queryDeals])
 
   // Check if user is authenticated
   const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('access_token')
@@ -2452,6 +2093,17 @@ export function DealsKanbanBoard({
         <Button onClick={() => window.location.href = '/login'}>
           Go to Login
         </Button>
+      </div>
+    )
+  }
+
+  // Show skeleton while pipelines or deals are loading (no flash of empty state)
+  if (pipelinesLoading || (isLoading && queryDeals.length === 0)) {
+    return (
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {[1, 2, 3, 4].map((i) => (
+          <DealColumnSkeleton key={i} />
+        ))}
       </div>
     )
   }
@@ -2503,14 +2155,6 @@ export function DealsKanbanBoard({
       contactInfo?: string
     }
   }) => {
-    // Debug: Log all incoming data to trace stageId corruption
-    console.log('handleCreateDeal called with:', {
-      dealData: JSON.stringify(dealData, null, 2),
-      stageIdType: typeof dealData.stageId,
-      stageIdValue: dealData.stageId,
-      selectedPipelineId: selectedPipeline?.id
-    })
-
     if (!selectedPipeline) {
       showError('No pipeline selected', 'Please select a pipeline first')
       return
@@ -2523,12 +2167,6 @@ export function DealsKanbanBoard({
     }
 
     if (!isValidUUID(dealData.stageId)) {
-      console.error('handleCreateDeal: INVALID STAGE ID DETECTED!', {
-        stageId: dealData.stageId,
-        type: typeof dealData.stageId,
-        selectedStageId,
-        isObjectString: dealData.stageId === '[object Object]'
-      })
       showError('Invalid stage', `Stage ID is invalid: "${dealData.stageId}". Please try again.`)
       return
     }
@@ -2551,8 +2189,6 @@ export function DealsKanbanBoard({
           })
           contactId = contact.id
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error)
-          console.error('Failed to create contact:', errorMsg)
           // Continue without contact
         }
       }
@@ -2565,21 +2201,11 @@ export function DealsKanbanBoard({
           const user = JSON.parse(userStr)
           currentUserId = user.id
         }
-      } catch (error) {
-        console.error('Failed to get current user:', error)
+      } catch {
+        // Continue without user ID
       }
 
-      // Create deal
       const { createDeal } = await import('@/lib/api/deals')
-      console.log('Creating deal with data:', {
-        title: dealData.title,
-        amount: dealData.amount,
-        pipelineId: selectedPipeline?.id,
-        stageId: dealData.stageId,
-        contactId: contactId || undefined,
-        assignedToId: currentUserId,
-      })
-
       const newDeal = await createDeal({
         title: dealData.title,
         amount: dealData.amount,
@@ -2589,8 +2215,6 @@ export function DealsKanbanBoard({
         assignedToId: currentUserId,
       })
 
-      console.log('Deal created successfully:', newDeal?.id, newDeal?.title, newDeal?.amount)
-      
       // Save deal to sessionStorage for immediate access in detail page
       if (typeof window !== 'undefined' && newDeal?.id) {
         try {
@@ -2630,8 +2254,8 @@ export function DealsKanbanBoard({
           }
           sessionStorage.setItem(`deal-${newDeal.id}`, JSON.stringify(cleanDeal))
           sessionStorage.setItem(`deal-${newDeal.id}-isNew`, 'true')
-        } catch (e) {
-          console.error('Failed to save deal to sessionStorage:', e)
+        } catch {
+          // sessionStorage save failed — non-critical
         }
       }
 
@@ -2645,13 +2269,7 @@ export function DealsKanbanBoard({
       await queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
     } catch (error) {
       // Log error without circular references
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      const errorStack = error instanceof Error ? error.stack : undefined
-      console.error('Failed to create deal:', errorMessage)
-      if (errorStack) {
-        console.error('Error stack:', errorStack)
-      }
-      showError('Failed to create deal', errorMessage)
+      showError('Failed to create deal', error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -2672,7 +2290,7 @@ export function DealsKanbanBoard({
       >
         <div className="flex gap-3 pb-4" style={{ minWidth: 'max-content' }}>
           {stages.map((stage) => {
-          const stageDeals = filteredAndSortedDeals.filter(deal => deal.stageId === stage.id)
+          const stageDeals = dealsByStage.get(stage.id) || []
           const isDraggedOver = draggedDeal !== null && draggedDeal.stageId !== stage.id
           const isStageDragged = draggedStageId === stage.id
           // Pass info about whether ANY stage is being dragged (not just this one)
@@ -2691,7 +2309,7 @@ export function DealsKanbanBoard({
               onMarkAsLost={handleMarkAsLost}
               onReassignContact={handleReassignContact}
               onOpenInSidebar={handleOpenInSidebar}
-              onDeleteDeal={handleDeleteDeal}
+              onDeleteDeal={handleRequestDeleteDeal}
               onAddDeal={handleAddDealClick}
               onAddStage={handleAddStage}
               onUpdateStage={handleUpdateStage}
@@ -2703,7 +2321,6 @@ export function DealsKanbanBoard({
               onStageDropAndSave={handleStageDropAndSave}
               isStageDragged={isStageDragged}
               isAnyStageDragging={isAnyStageDragging}
-              availableContacts={contacts}
               pipelineId={selectedPipeline.id}
               searchQuery={filters.searchQuery || filters.title}
             />
@@ -2717,7 +2334,6 @@ export function DealsKanbanBoard({
         <CreateDealModal
           isOpen={isCreateModalOpen}
           onClose={() => {
-            console.log('Closing modal, current state:', { isCreateModalOpen, selectedStageId })
             setIsCreateModalOpen(false)
             setSelectedStageId(null)
           }}
@@ -2762,6 +2378,26 @@ export function DealsKanbanBoard({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Deal Confirmation Dialog */}
+      <Dialog open={!!dealToDelete} onOpenChange={(open) => { if (!open) setDealToDelete(null) }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Удалить сделку?</DialogTitle>
+            <DialogDescription>
+              Это действие нельзя отменить. Сделка будет удалена безвозвратно.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDealToDelete(null)} disabled={isDeleting}>
+              Отмена
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteDeal} disabled={isDeleting}>
+              {isDeleting ? 'Удаление...' : 'Удалить'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
