@@ -663,7 +663,6 @@ export class DealsService {
             id: true,
             firstName: true,
             lastName: true,
-            avatar: true,
           },
         },
         contact: {
@@ -988,7 +987,6 @@ export class DealsService {
       assignedTo: deal.assignedTo ? {
         id: deal.assignedTo.id,
         name: `${deal.assignedTo.firstName || ''} ${deal.assignedTo.lastName || ''}`.trim() || 'Unknown User',
-        avatar: deal.assignedTo.avatar || null,
       } : null,
       contact: deal.contact ? {
         id: deal.contact.id,
