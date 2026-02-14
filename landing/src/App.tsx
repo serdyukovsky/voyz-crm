@@ -361,8 +361,8 @@ function TasksDemo() {
 
   return (
     <div className="w-full flex flex-col lg:flex-row">
-      {/* Sidebar — cards (LEFT, hidden on mobile) */}
-      <div className="hidden lg:flex lg:flex-1 min-w-0 p-8 flex-col justify-center gap-3">
+      {/* Sidebar — cards (LEFT, always visible) */}
+      <div className="flex lg:flex-1 min-w-0 p-6 lg:p-8 flex-col justify-center gap-3">
         {steps.map((s, i) => {
           const isActive = activeStep === i;
           const isPast = activeStep > i;
@@ -406,8 +406,8 @@ function TasksDemo() {
         })}
       </div>
 
-      {/* Demo area (RIGHT, full width on mobile) */}
-      <div className="w-full lg:w-[720px] flex-shrink-0 relative h-[320px] sm:h-[420px]">
+      {/* Demo area (RIGHT, hidden on mobile) */}
+      <div className="hidden lg:block w-full lg:w-[720px] flex-shrink-0 relative h-[320px] sm:h-[420px]">
         {/* Kanban columns behind */}
         <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[320px] sm:h-[420px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
           {columns.map(column => (
@@ -636,8 +636,8 @@ function KanbanProcessDemo() {
 
   return (
     <div className="w-full flex flex-col lg:flex-row">
-      {/* Sidebar — left (hidden on mobile) */}
-      <div className="hidden lg:flex lg:flex-1 min-w-0 p-8 flex-col justify-center gap-3">
+      {/* Sidebar — left (always visible) */}
+      <div className="flex lg:flex-1 min-w-0 p-6 lg:p-8 flex-col justify-center gap-3">
         {steps.map((s, i) => {
           const isActive = activeStep === i;
           const isPast = activeStep > i;
@@ -681,8 +681,8 @@ function KanbanProcessDemo() {
         })}
       </div>
 
-      {/* Demo — right (full width on mobile) */}
-      <div className="w-full lg:w-[720px] flex-shrink-0 relative h-[380px] sm:h-[480px]">
+      {/* Demo — right (hidden on mobile) */}
+      <div className="hidden lg:block w-full lg:w-[720px] flex-shrink-0 relative h-[380px] sm:h-[480px]">
         <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[380px] sm:h-[480px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
           {columns.map(column => (
             <div key={column.id} className="w-[200px] sm:w-[220px] flex-shrink-0 flex flex-col">
@@ -955,7 +955,7 @@ export default function TripSystemLanding() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-24 sm:pt-32 pb-12 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
+      <section className="pt-32 pb-8 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-3 mb-6 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm text-white/70">
@@ -979,11 +979,11 @@ export default function TripSystemLanding() {
             </div>
           </div>
 
-          {/* Hero Visual Element — hidden on mobile, visible on sm+ */}
-          <div className="relative w-full hidden sm:block">
+          {/* Hero Visual Element */}
+          <div className="relative w-full">
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 pointer-events-none"></div>
-            <div className="border border-white/10 rounded-2xl overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
-              <div className="bg-gradient-to-br from-purple-500/10 via-transparent to-green-500/10">
+            <div className="sm:border sm:border-white/10 sm:rounded-2xl overflow-hidden sm:bg-gradient-to-b sm:from-white/5 sm:to-transparent">
+              <div className="sm:bg-gradient-to-br sm:from-purple-500/10 sm:via-transparent sm:to-green-500/10">
                 <KanbanDemo />
               </div>
             </div>
@@ -992,7 +992,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Why TripSystem Section */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
