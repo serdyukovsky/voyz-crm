@@ -919,18 +919,21 @@ export default function TripSystemLanding() {
     {
       id: 'tasks',
       title: 'Управление задачами',
+      shortTitle: 'Задачи',
       description: 'Создание и отслеживание задач по работе с гидами',
       icon: CheckCircle2
     },
     {
       id: 'kanban',
       title: 'Kanban воронка',
+      shortTitle: 'Kanban',
       description: 'Визуальное управление процессом привлечения гидов',
       icon: Workflow
     },
     {
       id: 'dashboard',
       title: 'Дашборд',
+      shortTitle: 'Дашборд',
       description: 'Аналитика и ключевые метрики в реальном времени',
       icon: BarChart3
     }
@@ -1199,7 +1202,8 @@ export default function TripSystemLanding() {
                 >
                   <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                     <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span className="font-medium text-xs sm:text-sm truncate">{feature.title}</span>
+                    <span className="font-medium text-xs sm:text-sm truncate sm:hidden">{feature.shortTitle}</span>
+                    <span className="font-medium text-xs sm:text-sm truncate hidden sm:inline">{feature.title}</span>
                   </div>
                 </button>
               );
@@ -1363,7 +1367,7 @@ export default function TripSystemLanding() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-white/40">
-              &copy; 2025 TripSystem. Все права защищены.
+              &copy; {new Date().getFullYear()} TripSystem. Все права защищены.
             </div>
             <div className="flex gap-6 text-sm text-white/60">
               <a href="#" className="hover:text-white transition-colors">Контакты</a>
