@@ -129,7 +129,7 @@ function KanbanDemo() {
   }, [moveIndex]);
 
   return (
-    <div className="w-full flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden p-3 sm:p-5 h-[420px]">
+    <div className="w-full flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden p-3 sm:p-5 h-[280px] sm:h-[420px]">
       {columns.map(column => (
         <div key={column.id} className="flex-1 min-w-[160px] flex flex-col">
           {/* Column header */}
@@ -361,8 +361,8 @@ function TasksDemo() {
 
   return (
     <div className="w-full flex flex-col lg:flex-row">
-      {/* Sidebar — cards (LEFT) */}
-      <div className="lg:flex-1 min-w-0 p-4 sm:p-5 lg:p-8 flex flex-col justify-center gap-3">
+      {/* Sidebar — cards (LEFT, hidden on mobile) */}
+      <div className="hidden lg:flex lg:flex-1 min-w-0 p-8 flex-col justify-center gap-3">
         {steps.map((s, i) => {
           const isActive = activeStep === i;
           const isPast = activeStep > i;
@@ -370,7 +370,7 @@ function TasksDemo() {
           return (
             <div
               key={i}
-              className={`rounded-xl p-4 lg:p-5 border transition-all duration-700 ease-out ${
+              className={`rounded-xl p-5 border transition-all duration-700 ease-out ${
                 isActive
                   ? 'bg-white/[0.06] border-white/[0.12] -translate-x-2 scale-[1.02]'
                   : isPast
@@ -389,12 +389,12 @@ function TasksDemo() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className={`text-sm lg:text-base font-semibold mb-1 transition-all duration-700 ${
+                  <div className={`text-base font-semibold mb-1 transition-all duration-700 ${
                     isActive ? 'text-white' : isPast ? 'text-white/70' : 'text-white/50'
                   }`}>
                     {s.title}
                   </div>
-                  <p className={`text-xs lg:text-sm leading-relaxed transition-all duration-700 ${
+                  <p className={`text-sm leading-relaxed transition-all duration-700 ${
                     isActive ? 'text-white/50' : isPast ? 'text-white/35' : 'text-white/30'
                   }`}>
                     {s.desc}
@@ -406,10 +406,10 @@ function TasksDemo() {
         })}
       </div>
 
-      {/* Demo area (RIGHT) */}
-      <div className="lg:w-[720px] flex-shrink-0 relative h-[420px]">
+      {/* Demo area (RIGHT, full width on mobile) */}
+      <div className="w-full lg:w-[720px] flex-shrink-0 relative h-[320px] sm:h-[420px]">
         {/* Kanban columns behind */}
-        <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[420px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
+        <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[320px] sm:h-[420px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
           {columns.map(column => (
             <div key={column.id} className="w-[200px] sm:w-[220px] flex-shrink-0 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
@@ -636,8 +636,8 @@ function KanbanProcessDemo() {
 
   return (
     <div className="w-full flex flex-col lg:flex-row">
-      {/* Sidebar — left */}
-      <div className="lg:flex-1 min-w-0 p-4 sm:p-5 lg:p-8 flex flex-col justify-center gap-3">
+      {/* Sidebar — left (hidden on mobile) */}
+      <div className="hidden lg:flex lg:flex-1 min-w-0 p-8 flex-col justify-center gap-3">
         {steps.map((s, i) => {
           const isActive = activeStep === i;
           const isPast = activeStep > i;
@@ -645,7 +645,7 @@ function KanbanProcessDemo() {
           return (
             <div
               key={i}
-              className={`rounded-xl p-4 lg:p-5 border transition-all duration-700 ease-out ${
+              className={`rounded-xl p-5 border transition-all duration-700 ease-out ${
                 isActive
                   ? 'bg-white/[0.06] border-white/[0.12] -translate-x-2 scale-[1.02]'
                   : isPast
@@ -664,12 +664,12 @@ function KanbanProcessDemo() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className={`text-sm lg:text-base font-semibold mb-1 transition-all duration-700 ${
+                  <div className={`text-base font-semibold mb-1 transition-all duration-700 ${
                     isActive ? 'text-white' : isPast ? 'text-white/70' : 'text-white/50'
                   }`}>
                     {s.title}
                   </div>
-                  <p className={`text-xs lg:text-sm leading-relaxed transition-all duration-700 ${
+                  <p className={`text-sm leading-relaxed transition-all duration-700 ${
                     isActive ? 'text-white/50' : isPast ? 'text-white/35' : 'text-white/30'
                   }`}>
                     {s.desc}
@@ -681,9 +681,9 @@ function KanbanProcessDemo() {
         })}
       </div>
 
-      {/* Demo — right */}
-      <div className="lg:w-[720px] flex-shrink-0 relative h-[480px]">
-        <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[480px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
+      {/* Demo — right (full width on mobile) */}
+      <div className="w-full lg:w-[720px] flex-shrink-0 relative h-[380px] sm:h-[480px]">
+        <div className={`flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden py-3 sm:py-5 pl-3 sm:pl-5 pr-2 transition-all duration-300 h-[380px] sm:h-[480px] ${showModal ? 'blur-[2px] opacity-50' : ''}`}>
           {columns.map(column => (
             <div key={column.id} className="w-[200px] sm:w-[220px] flex-shrink-0 flex flex-col">
               <div className="flex items-center gap-2 mb-3">
@@ -955,17 +955,17 @@ export default function TripSystemLanding() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-24 px-6 relative overflow-hidden">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
         <div className="max-w-7xl mx-auto">
-          <div className="max-w-4xl mx-auto text-center mb-16">
+          <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-3 mb-6 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm text-white/70">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
               300+ гидов уже в базе
             </div>
-            <h1 className="text-6xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-4 sm:mb-6 bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
               CRM для работы с гидами
             </h1>
-            <p className="text-xl text-white/60 mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-xl text-white/60 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed">
               Управляйте базой гидов, отслеживайте воронку привлечения и автоматизируйте процессы — всё в одной системе
             </p>
             <div className="flex gap-4 justify-center">
@@ -979,8 +979,8 @@ export default function TripSystemLanding() {
             </div>
           </div>
 
-          {/* Hero Visual Element */}
-          <div className="relative w-full">
+          {/* Hero Visual Element — hidden on mobile, visible on sm+ */}
+          <div className="relative w-full hidden sm:block">
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 pointer-events-none"></div>
             <div className="border border-white/10 rounded-2xl overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
               <div className="bg-gradient-to-br from-purple-500/10 via-transparent to-green-500/10">
@@ -1172,34 +1172,34 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Feature Showcase with Tabs */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-12 sm:py-20 px-4 sm:px-6 border-t border-white/10">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 tracking-tight">
               Интерфейс системы
             </h2>
-            <p className="text-white/60 max-w-2xl mx-auto">
+            <p className="text-sm sm:text-base text-white/60 max-w-2xl mx-auto">
               Современный и интуитивно понятный интерфейс для эффективной работы
             </p>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 mb-8 max-w-3xl mx-auto border border-white/10 rounded-xl p-1 bg-white/5">
+          <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 max-w-3xl mx-auto border border-white/10 rounded-xl p-1 bg-white/5">
             {features.map(feature => {
               const Icon = feature.icon;
               return (
                 <button
                   key={feature.id}
                   onClick={() => setActiveTab(feature.id)}
-                  className={`flex-1 px-6 py-3 rounded-lg transition-all ${
+                  className={`flex-1 px-2 sm:px-6 py-2 sm:py-3 rounded-lg transition-all ${
                     activeTab === feature.id
                       ? 'bg-white text-black'
                       : 'text-white/60 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <Icon className="w-4 h-4" />
-                    <span className="font-medium text-sm">{feature.title}</span>
+                  <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="font-medium text-xs sm:text-sm truncate">{feature.title}</span>
                   </div>
                 </button>
               );
