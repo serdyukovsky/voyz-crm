@@ -235,7 +235,7 @@ export default function TasksPage() {
         console.error('Error creating task:', errorMessage)
         if (errorMessage === 'UNAUTHORIZED') {
           if (typeof window !== 'undefined') {
-            window.location.href = '/login'
+            window.location.href = '/app/login'
           }
           return
         }
@@ -262,7 +262,7 @@ export default function TasksPage() {
               const token = localStorage.getItem('access_token')
               if (!token) {
                 console.warn('No token found, redirecting to login')
-                window.location.href = '/login'
+                window.location.href = '/app/login'
                 return
               }
               setIsCreateTaskModalOpen(true)

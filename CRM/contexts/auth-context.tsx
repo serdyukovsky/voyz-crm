@@ -57,8 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Handle redirect when backend is unavailable and user is not authenticated
   useEffect(() => {
     if (isBackendUnavailable && authStatus === 'unauthenticated') {
-      // Redirect to landing page if backend is unavailable and user is not authenticated
-      window.location.href = '/'
+      // Redirect to login if backend is unavailable and user is not authenticated
+      window.location.href = '/app/login'
     }
   }, [isBackendUnavailable, authStatus])
 
