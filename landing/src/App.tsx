@@ -1016,11 +1016,14 @@ export default function TripSystemLanding() {
         <div className="sm:hidden w-full relative z-10">
           <KanbanDemo />
         </div>
-        {/* Desktop: with background, constrained width */}
+        {/* Desktop: original style with gradient overlay */}
         <div className="hidden sm:block max-w-7xl mx-auto px-6 relative z-10">
-          <div className="border border-white/10 rounded-2xl overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
-            <div className="bg-gradient-to-br from-purple-500/10 via-transparent to-green-500/10">
-              <KanbanDemo />
+          <div className="relative w-full">
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 pointer-events-none"></div>
+            <div className="border border-white/10 rounded-2xl overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
+              <div className="bg-gradient-to-br from-purple-500/10 via-transparent to-green-500/10">
+                <KanbanDemo />
+              </div>
             </div>
           </div>
         </div>
