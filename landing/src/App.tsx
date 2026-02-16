@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Database, BarChart3, Zap, Users, CheckCircle2, Shield, Workflow, TrendingUp, ArrowRight, Layers, Bell, Search, Link2, History, LineChart, Calendar, Check, X, MousePointerClick, PenLine, MessageSquare, Send, MoreHorizontal, ChevronDown, Plus } from 'lucide-react';
+import Grainient from './Grainient';
 
 // --- Kanban Demo Data ---
 interface MockDeal {
@@ -948,7 +949,7 @@ export default function TripSystemLanding() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-black/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 bg-transparent">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="text-xl font-semibold tracking-tight">TripSystem</div>
           <a href="/app/" className="px-6 py-2 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors">
@@ -959,7 +960,34 @@ export default function TripSystemLanding() {
 
       {/* Hero Section */}
       <section className="pt-32 pb-8 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+        {/* Grainient Background */}
+        <div className="absolute inset-0 z-0">
+          <Grainient
+            color1="#212121"
+            color2="#b8b2d2"
+            color3="#B19EEF"
+            timeSpeed={0.25}
+            colorBalance={0}
+            warpStrength={1}
+            warpFrequency={5}
+            warpSpeed={2}
+            warpAmplitude={50}
+            blendAngle={0}
+            blendSoftness={0.05}
+            rotationAmount={500}
+            noiseScale={2}
+            grainAmount={0.1}
+            grainScale={2}
+            grainAnimated={false}
+            contrast={1.5}
+            gamma={1}
+            saturation={1}
+            centerX={0}
+            centerY={0}
+            zoom={0.9}
+          />
+        </div>
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-3 mb-6 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm text-white/70">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
@@ -976,22 +1004,23 @@ export default function TripSystemLanding() {
                 Войти
                 <ArrowRight className="w-4 h-4" />
               </a>
-              <button className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/5 transition-colors">
+              <a href="https://t.me/iamserdyuk" target="_blank" rel="noopener noreferrer" className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/5 transition-colors">
                 Связаться с нами
-              </button>
+              </a>
             </div>
           </div>
 
           {/* Hero Visual Element */}
           <div className="relative w-full">
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10 pointer-events-none"></div>
-            <div className="sm:border sm:border-white/10 sm:rounded-2xl overflow-hidden sm:bg-gradient-to-b sm:from-white/5 sm:to-transparent">
+            <div className="sm:border sm:border-white/10 sm:rounded-2xl overflow-hidden bg-black/70 backdrop-blur-sm">
               <div className="sm:bg-gradient-to-br sm:from-purple-500/10 sm:via-transparent sm:to-green-500/10">
                 <KanbanDemo />
               </div>
             </div>
           </div>
         </div>
+        {/* Fade to black at bottom of hero */}
+        <div className="absolute bottom-0 left-0 right-0 h-[500px] bg-gradient-to-b from-transparent via-black/70 to-black z-30 pointer-events-none"></div>
       </section>
 
       {/* Why TripSystem Section */}
@@ -1051,7 +1080,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Key Features Section */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
@@ -1175,7 +1204,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Feature Showcase with Tabs */}
-      <section className="py-12 sm:py-20 px-4 sm:px-6 border-t border-white/10">
+      <section className="py-12 sm:py-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 tracking-tight">
@@ -1239,7 +1268,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Products Section */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">
@@ -1325,7 +1354,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Technology Section */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">
@@ -1342,7 +1371,7 @@ export default function TripSystemLanding() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6 border-t border-white/10">
+      <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-2xl mx-auto text-center border border-white/10 rounded-3xl p-12 bg-gradient-to-b from-white/5 to-transparent relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5"></div>
@@ -1363,16 +1392,14 @@ export default function TripSystemLanding() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-white/10">
+      <footer className="py-12 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-white/40">
               &copy; {new Date().getFullYear()} TripSystem. Все права защищены.
             </div>
             <div className="flex gap-6 text-sm text-white/60">
-              <a href="#" className="hover:text-white transition-colors">Контакты</a>
-              <a href="#" className="hover:text-white transition-colors">Поддержка</a>
-              <a href="#" className="hover:text-white transition-colors">Документация</a>
+              <a href="https://t.me/iamserdyuk" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Контакты</a>
             </div>
           </div>
         </div>
