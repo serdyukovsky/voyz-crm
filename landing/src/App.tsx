@@ -145,7 +145,7 @@ function KanbanDemo() {
             {column.deals.map(deal => (
               <div
                 key={deal.id}
-                className={`rounded-lg border border-white/[0.12] bg-black/60 backdrop-blur-sm p-3 transition-all duration-[400ms] ease-in-out ${
+                className={`rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 transition-all duration-[400ms] ease-in-out ${
                   movingDealId === deal.id && phase === 'fadeOut'
                     ? 'opacity-0 scale-95 -translate-y-1'
                     : movingDealId === deal.id && phase === 'fadeIn'
@@ -1011,9 +1011,18 @@ export default function TripSystemLanding() {
           </div>
 
         </div>
-        {/* Hero Visual Element — full width, cards flow beyond container */}
-        <div className="w-full relative z-10">
+        {/* Hero Visual Element */}
+        {/* Mobile: no background, full width */}
+        <div className="sm:hidden w-full relative z-10">
           <KanbanDemo />
+        </div>
+        {/* Desktop: with background, constrained width */}
+        <div className="hidden sm:block max-w-7xl mx-auto px-6 relative z-10">
+          <div className="border border-white/10 rounded-2xl overflow-hidden bg-gradient-to-b from-white/5 to-transparent">
+            <div className="bg-gradient-to-br from-purple-500/10 via-transparent to-green-500/10">
+              <KanbanDemo />
+            </div>
+          </div>
         </div>
         {/* Fade Grainient background to black — between bg (z-0) and content (z-10) */}
         <div className="absolute bottom-0 left-0 right-0 h-[400px] sm:h-[500px] bg-gradient-to-b from-transparent to-black z-[5] pointer-events-none"></div>
