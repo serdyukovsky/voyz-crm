@@ -2134,7 +2134,7 @@ export function DealsKanbanBoard({
           variant="outline" 
           onClick={() => {
             if (typeof window !== 'undefined') {
-              window.location.href = '/settings/pipelines'
+              window.location.href = '/app/settings/pipelines'
             }
           }}
         >
