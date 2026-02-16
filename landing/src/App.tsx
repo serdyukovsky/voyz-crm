@@ -952,7 +952,7 @@ export default function TripSystemLanding() {
       <nav className="fixed top-0 w-full z-50 bg-transparent">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="text-xl font-semibold tracking-tight">TripSystem</div>
-          <a href="/app/" className="px-6 py-2 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors">
+          <a href="/app/login" className="px-6 py-2 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors">
             Войти в систему
           </a>
         </div>
@@ -1000,7 +1000,7 @@ export default function TripSystemLanding() {
               Управляйте базой гидов, отслеживайте воронку привлечения и автоматизируйте процессы — всё в одной системе
             </p>
             <div className="flex gap-4 justify-center">
-              <a href="/app/" className="px-8 py-3 rounded-full bg-white text-black font-medium hover:bg-white/90 transition-colors flex items-center gap-2">
+              <a href="/app/login" className="px-8 py-3 rounded-full bg-white text-black font-medium hover:bg-white/90 transition-colors flex items-center gap-2">
                 Войти
                 <ArrowRight className="w-4 h-4" />
               </a>
@@ -1295,7 +1295,7 @@ export default function TripSystemLanding() {
                 Полноценная система для управления базой гидов, воронкой привлечения, задачами и аналитикой.
                 Адаптирована под специфику тревел-бизнеса.
               </p>
-              <a href="/app/" className="inline-block px-6 py-2 rounded-full border border-white/10 hover:bg-white/5 transition-colors text-sm">
+              <a href="/app/login" className="inline-block px-6 py-2 rounded-full border border-white/10 hover:bg-white/5 transition-colors text-sm">
                 Войти в CRM
               </a>
             </div>
@@ -1382,7 +1382,7 @@ export default function TripSystemLanding() {
               <p className="text-lg text-white/60 mb-8">
                 Войдите в систему и начните эффективно управлять процессом привлечения гидов
               </p>
-              <a href="/app/" className="px-8 py-3 rounded-full bg-white text-black font-medium hover:bg-white/90 transition-colors inline-flex items-center gap-2">
+              <a href="/app/login" className="px-8 py-3 rounded-full bg-white text-black font-medium hover:bg-white/90 transition-colors inline-flex items-center gap-2">
                 Войти в систему
                 <ArrowRight className="w-4 h-4" />
               </a>
