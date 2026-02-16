@@ -130,7 +130,7 @@ function KanbanDemo() {
   }, [moveIndex]);
 
   return (
-    <div className="w-full flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden p-3 sm:p-5 h-[280px] sm:h-[420px]">
+    <div className="w-full flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden p-3 sm:p-5 h-[340px] sm:h-[420px]">
       {columns.map(column => (
         <div key={column.id} className="flex-1 min-w-[160px] flex flex-col">
           {/* Column header */}
@@ -145,7 +145,7 @@ function KanbanDemo() {
             {column.deals.map(deal => (
               <div
                 key={deal.id}
-                className={`rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 transition-all duration-[400ms] ease-in-out ${
+                className={`rounded-lg border border-white/[0.12] bg-black/60 backdrop-blur-sm p-3 transition-all duration-[400ms] ease-in-out ${
                   movingDealId === deal.id && phase === 'fadeOut'
                     ? 'opacity-0 scale-95 -translate-y-1'
                     : movingDealId === deal.id && phase === 'fadeIn'
@@ -959,7 +959,7 @@ export default function TripSystemLanding() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-8 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
+      <section className="pt-32 pb-8 sm:pb-24 relative overflow-hidden">
         {/* Grainient Background */}
         <div className="absolute inset-0 z-0">
           <Grainient
@@ -987,7 +987,7 @@ export default function TripSystemLanding() {
             zoom={0.9}
           />
         </div>
-        <div className="max-w-7xl mx-auto relative z-10">
+        <div className="max-w-7xl mx-auto relative z-10 px-4 sm:px-6">
           <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-16">
             <div className="inline-flex items-center gap-3 mb-6 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-sm text-white/70">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
@@ -1010,17 +1010,13 @@ export default function TripSystemLanding() {
             </div>
           </div>
 
-          {/* Hero Visual Element */}
-          <div className="relative w-full">
-            <div className="sm:border sm:border-white/10 sm:rounded-2xl overflow-hidden bg-black/70 backdrop-blur-sm">
-              <div className="sm:bg-gradient-to-br sm:from-purple-500/10 sm:via-transparent sm:to-green-500/10">
-                <KanbanDemo />
-              </div>
-            </div>
-          </div>
         </div>
-        {/* Fade to black at bottom of hero */}
-        <div className="absolute bottom-0 left-0 right-0 h-[500px] bg-gradient-to-b from-transparent via-black/70 to-black z-30 pointer-events-none"></div>
+        {/* Hero Visual Element — full width, cards flow beyond container */}
+        <div className="w-full relative z-10">
+          <KanbanDemo />
+        </div>
+        {/* Fade Grainient background to black — between bg (z-0) and content (z-10) */}
+        <div className="absolute bottom-0 left-0 right-0 h-[400px] sm:h-[500px] bg-gradient-to-b from-transparent to-black z-[5] pointer-events-none"></div>
       </section>
 
       {/* Why TripSystem Section */}
