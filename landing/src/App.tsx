@@ -1010,7 +1010,6 @@ export default function TripSystemLanding() {
             </div>
           </div>
 
-        </div>
           {/* Hero Visual Element */}
           <div className="relative w-full">
             <div className="sm:border sm:border-white/10 sm:rounded-2xl overflow-hidden bg-black/70 backdrop-blur-sm">
