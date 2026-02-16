@@ -44,7 +44,7 @@ export function PageSkeleton() {
         {mounted && (
           <div className="flex items-center justify-center">
             <img 
-              src="/logo_voyz_crm.svg" 
+              src={import.meta.env.BASE_URL + "logo_voyz_crm.svg"} 
               alt="Voyz CRM" 
               className={cn(
                 "h-16 w-auto animate-logo-pulse",

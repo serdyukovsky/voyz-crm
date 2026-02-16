@@ -47,7 +47,7 @@ export async function getTasks(params?: {
   const token = localStorage.getItem('access_token')
   if (!token) {
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     return []
   }
@@ -78,7 +78,7 @@ export async function getTasks(params?: {
         localStorage.removeItem('user')
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         return []
       }
@@ -168,7 +168,7 @@ export async function createTask(data: CreateTaskDto): Promise<Task> {
         
         // Redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         // Throw error to trigger redirect in component
@@ -230,7 +230,7 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     throw new Error('No access token found')
@@ -254,7 +254,7 @@ export async function updateTask(id: string, data: UpdateTaskDto): Promise<Task>
         localStorage.removeItem('user')
         
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         throw new Error('UNAUTHORIZED')
@@ -297,7 +297,7 @@ export async function deleteTask(id: string): Promise<void> {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     throw new Error('No access token found')
@@ -320,7 +320,7 @@ export async function deleteTask(id: string): Promise<void> {
         localStorage.removeItem('user')
         
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         throw new Error('UNAUTHORIZED')

@@ -66,7 +66,7 @@ export async function getLogs(filters?: LogFilters): Promise<Log[]> {
         console.warn('Unauthorized to fetch logs')
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
+        window.location.href = '/app/login'
         return []
       }
       const errorText = await response.text().catch(() => 'Unknown error')

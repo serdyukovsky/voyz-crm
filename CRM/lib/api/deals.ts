@@ -95,7 +95,7 @@ export async function getDeals(params?: {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     return { data: [], nextCursor: undefined, hasMore: false }
@@ -156,7 +156,7 @@ export async function getDeals(params?: {
         localStorage.removeItem('user')
         
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         return { data: [], nextCursor: undefined, hasMore: false }

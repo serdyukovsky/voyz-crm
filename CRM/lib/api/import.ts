@@ -250,8 +250,8 @@ export async function importContacts(
       localStorage.removeItem('user_id')
       localStorage.removeItem('userId')
       // Redirect to login
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      if (typeof window !== 'undefined' && window.location.pathname !== '/app/login') {
+        window.location.href = '/app/login'
       }
       throw new UnauthorizedError()
     }
@@ -346,8 +346,8 @@ export async function importDeals(
       localStorage.removeItem('user_id')
       localStorage.removeItem('userId')
       // Redirect to login
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      if (typeof window !== 'undefined' && window.location.pathname !== '/app/login') {
+        window.location.href = '/app/login'
       }
       throw new UnauthorizedError()
     }

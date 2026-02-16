@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle redirect when backend is unavailable and user is not authenticated
   useEffect(() => {
-    if (isBackendUnavailable && authStatus === 'unauthenticated' && location.pathname !== '/login') {
+    if (isBackendUnavailable && authStatus === 'unauthenticated' && location.pathname !== '/app/login') {
       // Redirect to login if backend is unavailable and user is not authenticated
       navigate('/login', { replace: true })
     }
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('user')
         
         // Show error toast and redirect will happen via useEffect
-        if (location.pathname !== '/login') {
+        if (location.pathname !== '/app/login') {
           toast.error('Требуется авторизация', {
             description: 'Не удается подключиться к серверу. Пожалуйста, войдите в систему.',
             duration: 4000,
@@ -356,7 +356,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.clear()
       
       // Only redirect if not already on login page
-      if (location.pathname !== '/login') {
+      if (location.pathname !== '/app/login') {
         navigate('/login', { replace: true })
       }
       
