@@ -24,9 +24,9 @@ export default function LoginPage() {
       <div className="relative z-10 w-full px-6 flex flex-col items-center">
         {/* Logo */}
         <div className="mb-10">
-          <a href="/" className="text-xl font-semibold tracking-tight text-white hover:text-white/80 transition-colors">
+          <button onClick={() => { window.location.href = '/' }} className="text-xl font-semibold tracking-tight text-white hover:text-white/80 transition-colors">
             TripSystem
-          </a>
+          </button>
         </div>
 
         {/* Form card */}
