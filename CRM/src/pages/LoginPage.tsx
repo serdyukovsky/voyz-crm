@@ -1,24 +1,17 @@
 import { LoginForm } from "@/components/crm/auth-forms"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { Languages } from 'lucide-react'
+import Grainient from '@/components/shared/Grainient'
 
 export default function LoginPage() {
   const { language, setLanguage } = useTranslation()
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Background gradient orbs */}
-      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-purple-600/[0.07] rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-600/[0.07] rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Subtle grid */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
-      />
+      {/* Grainient Background */}
+      <div className="absolute inset-0 z-0">
+        <Grainient />
+      </div>
 
       {/* Content */}
       <div className="relative z-10 w-full px-6 flex flex-col items-center">
