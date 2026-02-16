@@ -79,7 +79,7 @@ export default function TasksPage() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       if (errorMessage === 'UNAUTHORIZED') {
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         return
       }
@@ -104,7 +104,7 @@ export default function TasksPage() {
               const token = localStorage.getItem('access_token')
               if (!token) {
                 console.warn('No token found, redirecting to login')
-                window.location.href = '/login'
+                window.location.href = '/app/login'
                 return
               }
               console.log('Token found, setting isCreateTaskModalOpen to true')

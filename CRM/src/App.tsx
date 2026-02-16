@@ -230,7 +230,7 @@ function App() {
           enableSystem
           disableTransitionOnChange
         >
-          <BrowserRouter>
+          <BrowserRouter basename="/app">
             <AuthProvider>
               <SearchProvider>
                 <UnauthorizedHandler />

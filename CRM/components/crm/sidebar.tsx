@@ -91,7 +91,7 @@ export function Sidebar() {
           {isCollapsed ? (
             <div className="flex items-center justify-center w-full relative">
               <img 
-                src="/logo_voyz_crm.svg" 
+                src={import.meta.env.BASE_URL + "logo_voyz_crm.svg"} 
                 alt="Voyz CRM" 
                 className={cn(
                   "h-4 w-auto transition-all duration-200",
@@ -102,7 +102,7 @@ export function Sidebar() {
           ) : (
             <div className="flex items-center gap-2 w-full min-w-0">
               <img 
-                src="/logo_voyz_crm.svg" 
+                src={import.meta.env.BASE_URL + "logo_voyz_crm.svg"} 
                 alt="Voyz CRM" 
                 className={cn(
                   "h-4 w-auto flex-shrink-0 transition-all duration-200",

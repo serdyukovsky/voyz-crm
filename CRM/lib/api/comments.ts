@@ -97,7 +97,7 @@ export async function getDealComments(dealId: string): Promise<Comment[]> {
     localStorage.removeItem('user')
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = '/app/login'
     }
     
     return []
@@ -120,7 +120,7 @@ export async function getDealComments(dealId: string): Promise<Comment[]> {
         localStorage.removeItem('user')
         
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/app/login'
         }
         
         throw new Error('UNAUTHORIZED')
