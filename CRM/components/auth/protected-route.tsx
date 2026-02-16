@@ -23,7 +23,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // If unauthenticated → redirect to landing page
   if (authStatus === 'unauthenticated') {
-    window.location.href = '/'
+    window.location.href = '/app/login'
     return <PageSkeleton />
   }
 
