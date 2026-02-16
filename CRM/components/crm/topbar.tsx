@@ -103,7 +103,7 @@ export function Topbar() {
     } catch (error) {
       console.error('Logout error:', error)
       // Fallback navigation if logout fails
-      navigate("/login", { replace: true })
+      window.location.href = '/'
     }
   }
 

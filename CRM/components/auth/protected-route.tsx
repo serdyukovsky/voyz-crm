@@ -1,6 +1,5 @@
 "use client"
 
-import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/auth-context'
 import { PageSkeleton } from '@/components/shared/loading-skeleton'
 
@@ -16,17 +15,16 @@ interface ProtectedRouteProps {
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { authStatus } = useAuth()
-  const location = useLocation()
 
   // If authStatus === 'loading' → render loading screen
   if (authStatus === 'loading') {
     return <PageSkeleton />
   }
 
-  // If unauthenticated → redirect to /login
+  // If unauthenticated → redirect to landing page
   if (authStatus === 'unauthenticated') {
-    // Save the attempted location to redirect back after login
-    return <Navigate to="/login" state={{ from: location }} replace />
+    window.location.href = '/'
+    return <PageSkeleton />
   }
 
   // If authenticated → render children
