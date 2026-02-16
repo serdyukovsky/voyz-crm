@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCurrentUser, logout as logoutApi, refreshToken, type User } from '@/lib/api/auth'
@@ -43,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isBackendUnavailable, setIsBackendUnavailable] = useState(false)
   const isLoggingOutRef = useRef(false)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
   const toastShownRef = useRef(false)
@@ -57,11 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle redirect when backend is unavailable and user is not authenticated
   useEffect(() => {
-    if (isBackendUnavailable && authStatus === 'unauthenticated' && location.pathname !== '/app/login') {
-      // Redirect to login if backend is unavailable and user is not authenticated
-      navigate('/login', { replace: true })
+    if (isBackendUnavailable && authStatus === 'unauthenticated') {
+      // Redirect to landing page if backend is unavailable and user is not authenticated
+      window.location.href = '/'
     }
-  }, [isBackendUnavailable, authStatus, navigate, location.pathname])
+  }, [isBackendUnavailable, authStatus])
 
   // Show toast notification when backend becomes unavailable
   useEffect(() => {
@@ -355,17 +354,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear React Query cache
       queryClient.clear()
       
-      // Only redirect if not already on login page
-      if (location.pathname !== '/app/login') {
-        navigate('/login', { replace: true })
-      }
+      // Redirect to landing page on logout
+      window.location.href = '/'
       
       // Reset guard after a short delay to allow navigation to complete
       setTimeout(() => {
         isLoggingOutRef.current = false
       }, 100)
     }
-  }, [navigate, queryClient, location.pathname])
+  }, [queryClient])
 
   const refreshAuth = useCallback(async () => {
     await checkAuth()

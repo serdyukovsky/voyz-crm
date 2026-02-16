@@ -325,7 +325,7 @@ function DealsPageContent() {
   useEffect(() => {
     if (pipelinesError && pipelinesError instanceof Error && (pipelinesError.message === 'UNAUTHORIZED' || pipelinesError.message.includes('401'))) {
       console.warn('Authentication failed, redirecting to login')
-      navigate('/login')
+      window.location.href = '/'
     }
   }, [pipelinesError, navigate])
 

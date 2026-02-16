@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom'
 import { CRMLayout } from "@/components/crm/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +8,6 @@ import { logout } from '@/lib/api/auth'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
 
   const handleLogout = async () => {
     try {
@@ -17,7 +15,7 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Logout error:', error)
     }
-    navigate("/login")
+    window.location.href = '/'
   }
 
   return (
