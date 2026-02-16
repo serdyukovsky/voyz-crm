@@ -23,7 +23,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form card */}
-        <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-sm p-8">
+        <div className="w-full max-w-sm rounded-2xl border border-white/[0.12] bg-black/70 backdrop-blur-xl p-8">
           <LoginForm />
         </div>
       </div>
