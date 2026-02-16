@@ -106,12 +106,6 @@ export function LoginForm() {
           {isLoading ? t('auth.signingIn') : t('auth.signIn')}
         </button>
 
-        <p className="text-center text-sm text-white/30 pt-2">
-          {t('auth.noAccount')}{" "}
-          <a href="/app/register" className="text-white/70 hover:text-white transition-colors">
-            {t('auth.createAccount')}
-          </a>
-        </p>
       </form>
     </div>
   )
