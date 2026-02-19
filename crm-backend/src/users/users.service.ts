@@ -75,7 +75,7 @@ export class UsersService {
         email: true,
         firstName: true,
         lastName: true,
-        avatar: true,
+        // avatar excluded from list — base64 data URLs bloat response (220KB+ per user)
         phone: true,
         telegramUsername: true,
         role: true,
