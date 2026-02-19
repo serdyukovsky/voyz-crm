@@ -210,7 +210,7 @@ export class TasksService {
             id: true,
             firstName: true,
             lastName: true,
-            avatar: true,
+            // avatar excluded — base64 avatars bloat response
           },
         },
       },
@@ -424,7 +424,7 @@ export class TasksService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            // avatar excluded — base64 avatars bloat response
           },
         },
         createdBy: {
@@ -433,7 +433,7 @@ export class TasksService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            // avatar excluded — base64 avatars bloat response
           },
         },
       },

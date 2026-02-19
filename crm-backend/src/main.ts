@@ -4,6 +4,7 @@ import { BaseExceptionFilter } from '@nestjs/core';
 import { ArgumentsHost } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
+import * as compression from 'compression';
 import * as express from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -31,6 +32,7 @@ async function bootstrap() {
   // Get underlying Express instance and configure body parser
   const httpAdapter = app.getHttpAdapter();
   const expressApp = httpAdapter.getInstance();
+  expressApp.use(compression());
   expressApp.use(express.json({ limit: '50mb' }));
   expressApp.use(express.urlencoded({ limit: '50mb', extended: true }));
 

@@ -839,7 +839,6 @@ export class DealsService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
           },
         },
         assignedTo: {
@@ -848,7 +847,6 @@ export class DealsService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
           },
         },
         contact: {
