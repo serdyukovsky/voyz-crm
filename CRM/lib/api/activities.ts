@@ -82,15 +82,12 @@ export async function getActivities(filters?: ActivityFilters): Promise<Activity
 
   const API_BASE_URL = getApiBaseUrl()
   const url = `${API_BASE_URL}/activities?${queryParams.toString()}`
-  console.log('Fetching activities from:', url)
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('access_token')}`,
     },
   })
-
-  console.log('Activities response status:', response.status, response.statusText)
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error')
@@ -99,7 +96,6 @@ export async function getActivities(filters?: ActivityFilters): Promise<Activity
   }
 
   const data = await response.json()
-  console.log('Activities fetched successfully:', data.length, 'activities', data)
 
   // Transform activities to extract payload data for display
   const transformedActivities = data.map((activity: Activity) => {

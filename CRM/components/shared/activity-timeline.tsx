@@ -427,11 +427,15 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
     return { pinnedNotes: pinned, regularActivities: regular }
   }, [activities])
 
-  // Group regular activities by date
+  // Group regular activities by date, pre-filtering out activities with no message
   const groupedActivities = useMemo(() => {
     const groups: Record<string, Activity[]> = {}
 
     regularActivities.forEach(activity => {
+      // Pre-filter: skip activities that formatActivityMessage would return null for
+      const message = formatActivityMessage(activity, pipelineStages, t)
+      if (message === null) return
+
       const date = parseISO(activity.createdAt)
       const dateKey = format(date, 'yyyy-MM-dd')
 
@@ -449,7 +453,7 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
     })
 
     return groups
-  }, [regularActivities])
+  }, [regularActivities, pipelineStages, t])
 
   const sortedDates = useMemo(() => 
     Object.keys(groupedActivities).sort((a, b) => 
@@ -532,16 +536,11 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-4 pt-2">
-                {dateActivities
-                  .filter(activity => {
-                    const message = formatActivityMessage(activity, pipelineStages, t)
-                    return message !== null
-                  })
-                  .map((activity, index, filteredActivities) => (
+                {dateActivities.map((activity, index) => (
                     <ActivityItem
                       key={activity.id}
                       activity={activity}
-                      isLast={index === filteredActivities.length - 1}
+                      isLast={index === dateActivities.length - 1}
                       pipelineStages={pipelineStages}
                     />
                   ))}
