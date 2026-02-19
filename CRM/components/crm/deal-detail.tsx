@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { DollarSign, ChevronDown, Check, Plus, XCircle, Link as LinkIcon, Users, Hash, MessageCircle, Globe } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,20 +18,18 @@ import { DealCommentsPanel } from './deal/deal-comments-panel'
 import { useDealDetail, dealKeys } from '@/hooks/use-deals'
 import { contactKeys } from '@/hooks/use-contacts'
 import { useDealTasks } from '@/hooks/use-deal-tasks'
-import { useDealActivity } from '@/hooks/use-deal-activity'
 import { useDealFiles } from '@/hooks/use-deal-files'
 import { useRealtimeDeal } from '@/hooks/use-realtime-deal'
-import { getContacts, updateContact, createContact } from '@/lib/api/contacts'
+import { updateContact, createContact } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
 import type { Task } from '@/hooks/use-deal-tasks'
-import type { Activity } from '@/hooks/use-deal-activity'
 import { CrossNavigation } from '@/components/shared/cross-navigation'
 import { DetailSkeleton } from '@/components/shared/loading-skeleton'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { SendEmailModal } from '@/components/crm/send-email-modal'
 import { Mail } from 'lucide-react'
-import { getPipeline, type Pipeline, type Stage } from '@/lib/api/pipelines'
+import { type Pipeline, type Stage } from '@/lib/api/pipelines'
 import { getUsers, type User } from '@/lib/api/users'
 import { createComment, getDealComments, updateCommentType, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -118,19 +116,11 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [assignedUser, setAssignedUser] = useState("Current User")
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
-  const [rejectionReasonsOptions, setRejectionReasonsOptions] = useState<string[]>([])
-  const [directionsOptions, setDirectionsOptions] = useState<string[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [usersLoading, setUsersLoading] = useState(false)
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
-  const [pipeline, setPipeline] = useState<Pipeline | null>(null)
-  const [pipelineLoading, setPipelineLoading] = useState(false)
-  const [comments, setComments] = useState<Comment[]>([])
-  const [commentsLoading, setCommentsLoading] = useState(false)
+  // Pipeline comes directly from deal response — no separate fetch needed
   const [openDirections, setOpenDirections] = useState(false)
   const [openMethods, setOpenMethods] = useState(false)
   const [openReasons, setOpenReasons] = useState(false)
@@ -189,142 +179,69 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     }
   }, [deal?.rejectionReasons])
   const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
-  const { activities: legacyActivities, addActivity, groupByDate } = useDealActivity({ dealId })
-  const { activities, loading: activitiesLoading, refetch: refetchActivities } = useActivity({ entityType: 'deal', entityId: dealId })
+  const { activities, loading: activitiesLoading } = useActivity({ entityType: 'deal', entityId: dealId })
+
+  // Lightweight activity invalidation — marks cache as stale without blocking UI
+  const invalidateActivities = () => {
+    queryClient.invalidateQueries({ queryKey: ['activities', 'deal', dealId] })
+  }
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
 
-  // Load contacts
-  useEffect(() => {
-    const loadContacts = async () => {
-      try {
-        const contactsData = await getContacts()
-        setContacts(contactsData)
-      } catch (error) {
-        console.error('Failed to load contacts:', error)
-      }
+  // Users with React Query caching (10 min stale time - rarely changes)
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+    staleTime: 10 * 60 * 1000,
+  })
+  const users = useMemo(() => allUsers.filter(user => user.isActive), [allUsers])
+
+  // Comments with React Query caching
+  const { data: comments = [], isLoading: commentsLoading } = useQuery({
+    queryKey: ['comments', 'deal', dealId],
+    queryFn: () => getDealComments(dealId),
+    enabled: !!dealId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // System field options with React Query caching (10 min - rarely changes)
+  const { data: rejectionReasonsOptions = [] } = useQuery({
+    queryKey: ['systemFieldOptions', 'deal', 'rejectionReasons'],
+    queryFn: () => getSystemFieldOptions('deal', 'rejectionReasons'),
+    staleTime: 10 * 60 * 1000,
+  })
+
+  const { data: directionsOptions = [] } = useQuery({
+    queryKey: ['systemFieldOptions', 'contact', 'directions'],
+    queryFn: () => getSystemFieldOptions('contact', 'directions'),
+    staleTime: 10 * 60 * 1000,
+  })
+
+
+
+  // Pipeline data comes from deal response — derive it with useMemo
+  const pipeline = useMemo<Pipeline | null>(() => {
+    if (!deal?.pipeline?.stages || deal.pipeline.stages.length === 0) return null
+    return {
+      id: deal.pipeline.id,
+      name: deal.pipeline.name,
+      description: deal.pipeline.description,
+      isDefault: deal.pipeline.isDefault || false,
+      isActive: deal.pipeline.isActive !== undefined ? deal.pipeline.isActive : true,
+      order: deal.pipeline.order || 0,
+      stages: deal.pipeline.stages.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        order: s.order || 0,
+        color: s.color || '#6B7280',
+        isDefault: s.isDefault || false,
+        type: s.type || 'OPEN',
+        createdAt: s.createdAt || '',
+        updatedAt: s.updatedAt || '',
+      })),
+      createdAt: deal.pipeline.createdAt || '',
+      updatedAt: deal.pipeline.updatedAt || '',
     }
-    loadContacts()
-  }, [])
-
-  // Load users
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        setUsersLoading(true)
-        const usersData = await getUsers()
-        // Filter only active users
-        const activeUsers = usersData.filter(user => user.isActive)
-        setUsers(activeUsers)
-      } catch (error) {
-        console.error('Failed to load users:', error)
-        setUsers([])
-      } finally {
-        setUsersLoading(false)
-      }
-    }
-    loadUsers()
-  }, [])
-
-  // Load comments
-  useEffect(() => {
-    const loadComments = async () => {
-      try {
-        setCommentsLoading(true)
-        const commentsData = await getDealComments(dealId)
-        setComments(commentsData)
-      } catch (error) {
-        console.error('Failed to load comments:', error)
-        setComments([])
-      } finally {
-        setCommentsLoading(false)
-      }
-    }
-    loadComments()
-  }, [dealId])
-
-  // Load rejection reasons options from API
-  useEffect(() => {
-    const loadRejectionReasonsOptions = async () => {
-      try {
-        console.log('[DEAL DETAIL] Loading rejection reasons options...')
-        const options = await getSystemFieldOptions('deal', 'rejectionReasons')
-        console.log('[DEAL DETAIL] Loaded rejection reasons options:', options)
-        setRejectionReasonsOptions(options)
-      } catch (error) {
-        console.error('[DEAL DETAIL] Failed to load rejection reasons options:', error)
-        // Fallback to default options if API fails
-        console.log('[DEAL DETAIL] Using fallback rejection reasons options')
-        setRejectionReasonsOptions(['price', 'competitor', 'timing', 'budget', 'requirements', 'other'])
-      }
-    }
-    loadRejectionReasonsOptions()
-  }, [])
-
-  // Load directions options from API
-  useEffect(() => {
-    const loadDirectionsOptions = async () => {
-      try {
-        console.log('[DEAL DETAIL] Loading directions options...')
-        const options = await getSystemFieldOptions('contact', 'directions')
-        console.log('[DEAL DETAIL] Loaded directions options:', options)
-        setDirectionsOptions(options)
-      } catch (error) {
-        console.error('[DEAL DETAIL] Failed to load directions options:', error)
-        // Fallback to empty array if API fails - will show no options
-        setDirectionsOptions([])
-      }
-    }
-    loadDirectionsOptions()
-  }, [])
-
-  // Load pipeline with stages when deal is loaded
-  useEffect(() => {
-    const loadPipeline = async () => {
-      if (!deal?.pipelineId) {
-        setPipeline(null)
-        return
-      }
-
-      // If pipeline data is already in deal, use it
-      if (deal.pipeline?.stages && deal.pipeline.stages.length > 0) {
-        setPipeline({
-          id: deal.pipeline.id,
-          name: deal.pipeline.name,
-          description: deal.pipeline.description,
-          isDefault: deal.pipeline.isDefault || false,
-          isActive: deal.pipeline.isActive !== undefined ? deal.pipeline.isActive : true,
-          order: deal.pipeline.order || 0,
-          stages: deal.pipeline.stages.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            order: s.order || 0,
-            color: s.color || '#6B7280',
-            isDefault: s.isDefault || false,
-            type: s.type || 'OPEN',
-            createdAt: s.createdAt || '',
-            updatedAt: s.updatedAt || '',
-          })),
-          createdAt: deal.pipeline.createdAt || '',
-          updatedAt: deal.pipeline.updatedAt || '',
-        })
-        return
-      }
-
-      // Otherwise, fetch pipeline from API
-      try {
-        setPipelineLoading(true)
-        const pipelineData = await getPipeline(deal.pipelineId)
-        setPipeline(pipelineData)
-      } catch (error) {
-        console.error('DealDetail: Failed to load pipeline:', error)
-        setPipeline(null)
-      } finally {
-        setPipelineLoading(false)
-      }
-    }
-
-    loadPipeline()
-  }, [deal?.pipelineId, deal?.pipeline])
+  }, [deal?.pipeline])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -360,14 +277,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     dealId,
     onFieldUpdate: (fieldId, value) => {
       updateField(fieldId, value)
-      addActivity({
-        type: 'field_updated',
-        user: { id: "system", name: "System" },
-        fieldName: fieldId,
-        newValue: value,
-        timestamp: new Date().toISOString(),
-        date: new Date().toLocaleString()
-      })
+      invalidateActivities()
     },
     onTaskCreated: (task) => {
       // Task will be added via createTask
@@ -407,7 +317,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       await updateDeal({ stageId: newStageId })
 
       // Reload activities to show the stage change activity (created by backend)
-      await refetchActivities()
+      invalidateActivities()
 
       showSuccess(t('deals.stageUpdatedSuccess'))
     } catch (error) {
@@ -421,7 +331,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const handleTitleUpdate = async (title: string) => {
     await updateDeal({ title })
     // Reload activities to show the update activity (created by backend)
-    await refetchActivities()
+    invalidateActivities()
   }
 
   const handleTaskCreate = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
@@ -429,7 +339,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       const newTask = await createTask(taskData)
       
       // Reload activities to show the task creation activity (created by backend)
-      await refetchActivities()
+      invalidateActivities()
 
       // Tasks are automatically refreshed by React Query mutation cache invalidation
       
@@ -497,7 +407,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     await updateTask(taskId, updates)
 
     // Reload activities to show the task update activity (created by backend)
-    await refetchActivities()
+    invalidateActivities()
   }
 
   const handleTaskDelete = async (taskId: string) => {
@@ -505,7 +415,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       await deleteTask(taskId)
       
       // Reload activities to show the task deletion activity (created by backend)
-      await refetchActivities()
+      invalidateActivities()
 
       // Tasks are automatically refreshed by React Query mutation cache invalidation
       
@@ -520,7 +430,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     const uploadedFile = await uploadFile(file)
     
     // Reload activities to show the file upload activity (created by backend)
-    await refetchActivities()
+    invalidateActivities()
   }
 
   const handleCommentAdd = async (
@@ -547,11 +457,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         dealId: dealId,
       })
 
-      // Add to local comments list
-      setComments(prev => [newComment, ...prev])
-
-      // Reload activities to show the new comment activity (created by backend)
-      await refetchActivities()
+      // Reload comments and activities
+      queryClient.invalidateQueries({ queryKey: ['comments', 'deal', dealId] })
+      invalidateActivities()
 
       showSuccess('Comment added successfully')
 
@@ -585,7 +493,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       await updateCommentType(commentId, 'COMMENT')
 
       // Reload activities to reflect the change
-      await refetchActivities()
+      invalidateActivities()
 
       showSuccess('Примечание откреплено')
     } catch (error) {
@@ -703,11 +611,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
           <div className="flex items-center gap-3">
             <label className="text-sm text-foreground flex-shrink-0 w-32">{t('deals.stage')}</label>
             <div className="flex-1">
-            {pipelineLoading ? (
-              <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
-                <span className="text-sm text-muted-foreground">{t('deals.loadingStages')}</span>
-              </div>
-            ) : stages.length === 0 ? (
+            {stages.length === 0 ? (
               <div className="w-full px-3 h-9 rounded-md flex items-center bg-transparent">
                 <span className="text-sm text-muted-foreground">{t('deals.noStagesAvailable')}</span>
               </div>
@@ -793,7 +697,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             setShowUserDropdown(false)
                             try {
                               await updateDeal({ assignedToId: null })
-                              await refetchActivities()
+                              invalidateActivities()
                               showSuccess('Responsible user updated')
                             } catch (error) {
                               console.error('Failed to update assigned user:', error)
@@ -804,7 +708,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             setShowUserDropdown(false)
                             try {
                               await updateDeal({ assignedToId: user.id })
-                              await refetchActivities()
+                              invalidateActivities()
                               showSuccess('Responsible user updated')
                             } catch (error) {
                               console.error('Failed to update assigned user:', error)
@@ -864,7 +768,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
                         if (deal?.contact?.link !== value) {
-                          await refetchActivities()
+                          invalidateActivities()
                         }
                       } catch (error) {
                         console.error('Failed to update link:', error)
@@ -906,7 +810,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly (not on every keystroke)
                         if (deal?.contact?.subscriberCount !== value) {
-                          await refetchActivities()
+                          invalidateActivities()
                         }
                       } catch (error) {
                         console.error('Failed to update subscriber count:', error)
@@ -928,7 +832,6 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 <div className="flex-1 relative">
                   <button
                     onClick={() => {
-                      console.log('[DEAL DETAIL] Directions dropdown clicked, current options:', directionsOptions)
                       setOpenDirections(!openDirections)
                       if (openDirections) {
                         setSearchDirections('')
@@ -975,10 +878,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               checked={localDirections.includes(direction)}
                               onChange={async (e) => {
                                 try {
-                                  console.time('[Directions] Total time')
                                   const isChecked = e.target.checked
-
-                                  console.log('[Directions] === START (INSTANT LOCAL UPDATE) ===')
 
                                   // Calculate new directions
                                   let newDirections
@@ -988,24 +888,18 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                     newDirections = localDirections.filter((d) => d !== direction)
                                   }
 
-                                  console.log('[Directions] New directions:', newDirections)
-
                                   // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
                                   setLocalDirections(newDirections)
-                                  console.timeEnd('[Directions] Total time') // This should be < 5ms
 
                                   // Then send to server in background (backend logs activity)
-                                  console.time('[Directions] Server update')
                                   const contactId = deal?.contact?.id || await ensureContact()
                                   await updateContact(contactId, { directions: newDirections }, dealId)
-                                  console.timeEnd('[Directions] Server update')
 
-                                  // Invalidate caches after successful update
-                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                  await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                                  await refetchActivities()
+                                  // Invalidate caches — React Query refetches in background
+                                  queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                  queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
+                                  invalidateActivities()
 
-                                  console.log('[Directions] Server sync complete')
                                 } catch (error) {
                                   console.error('Failed to update directions:', error)
                                   // Revert to server state
@@ -1061,34 +955,25 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             checked={localContactMethods.includes(method)}
                             onChange={async (e) => {
                               try {
-                                console.time('[ContactMethods] Total time')
                                 const isChecked = e.target.checked
-
-                                console.log('[ContactMethods] === START (INSTANT LOCAL UPDATE) ===')
 
                                 // Calculate new methods
                                 const newMethods = isChecked
                                   ? [...localContactMethods, method]
                                   : localContactMethods.filter((m) => m !== method)
 
-                                console.log('[ContactMethods] New methods:', newMethods)
-
                                 // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
                                 setLocalContactMethods(newMethods)
-                                console.timeEnd('[ContactMethods] Total time') // This should be < 5ms
 
                                 // Then send to server in background (backend logs activity)
-                                console.time('[ContactMethods] Server update')
                                 const contactId = deal?.contact?.id || await ensureContact()
                                 await updateContact(contactId, { contactMethods: newMethods }, dealId)
-                                console.timeEnd('[ContactMethods] Server update')
 
                                 // Invalidate caches after successful update
                                 await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                                 await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
-                                await refetchActivities()
+                                invalidateActivities()
 
-                                console.log('[ContactMethods] Server sync complete')
                               } catch (error) {
                                 console.error('Failed to update contact methods:', error)
                                 // Revert to server state
@@ -1128,16 +1013,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     // Debounce API call
                     websiteTimeoutRef.current = setTimeout(async () => {
                       try {
-                        console.log('[websiteOrTgChannel] Updating with value:', value, 'sending:', value || null)
                         const contactId = deal?.contact?.id || await ensureContact()
                         // Use null to explicitly clear field, not undefined (which gets stripped from JSON)
                         await updateContact(contactId, { websiteOrTgChannel: value || null }, dealId)
-                        console.log('[websiteOrTgChannel] Update successful')
                         // Invalidate contact cache instead of refetching entire deal
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
                         if (deal?.contact?.websiteOrTgChannel !== value) {
-                          await refetchActivities()
+                          invalidateActivities()
                         }
                       } catch (error) {
                         console.error('Failed to update website/TG channel:', error)
@@ -1178,7 +1061,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
                         // Only refetch activities if value changed significantly
                         if (deal?.contact?.contactInfo !== value) {
-                          await refetchActivities()
+                          invalidateActivities()
                         }
                       } catch (error) {
                         console.error('Failed to update contact info:', error)
@@ -1201,7 +1084,6 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
             <div className="flex-1 relative">
               <button
                 onClick={() => {
-                  console.log('[DEAL DETAIL] Rejection Reasons dropdown clicked, current options:', rejectionReasonsOptions)
                   setOpenReasons(!openReasons)
                 }}
                 className="w-full flex items-start justify-between gap-2 px-3 min-h-9 py-2 rounded-md bg-transparent text-sm text-left"
@@ -1245,32 +1127,23 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                           checked={localRejectionReasons.includes(reason)}
                           onChange={async (e) => {
                             try {
-                              console.time('[RejectionReasons] Total time')
                               const isChecked = e.target.checked
-
-                              console.log('[RejectionReasons] === START (INSTANT LOCAL UPDATE) ===')
 
                               // Calculate new reasons
                               const newReasons = isChecked
                                 ? [...localRejectionReasons, reason]
                                 : localRejectionReasons.filter((r) => r !== reason)
 
-                              console.log('[RejectionReasons] New reasons:', newReasons)
-
                               // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
                               setLocalRejectionReasons(newReasons)
-                              console.timeEnd('[RejectionReasons] Total time') // This should be < 5ms
 
                               // Then send to server in background (backend logs activity)
-                              console.time('[RejectionReasons] Server update')
                               await updateDeal({ rejectionReasons: newReasons })
-                              console.timeEnd('[RejectionReasons] Server update')
 
-                              // Invalidate after successful update
-                              await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
-                              await refetchActivities()
+                              // Invalidate — React Query refetches in background
+                              queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
+                              invalidateActivities()
 
-                              console.log('[RejectionReasons] Server sync complete')
                             } catch (error) {
                               console.error('Failed to update rejection reasons:', error)
                               // Revert to server state
@@ -1295,32 +1168,23 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                             checked={deal.rejectionReasons?.includes(reason) || false}
                             onChange={async (e) => {
                               try {
-                                console.time('[RejectionReasons-Fallback] Total time')
                                 const isChecked = e.target.checked
-
-                                console.log('[RejectionReasons-Fallback] === START (INSTANT LOCAL UPDATE) ===')
 
                                 // Calculate new reasons
                                 const newReasons = isChecked
                                   ? [...localRejectionReasons, reason]
                                   : localRejectionReasons.filter((r) => r !== reason)
 
-                                console.log('[RejectionReasons-Fallback] New reasons:', newReasons)
-
                                 // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
                                 setLocalRejectionReasons(newReasons)
-                                console.timeEnd('[RejectionReasons-Fallback] Total time') // This should be < 5ms
 
                                 // Then send to server in background (backend logs activity)
-                                console.time('[RejectionReasons-Fallback] Server update')
                                 await updateDeal({ rejectionReasons: newReasons })
-                                console.timeEnd('[RejectionReasons-Fallback] Server update')
 
                                 // Invalidate after successful update
                                 await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
-                                await refetchActivities()
+                                invalidateActivities()
 
-                                console.log('[RejectionReasons-Fallback] Server sync complete')
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
                                 // Revert to server state
