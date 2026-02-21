@@ -30,6 +30,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -78,6 +79,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -125,6 +127,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -219,6 +222,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
           },
         },
         deal: {

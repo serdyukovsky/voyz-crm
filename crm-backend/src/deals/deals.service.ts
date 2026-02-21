@@ -209,6 +209,7 @@ export class DealsService {
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
           name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
+          avatarColor: deal.assignedTo.avatarColor || null,
         } : null,
         createdBy: deal.createdBy ? {
           id: deal.createdBy.id,
@@ -663,6 +664,7 @@ export class DealsService {
             id: true,
             firstName: true,
             lastName: true,
+            avatarColor: true,
           },
         },
         contact: {
@@ -847,6 +849,7 @@ export class DealsService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
           },
         },
         contact: {
@@ -985,6 +988,7 @@ export class DealsService {
       assignedTo: deal.assignedTo ? {
         id: deal.assignedTo.id,
         name: `${deal.assignedTo.firstName || ''} ${deal.assignedTo.lastName || ''}`.trim() || 'Unknown User',
+        avatarColor: deal.assignedTo.avatarColor || null,
       } : null,
       contact: deal.contact ? {
         id: deal.contact.id,
@@ -1239,6 +1243,7 @@ export class DealsService {
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
           name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
+          avatarColor: deal.assignedTo.avatarColor || null,
         } : null,
         stage: deal.stage ? {
           id: deal.stage.id,

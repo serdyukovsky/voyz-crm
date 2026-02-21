@@ -13,6 +13,7 @@ export interface User {
   lastName: string
   role: string
   permissions?: string[]
+  avatarColor?: string | null
 }
 
 export interface LoginResponse {

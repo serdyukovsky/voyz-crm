@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo, startTransitio
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DealColumnSkeleton } from "./deal-card-skeleton"
 import { Button } from "@/components/ui/button"
@@ -32,7 +32,6 @@ import {
   MoreVertical,
   Link as LinkIcon,
   Users,
-  Hash,
   CheckCircle2,
   XCircle,
   UserPlus,
@@ -45,7 +44,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getDeals, updateDeal, type Deal } from "@/lib/api/deals"
+import { getDeals, updateDeal, getDealFullDetail, type Deal } from "@/lib/api/deals"
 import { getPipelines, createStage, updateStage, deleteStage, reorderStages, type Pipeline, type Stage, type CreateStageDto } from "@/lib/api/pipelines"
 import { CompanyBadge } from "@/components/shared/company-badge"
 import { DealDetail } from './deal-detail'
@@ -57,7 +56,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { cn } from "@/lib/utils"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
-import { getWsUrl } from '@/lib/config'
+import { getWsUrl, getApiBaseUrl } from '@/lib/config'
 import { CreateDealModal } from './create-deal-modal'
 import { AddStageModal } from './add-stage-modal'
 import { useSidebar } from './sidebar-context'
@@ -201,6 +200,7 @@ const DealCard = memo(function DealCard({
   const [isDragging, setIsDragging] = useState(false)
   const [menuReady, setMenuReady] = useState(false)
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation()
@@ -232,9 +232,40 @@ const DealCard = memo(function DealCard({
       return
     }
 
-    // Open deal in modal
+    // Seed cache with kanban card data so DealDetail renders instantly
     e.preventDefault()
     e.stopPropagation()
+    queryClient.setQueryData(['dealFullDetail', deal.id], (old: any) => {
+      if (old) return old // Don't overwrite full data with partial
+      return {
+        deal: {
+          id: deal.id,
+          title: deal.title,
+          number: deal.number,
+          amount: deal.amount,
+          budget: deal.budget,
+          description: deal.description,
+          stageId: deal.stageId,
+          status: deal.status,
+          tags: deal.tags,
+          rejectionReasons: deal.rejectionReasons,
+          expectedCloseAt: deal.expectedCloseAt,
+          closedAt: deal.closedAt,
+          createdAt: deal.createdAt,
+          updatedAt: deal.updatedAt,
+          contact: deal.contact,
+          company: deal.company,
+          assignedTo: deal.assignedTo,
+          createdById: deal.createdById,
+        },
+        tasks: [],
+        activities: [],
+        comments: [],
+        users: [],
+        systemFieldOptions: { rejectionReasons: [], directions: [] },
+        _isPreview: true,
+      }
+    })
     onOpenInSidebar(deal.id)
   }
 
@@ -246,9 +277,16 @@ const DealCard = memo(function DealCard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleCardClick}
-        onMouseEnter={() => { if (!menuReady) setMenuReady(true) }}
+        onMouseEnter={() => {
+          if (!menuReady) setMenuReady(true)
+          queryClient.prefetchQuery({
+            queryKey: ['dealFullDetail', deal.id],
+            queryFn: () => getDealFullDetail(deal.id),
+            staleTime: 2 * 60 * 1000,
+          })
+        }}
         className={cn(
-          "mb-2 cursor-pointer transition-all group shadow-none",
+          "mb-2 cursor-pointer transition-all group",
           isDragging && "opacity-50",
           isHighlighted && "bg-blue-50/40 dark:bg-blue-950/15 border-blue-200/50 dark:border-blue-800/30"
         )}
@@ -310,15 +348,16 @@ const DealCard = memo(function DealCard({
         {deal.assignedTo && (
           <div className="mb-2" data-no-navigate>
             <div className="flex items-center gap-2">
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="text-xs">
-                  {deal.assignedTo.name
-                    .split(' ')
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={`${getApiBaseUrl()}/users/${deal.assignedTo.id}/avatar`} alt={deal.assignedTo.name} />
+                  <AvatarFallback className="text-[10px]">
+                    {deal.assignedTo.name
+                      .split(' ')
+                      .map(n => n[0])
+                      .join('')
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
               <span className="text-xs font-medium text-foreground">
                 {deal.assignedTo.name}
               </span>
@@ -362,15 +401,28 @@ const DealCard = memo(function DealCard({
         {/* Directions */}
         {deal.contact?.directions && deal.contact.directions.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1" data-no-navigate>
-            {deal.contact.directions.map((direction, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/50 text-xs text-muted-foreground"
-              >
-                <Hash className="h-3 w-3" />
-                {direction}
-              </span>
-            ))}
+            {deal.contact.directions.map((direction, idx) => {
+              const colors = [
+                'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+                'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+                'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+                'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+                'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+              ]
+              const hash = direction.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+              const colorClass = colors[hash % colors.length]
+              return (
+                <span
+                  key={idx}
+                  className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-normal ${colorClass}`}
+                >
+                  {direction}
+                </span>
+              )
+            })}
           </div>
         )}
 
@@ -1088,7 +1140,7 @@ const KanbanColumn = memo(function KanbanColumn({
 
       <Card
         className={cn(
-          "flex flex-col shadow-none",
+          "flex flex-col",
           isDraggedOver && "border-primary border-2"
         )}
         onDragOver={(e) => {

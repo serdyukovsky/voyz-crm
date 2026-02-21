@@ -8,6 +8,7 @@ import { Calendar, User, Link as LinkIcon } from 'lucide-react'
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealDetailModal } from "./deal-detail-modal"
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { getApiBaseUrl } from '@/lib/config'
 
 interface Task {
   id: string
@@ -16,7 +17,9 @@ interface Task {
   dealName: string | null
   dueDate: string
   assignee: string
+  assigneeId?: string
   assigneeAvatar?: string | null
+  assigneeColor?: string | null
   completed: boolean
   status: string
   description?: string
@@ -136,14 +139,14 @@ export function TaskCard({ task, onTaskUpdate, onTaskDelete, selectedTaskId, onT
           {/* Footer */}
           <div className="flex items-center justify-between pt-1">
             {/* Assignee Avatar */}
-            <Avatar className="h-6 w-6" title={task.assignee}>
-              {task.assigneeAvatar && (
-                <AvatarImage src={task.assigneeAvatar} alt={task.assignee} />
-              )}
-              <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
-                {getInitials(task.assignee)}
-              </AvatarFallback>
-            </Avatar>
+              <Avatar className="h-6 w-6" title={task.assignee}>
+                {task.assigneeId && (
+                  <AvatarImage src={`${getApiBaseUrl()}/users/${task.assigneeId}/avatar`} alt={task.assignee} />
+                )}
+                <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
+                  {getInitials(task.assignee)}
+                </AvatarFallback>
+              </Avatar>
           </div>
         </div>
       </Card>

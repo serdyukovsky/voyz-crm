@@ -16,6 +16,7 @@ export interface Deal {
   stage: string
   stageName?: string
   assignedTo: {
+    id?: string
     name: string
     avatar: string
   }

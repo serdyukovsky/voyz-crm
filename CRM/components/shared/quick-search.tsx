@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+
 import { Contact, User, Briefcase, CheckSquare, Building2, Users } from 'lucide-react'
 import { getContacts } from '@/lib/api/contacts'
 import { getDeals } from '@/lib/api/deals'
