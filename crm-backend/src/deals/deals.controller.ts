@@ -227,7 +227,7 @@ export class DealsController {
   @ApiResponse({ status: 200, description: 'Full deal detail' })
   @ApiResponse({ status: 404, description: 'Deal not found' })
   async getFullDetail(@Param('id') id: string) {
-    const [deal, tasks, activities, comments, users, rejectionReasons, directions] = await Promise.all([
+    const [deal, tasks, activities, comments, users, rejectionReasons, directions, contactMethods] = await Promise.all([
       this.dealsService.findOne(id),
       this.tasksService.findAll({ dealId: id, limit: 100 }),
       this.activityService.findByDeal(id),
@@ -235,6 +235,7 @@ export class DealsController {
       this.usersService.findAll(),
       this.systemFieldOptionsService.getOptions('deal', 'rejectionReasons'),
       this.systemFieldOptionsService.getOptions('contact', 'directions'),
+      this.systemFieldOptionsService.getOptions('contact', 'contactMethods'),
     ]);
 
     return {
@@ -246,6 +247,7 @@ export class DealsController {
       systemFieldOptions: {
         rejectionReasons,
         directions,
+        contactMethods,
       },
     };
   }

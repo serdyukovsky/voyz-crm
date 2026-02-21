@@ -227,6 +227,7 @@ export interface DealFullDetail {
   systemFieldOptions: {
     rejectionReasons: string[]
     directions: string[]
+    contactMethods: string[]
   }
 }
 
