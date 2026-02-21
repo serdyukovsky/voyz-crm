@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import type { User, UserRole } from '@/lib/api/users'
 
 interface ChangeRoleModalProps {
@@ -66,12 +67,12 @@ export function ChangeRoleModal({ user, isOpen, onClose, onSave }: ChangeRoleMod
         </DialogHeader>
 
         <div className="flex items-center gap-3 py-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={user.avatar} />
-            <AvatarFallback className="bg-primary/10 text-primary">
-              {user.firstName[0]}{user.lastName[0]}
-            </AvatarFallback>
-          </Avatar>
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={`${getApiBaseUrl()}/users/${user.id}/avatar`} />
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {user.firstName[0]}{user.lastName[0]}
+              </AvatarFallback>
+            </Avatar>
           <div>
             <div className="font-medium">
               {user.firstName} {user.lastName}

@@ -1295,12 +1295,13 @@ function DealsPageContent() {
                     stage: stageId,
                     stageName: stageName, // Store stage name for fallback
                     assignedTo: deal.assignedTo ? {
-                      name: deal.assignedTo.firstName && deal.assignedTo.lastName 
+                      id: deal.assignedTo.id,
+                      name: deal.assignedTo.firstName && deal.assignedTo.lastName
                         ? `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}`
                         : deal.assignedTo.name || deal.assignedTo.email || 'Unknown',
                       avatar: deal.assignedTo.avatar || (deal.assignedTo.firstName && deal.assignedTo.lastName
                         ? `${deal.assignedTo.firstName[0]}${deal.assignedTo.lastName[0]}`.toUpperCase()
-                        : deal.assignedTo.name?.substring(0, 2).toUpperCase() || deal.assignedTo.email?.substring(0, 2).toUpperCase() || 'U')
+                        : deal.assignedTo.name?.substring(0, 2).toUpperCase() || deal.assignedTo.email?.substring(0, 2).toUpperCase() || 'U'),
                     } : { name: 'Unassigned', avatar: 'U' },
                     updatedAt: deal.updatedAt || deal.createdAt || new Date().toISOString(),
                     contact: deal.contact ? {

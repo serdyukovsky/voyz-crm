@@ -210,6 +210,7 @@ export class TasksService {
             id: true,
             firstName: true,
             lastName: true,
+            avatarColor: true,
             // avatar excluded — base64 avatars bloat response
           },
         },
@@ -344,6 +345,7 @@ export class TasksService {
         id: task.assignedTo.id,
         name: `${task.assignedTo.firstName || ''} ${task.assignedTo.lastName || ''}`.trim() || 'Unknown User',
         avatar: task.assignedTo.avatar || null,
+        avatarColor: task.assignedTo.avatarColor || null,
       } : null,
     };
   }
@@ -424,6 +426,7 @@ export class TasksService {
             firstName: true,
             lastName: true,
             email: true,
+            avatarColor: true,
             // avatar excluded — base64 avatars bloat response
           },
         },

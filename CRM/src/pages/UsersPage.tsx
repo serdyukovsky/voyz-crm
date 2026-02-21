@@ -5,6 +5,8 @@ import { CRMLayout } from "@/components/crm/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
+import { getApiBaseUrl } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Mail, MoreVertical, Settings } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -131,12 +133,12 @@ export default function UsersPage() {
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.avatar || undefined} />
-                      <AvatarFallback className="bg-primary/20 text-sm text-primary">
-                        {user.firstName[0]}{user.lastName[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={`${getApiBaseUrl()}/users/${user.id}/avatar`} />
+                        <AvatarFallback className="bg-primary/20 text-sm text-primary">
+                          {user.firstName[0]}{user.lastName[0]}
+                        </AvatarFallback>
+                      </Avatar>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">

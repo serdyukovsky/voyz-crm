@@ -43,6 +43,7 @@ export interface Activity {
     name: string
     email: string
     avatar?: string
+    avatarColor?: string | null
   }
   deal?: {
     id: string

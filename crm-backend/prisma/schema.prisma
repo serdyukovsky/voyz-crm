@@ -15,6 +15,7 @@ model User {
   firstName              String
   lastName               String
   avatar                 String?
+  avatarColor            String?
   role                   UserRole                @default(MANAGER)
   isActive               Boolean                 @default(true)
   lastLoginAt            DateTime?

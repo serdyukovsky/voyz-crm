@@ -7,33 +7,32 @@ import { DollarSign, ChevronDown, Check, Plus, XCircle, Link as LinkIcon, Users,
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import { TaskDetailModal } from "./task-detail-modal"
 import { DealHeader } from './deal/deal-header'
 import { DealTasksList } from './deal/deal-tasks-list'
 import { ContactCard } from './deal/contact-card'
 import { CreateTaskModal } from './create-task-modal'
 import { ActivityTimeline } from '@/components/shared/activity-timeline'
-import { useActivity } from '@/hooks/use-activity'
 import { DealCommentsPanel } from './deal/deal-comments-panel'
-import { useDealDetail, dealKeys } from '@/hooks/use-deals'
+import { dealKeys } from '@/hooks/use-deals'
 import { contactKeys } from '@/hooks/use-contacts'
-import { useDealTasks } from '@/hooks/use-deal-tasks'
+import { useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/use-tasks'
 import { useDealFiles } from '@/hooks/use-deal-files'
 import { useRealtimeDeal } from '@/hooks/use-realtime-deal'
 import { updateContact, createContact } from '@/lib/api/contacts'
 import { Contact } from '@/types/contact'
 import type { Task } from '@/hooks/use-deal-tasks'
 import { CrossNavigation } from '@/components/shared/cross-navigation'
-import { DetailSkeleton } from '@/components/shared/loading-skeleton'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToastNotification } from '@/hooks/use-toast-notification'
 import { SendEmailModal } from '@/components/crm/send-email-modal'
 import { Mail } from 'lucide-react'
 import { type Pipeline, type Stage } from '@/lib/api/pipelines'
-import { getUsers, type User } from '@/lib/api/users'
-import { createComment, getDealComments, updateCommentType, type Comment, type CommentType } from '@/lib/api/comments'
+import { type User } from '@/lib/api/users'
+import { createComment, updateCommentType, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
-import { getSystemFieldOptions } from '@/lib/api/system-field-options'
+import { getDealFullDetail, updateDeal as updateDealApi } from '@/lib/api/deals'
 
 interface DealDetailProps {
   dealId: string
@@ -147,9 +146,43 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const websiteTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const contactInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Use hooks
-  const { deal, loading: dealLoading, error: dealError, updateDeal, updateField, refetch: refetchDeal } = useDealDetail({ dealId })
-  
+  // Combined query — fetches deal + tasks + activities + comments + users + field options in ONE request
+  const fullDetailQuery = useQuery({
+    queryKey: ['dealFullDetail', dealId],
+    queryFn: () => getDealFullDetail(dealId),
+    enabled: !!dealId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const deal = fullDetailQuery.data?.deal
+  const isPreview = !!(fullDetailQuery.data as any)?._isPreview
+  const dealLoading = fullDetailQuery.isLoading && !deal
+  const dealError = fullDetailQuery.error
+  const activities = fullDetailQuery.data?.activities || []
+  const activitiesLoading = fullDetailQuery.isFetching && (isPreview || activities.length === 0)
+  const comments = fullDetailQuery.data?.comments || []
+  const allUsers = fullDetailQuery.data?.users || []
+  const usersLoading = fullDetailQuery.isFetching && allUsers.length === 0
+  const commentsLoading = fullDetailQuery.isFetching && (isPreview || comments.length === 0)
+  const users = useMemo(() => allUsers.filter((user: any) => user.isActive), [allUsers])
+  const rejectionReasonsOptions = fullDetailQuery.data?.systemFieldOptions?.rejectionReasons || []
+  const directionsOptions = fullDetailQuery.data?.systemFieldOptions?.directions || []
+
+  // Deal update helper
+  const updateDeal = async (data: any) => {
+    const result = await updateDealApi(dealId, data)
+    // Update cache with new deal data
+    queryClient.setQueryData(['dealFullDetail', dealId], (old: any) => old ? { ...old, deal: result } : old)
+    queryClient.invalidateQueries({ queryKey: dealKeys.lists() })
+    return result
+  }
+  const updateField = (fieldId: string, value: any) => {
+    // Optimistic update
+    queryClient.setQueryData(['dealFullDetail', dealId], (old: any) => old ? { ...old, deal: { ...old.deal, [fieldId]: value } } : old)
+    return updateDeal({ [fieldId]: value })
+  }
+  const refetchDeal = () => fullDetailQuery.refetch()
+
   // Sync local state with deal.contact when deal changes
   useEffect(() => {
     if (deal?.contact) {
@@ -178,43 +211,72 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       setLocalRejectionReasons([])
     }
   }, [deal?.rejectionReasons])
-  const { tasks, createTask, updateTask, deleteTask } = useDealTasks({ dealId })
-  const { activities, loading: activitiesLoading } = useActivity({ entityType: 'deal', entityId: dealId })
+  // Tasks from combined query — no separate fetch needed
+  const rawTasks = fullDetailQuery.data?.tasks || []
+  const tasks: Task[] = useMemo(() => {
+    return rawTasks.map((task: any) => ({
+      id: task.id,
+      title: task.title || 'Untitled Task',
+      description: task.description,
+      dealId: task.deal?.id || dealId,
+      dealName: task.deal?.title || null,
+      contactId: task.contact?.id || null,
+      contactName: task.contact?.fullName || null,
+      dueDate: task.deadline || undefined,
+      assignee: task.assignedTo
+        ? { id: task.assignedTo.id || '', name: task.assignedTo.name || 'Unassigned', avatar: task.assignedTo.avatar }
+        : { id: '', name: 'Unassigned' },
+      status: (task.status?.toLowerCase() || 'open') as 'open' | 'in_progress' | 'completed' | 'overdue',
+      priority: (task.priority?.toLowerCase() || 'medium') as 'low' | 'medium' | 'high',
+      completed: task.status === 'DONE',
+      result: task.result,
+      createdAt: task.createdAt || new Date().toISOString(),
+    })).filter(Boolean)
+  }, [rawTasks, dealId])
 
-  // Lightweight activity invalidation — marks cache as stale without blocking UI
+  // Task mutations (no separate fetch — only mutations)
+  const { mutateAsync: createTaskApi } = useCreateTask()
+  const { mutateAsync: updateTaskApi } = useUpdateTask()
+  const { mutateAsync: deleteTaskApi } = useDeleteTask()
+
+  const createTask = async (taskData: Omit<Task, 'id' | 'createdAt'>) => {
+    const statusMap: Record<string, string> = { open: 'TODO', in_progress: 'IN_PROGRESS', completed: 'DONE', overdue: 'OVERDUE' }
+    const result = await createTaskApi({
+      title: taskData.title,
+      description: taskData.description,
+      status: statusMap[taskData.status?.toLowerCase() || 'open'] || 'TODO',
+      priority: taskData.priority?.toUpperCase() || 'MEDIUM',
+      deadline: taskData.dueDate,
+      dealId: taskData.dealId || dealId,
+      contactId: taskData.contactId,
+      assignedToId: typeof taskData.assignee === 'string' ? taskData.assignee : taskData.assignee.id,
+    })
+    queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+    return result
+  }
+
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    const updateData: any = {}
+    if (updates.title) updateData.title = updates.title
+    if (updates.description !== undefined) updateData.description = updates.description
+    if (updates.status) updateData.status = updates.status.toUpperCase()
+    if (updates.priority) updateData.priority = updates.priority.toUpperCase()
+    if (updates.dueDate !== undefined) updateData.deadline = updates.dueDate
+    if (updates.result !== undefined) updateData.result = updates.result
+    await updateTaskApi({ id: taskId, data: updateData })
+    queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+  }
+
+  const deleteTask = async (taskId: string) => {
+    await deleteTaskApi(taskId)
+    queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+  }
+
+  // Lightweight activity/data invalidation — marks cache as stale without blocking UI
   const invalidateActivities = () => {
-    queryClient.invalidateQueries({ queryKey: ['activities', 'deal', dealId] })
+    queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
   }
   const { files, uploadFile, deleteFile, downloadFile, uploading } = useDealFiles({ dealId })
-
-  // Users with React Query caching (10 min stale time - rarely changes)
-  const { data: allUsers = [], isLoading: usersLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: getUsers,
-    staleTime: 10 * 60 * 1000,
-  })
-  const users = useMemo(() => allUsers.filter(user => user.isActive), [allUsers])
-
-  // Comments with React Query caching
-  const { data: comments = [], isLoading: commentsLoading } = useQuery({
-    queryKey: ['comments', 'deal', dealId],
-    queryFn: () => getDealComments(dealId),
-    enabled: !!dealId,
-    staleTime: 2 * 60 * 1000,
-  })
-
-  // System field options with React Query caching (10 min - rarely changes)
-  const { data: rejectionReasonsOptions = [] } = useQuery({
-    queryKey: ['systemFieldOptions', 'deal', 'rejectionReasons'],
-    queryFn: () => getSystemFieldOptions('deal', 'rejectionReasons'),
-    staleTime: 10 * 60 * 1000,
-  })
-
-  const { data: directionsOptions = [] } = useQuery({
-    queryKey: ['systemFieldOptions', 'contact', 'directions'],
-    queryFn: () => getSystemFieldOptions('contact', 'directions'),
-    staleTime: 10 * 60 * 1000,
-  })
 
 
 
@@ -457,9 +519,8 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
         dealId: dealId,
       })
 
-      // Reload comments and activities
-      queryClient.invalidateQueries({ queryKey: ['comments', 'deal', dealId] })
-      invalidateActivities()
+      // Reload combined data (comments + activities)
+      queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
 
       showSuccess('Comment added successfully')
 
@@ -502,9 +563,99 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
     }
   }
 
-  // Show skeleton only while deal is loading (before we have any deal data)
+  // Show skeleton matching the actual deal card layout while loading
   if (dealLoading && !deal) {
-    return <DetailSkeleton />
+    return (
+      <div className={`flex flex-col md:flex-row ${onClose ? 'h-full w-full' : 'h-[calc(100vh-3rem)]'} overflow-hidden animate-in fade-in-0 duration-200`}>
+        {/* LEFT COLUMN skeleton */}
+        <div className="w-full md:w-[420px] flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b border-border/50">
+            <div className="flex items-center justify-between mb-3">
+              {onClose ? (
+                <Skeleton className="h-8 w-8 rounded-md" />
+              ) : (
+                <Skeleton className="h-8 w-20 rounded-md" />
+              )}
+              <div className="flex gap-1">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </div>
+            <Skeleton className="h-7 w-3/4 rounded-md" />
+            <Skeleton className="h-4 w-1/3 mt-2 rounded-md" />
+          </div>
+
+          {/* Fields */}
+          <div className="px-6 py-4 space-y-4">
+            {/* Stage */}
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-32 rounded-sm" />
+              <Skeleton className="h-9 flex-1 rounded-md" />
+            </div>
+            {/* Assigned */}
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-32 rounded-sm" />
+              <Skeleton className="h-9 flex-1 rounded-md" />
+            </div>
+            {/* Amount */}
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-32 rounded-sm" />
+              <Skeleton className="h-9 flex-1 rounded-md" />
+            </div>
+            {/* Budget */}
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-32 rounded-sm" />
+              <Skeleton className="h-9 flex-1 rounded-md" />
+            </div>
+
+            {/* Contact card */}
+            <div className="mt-6 p-4 rounded-lg border border-border/50 space-y-3">
+              <Skeleton className="h-5 w-24 rounded-sm" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="space-y-1.5 flex-1">
+                  <Skeleton className="h-4 w-32 rounded-sm" />
+                  <Skeleton className="h-3 w-24 rounded-sm" />
+                </div>
+              </div>
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-8 w-full rounded-md" />
+            </div>
+
+            {/* Tasks section */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-20 rounded-sm" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+              </div>
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN skeleton */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background hidden md:flex" style={{ minWidth: '640px' }}>
+          <div className="flex-1 overflow-y-auto pl-6 pr-6 py-6 space-y-4">
+            <Skeleton className="h-5 w-32 rounded-sm" />
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="flex gap-3 items-start">
+                <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                <div className="space-y-1.5 flex-1">
+                  <Skeleton className="h-4 w-48 rounded-sm" />
+                  <Skeleton className="h-3 w-full rounded-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Comment input */}
+          <div className="border-t border-border/50 px-6 py-4">
+            <Skeleton className="h-20 w-full rounded-md" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (dealError) {
@@ -675,12 +826,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-transparent"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={currentUser.avatar} />
-                      <AvatarFallback className="text-[10px]">
-                        {currentUser.name.split(' ').map(n => n[0]).join('') || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={currentUser.id && currentUser.id !== 'unassigned' ? `${getApiBaseUrl()}/users/${currentUser.id}/avatar` : undefined} />
+                        <AvatarFallback className="text-[10px]">
+                          {currentUser.name.split(' ').map(n => n[0]).join('') || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
                     <span className="text-sm text-foreground">{currentUser.name || 'Unassigned'}</span>
                   </div>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -719,12 +870,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                         className="w-full flex items-center justify-between gap-2 px-3 h-9 hover:bg-accent/50 first:rounded-t-md last:rounded-b-md transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-5 w-5">
-                            <AvatarImage src={user.avatar} />
-                            <AvatarFallback className="text-[10px]">
-                              {user.name.split(' ').map(n => n[0]).join('') || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={user.id && user.id !== 'unassigned' ? `${getApiBaseUrl()}/users/${user.id}/avatar` : undefined} />
+                              <AvatarFallback className="text-[10px]">
+                                {user.name.split(' ').map(n => n[0]).join('') || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
                           <span className="text-sm text-foreground">{user.name}</span>
                         </div>
                         {(assignedUser === user.name || deal?.assignedTo?.id === user.id) && (
@@ -897,14 +1048,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
                                   // Invalidate caches — React Query refetches in background
                                   queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                  queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
+                                  queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
                                   invalidateActivities()
 
                                 } catch (error) {
                                   console.error('Failed to update directions:', error)
                                   // Revert to server state
                                   setLocalDirections(deal?.contact?.directions || [])
-                                  await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                  await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                                 }
                               }}
                               className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -971,14 +1122,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
                                 // Invalidate caches after successful update
                                 await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                                 invalidateActivities()
 
                               } catch (error) {
                                 console.error('Failed to update contact methods:', error)
                                 // Revert to server state
                                 setLocalContactMethods(deal?.contact?.contactMethods || [])
-                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                               }
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1141,14 +1292,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               await updateDeal({ rejectionReasons: newReasons })
 
                               // Invalidate — React Query refetches in background
-                              queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
+                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
                               invalidateActivities()
 
                             } catch (error) {
                               console.error('Failed to update rejection reasons:', error)
                               // Revert to server state
                               setLocalRejectionReasons(deal?.rejectionReasons || [])
-                              await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                              await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                             }
                           }}
                           className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1182,14 +1333,14 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                 await updateDeal({ rejectionReasons: newReasons })
 
                                 // Invalidate after successful update
-                                await queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) })
+                                await queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
                                 invalidateActivities()
 
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
                                 // Revert to server state
                                 setLocalRejectionReasons(deal?.rejectionReasons || [])
-                                await queryClient.refetchQueries({ queryKey: dealKeys.detail(dealId) })
+                                await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                               }
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
@@ -1221,7 +1372,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                 Add Task
               </Button>
             </div>
-            {!tasks || tasks.length === 0 ? (
+            {isPreview && tasks.length === 0 ? (
+              <div className="space-y-2 py-1">
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+            ) : !tasks || tasks.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">{t('deals.noTasksYet')}</p>
             ) : (
               <DealTasksList
