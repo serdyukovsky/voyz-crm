@@ -40,3 +40,66 @@ export async function getSystemFieldOptions(
   }
 }
 
+/**
+ * Add a new option to a system field
+ */
+export async function addSystemFieldOption(
+  entityType: 'deal' | 'contact',
+  fieldName: string,
+  option: string,
+): Promise<string[]> {
+  const token = localStorage.getItem('access_token')
+  if (!token) throw new Error('No access token found')
+
+  const response = await apiFetch(
+    `/system-field-options/add?entityType=${entityType}&fieldName=${fieldName}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ option }),
+    },
+  )
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+    throw new Error(errorData.message || 'Failed to add option')
+  }
+
+  const data = await response.json()
+  return data.options || []
+}
+
+/**
+ * Remove an option from a system field
+ */
+export async function removeSystemFieldOption(
+  entityType: 'deal' | 'contact',
+  fieldName: string,
+  option: string,
+): Promise<string[]> {
+  const token = localStorage.getItem('access_token')
+  if (!token) throw new Error('No access token found')
+
+  const response = await apiFetch(
+    `/system-field-options/remove?entityType=${entityType}&fieldName=${fieldName}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ option }),
+    },
+  )
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+    throw new Error(errorData.message || 'Failed to remove option')
+  }
+
+  const data = await response.json()
+  return data.options || []
+}

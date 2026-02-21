@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { DollarSign, ChevronDown, Check, Plus, XCircle, Link as LinkIcon, Users, Hash, MessageCircle, Globe } from 'lucide-react'
+import { DollarSign, ChevronDown, Check, Plus, XCircle, X, Link as LinkIcon, Users, Hash, MessageCircle, Globe, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -33,6 +33,17 @@ import { type User } from '@/lib/api/users'
 import { createComment, updateCommentType, type Comment, type CommentType } from '@/lib/api/comments'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { getDealFullDetail, updateDeal as updateDealApi } from '@/lib/api/deals'
+import { addSystemFieldOption, removeSystemFieldOption } from '@/lib/api/system-field-options'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface DealDetailProps {
   dealId: string
@@ -64,7 +75,10 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   }
   
   const getContactMethodLabel = (value: string) => {
-    return t(`contacts.contactMethod.${value.toLowerCase()}`) || value
+    const key = `contacts.contactMethod.${value.toLowerCase()}`
+    const translated = t(key)
+    // If translation returns the key itself, show the original value
+    return translated === key ? value : translated
   }
   
   const getRejectionReasonLabel = (value: string) => {
@@ -140,6 +154,24 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [localContactMethods, setLocalContactMethods] = useState<string[]>([])
   const [localRejectionReasons, setLocalRejectionReasons] = useState<string[]>([])
 
+  // State for adding/removing direction options
+  const [newDirectionValue, setNewDirectionValue] = useState('')
+  const [directionToDelete, setDirectionToDelete] = useState<string | null>(null)
+  const [localDirectionsOptions, setLocalDirectionsOptions] = useState<string[]>([])
+  const [addingDirection, setAddingDirection] = useState(false)
+
+  // State for adding/removing contact method options
+  const [newMethodValue, setNewMethodValue] = useState('')
+  const [methodToDelete, setMethodToDelete] = useState<string | null>(null)
+  const [localMethodsOptions, setLocalMethodsOptions] = useState<string[]>([])
+  const [addingMethod, setAddingMethod] = useState(false)
+
+  // State for adding/removing rejection reason options
+  const [newReasonValue, setNewReasonValue] = useState('')
+  const [reasonToDelete, setReasonToDelete] = useState<string | null>(null)
+  const [localReasonsOptions, setLocalReasonsOptions] = useState<string[]>([])
+  const [addingReason, setAddingReason] = useState(false)
+
   // Refs for debounce timers
   const linkTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const subscriberCountTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -165,8 +197,32 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const usersLoading = fullDetailQuery.isFetching && allUsers.length === 0
   const commentsLoading = fullDetailQuery.isFetching && (isPreview || comments.length === 0)
   const users = useMemo(() => allUsers.filter((user: any) => user.isActive), [allUsers])
-  const rejectionReasonsOptions = fullDetailQuery.data?.systemFieldOptions?.rejectionReasons || []
-  const directionsOptions = fullDetailQuery.data?.systemFieldOptions?.directions || []
+  const rejectionReasonsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.rejectionReasons || []
+  const directionsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.directions || []
+  const contactMethodsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.contactMethods || []
+
+  // Sync local options with server data
+  useEffect(() => {
+    if (directionsOptionsFromServer.length > 0 && localDirectionsOptions.length === 0) {
+      setLocalDirectionsOptions(directionsOptionsFromServer)
+    }
+  }, [directionsOptionsFromServer])
+
+  useEffect(() => {
+    if (contactMethodsOptionsFromServer.length > 0 && localMethodsOptions.length === 0) {
+      setLocalMethodsOptions(contactMethodsOptionsFromServer)
+    }
+  }, [contactMethodsOptionsFromServer])
+
+  useEffect(() => {
+    if (rejectionReasonsOptionsFromServer.length > 0 && localReasonsOptions.length === 0) {
+      setLocalReasonsOptions(rejectionReasonsOptionsFromServer)
+    }
+  }, [rejectionReasonsOptionsFromServer])
+
+  const directionsOptions = localDirectionsOptions.length > 0 ? localDirectionsOptions : directionsOptionsFromServer
+  const contactMethodsOptions = localMethodsOptions.length > 0 ? localMethodsOptions : (contactMethodsOptionsFromServer.length > 0 ? contactMethodsOptionsFromServer : ['Whatsapp', 'Telegram', 'Direct'])
+  const rejectionReasonsOptions = localReasonsOptions.length > 0 ? localReasonsOptions : (rejectionReasonsOptionsFromServer.length > 0 ? rejectionReasonsOptionsFromServer : ['Price', 'Competitor', 'Timing', 'Budget', 'Requirements', 'Other'])
 
   // Deal update helper
   const updateDeal = async (data: any) => {
@@ -1004,6 +1060,28 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
                   {openDirections && (
                     <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50">
+                      {localDirections.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            setLocalDirections([])
+                            try {
+                              const contactId = deal?.contact?.id || await ensureContact()
+                              await updateContact(contactId, { directions: [] }, dealId)
+                              queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                              invalidateActivities()
+                            } catch (error) {
+                              console.error('Failed to clear directions:', error)
+                              setLocalDirections(deal?.contact?.directions || [])
+                            }
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground mb-2 w-full text-left"
+                        >
+                          Очистить
+                        </button>
+                      )}
                       {directionsOptions.length > 10 && (
                         <Input
                           type="text"
@@ -1022,7 +1100,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                                 .includes(searchDirections.toLowerCase())
                             )
                             .map((direction) => (
-                          <div key={direction} className="flex items-center gap-2">
+                          <div key={direction} className="flex items-center gap-2 group min-w-0">
                             <input
                               type="checkbox"
                               id={`direction-${direction}`}
@@ -1060,19 +1138,124 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                               }}
                               className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                             />
-                            <label htmlFor={`direction-${direction}`} className="text-sm cursor-pointer">
+                            <label htmlFor={`direction-${direction}`} className="text-sm cursor-pointer flex-1 min-w-0 truncate" title={getDirectionLabel(direction)}>
                               {getDirectionLabel(direction)}
                             </label>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setDirectionToDelete(direction)
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
+                              title="Удалить направление"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
                           </div>
                         ))
                       ) : (
                         <p className="text-sm text-muted-foreground py-1">No options available</p>
                       )}
                       </div>
+                      {/* Inline add new direction */}
+                      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border/40">
+                        <Input
+                          type="text"
+                          placeholder="Новое направление..."
+                          value={newDirectionValue}
+                          onChange={(e) => setNewDirectionValue(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={addingDirection}
+                          onKeyDown={async (e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter' && newDirectionValue.trim() && !addingDirection) {
+                              e.preventDefault()
+                              const value = newDirectionValue.trim()
+                              setAddingDirection(true)
+                              try {
+                                const updatedOptions = await addSystemFieldOption('contact', 'directions', value)
+                                setLocalDirectionsOptions(updatedOptions)
+                                setNewDirectionValue('')
+                              } catch (error) {
+                                console.error('Failed to add direction:', error)
+                                showError('Не удалось добавить направление')
+                              } finally {
+                                setAddingDirection(false)
+                              }
+                            }
+                          }}
+                          className="h-7 text-xs bg-transparent !border-none !shadow-none flex-1"
+                        />
+                        <button
+                          type="button"
+                          disabled={addingDirection}
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            if (!newDirectionValue.trim() || addingDirection) return
+                            const value = newDirectionValue.trim()
+                            setAddingDirection(true)
+                            try {
+                              const updatedOptions = await addSystemFieldOption('contact', 'directions', value)
+                              setLocalDirectionsOptions(updatedOptions)
+                              setNewDirectionValue('')
+                            } catch (error) {
+                              console.error('Failed to add direction:', error)
+                              showError('Не удалось добавить направление')
+                            } finally {
+                              setAddingDirection(false)
+                            }
+                          }}
+                          className="p-1 hover:text-primary transition-colors disabled:opacity-50"
+                          title="Добавить направление"
+                        >
+                          {addingDirection ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* AlertDialog for direction deletion confirmation */}
+              <AlertDialog open={!!directionToDelete} onOpenChange={(open) => !open && setDirectionToDelete(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить направление?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Направление «{directionToDelete}» будет удалено из списка доступных вариантов. Это действие нельзя отменить.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        if (!directionToDelete) return
+                        try {
+                          const updatedOptions = await removeSystemFieldOption('contact', 'directions', directionToDelete)
+                          setLocalDirectionsOptions(updatedOptions)
+                          // Also remove from selected directions if it was selected
+                          if (localDirections.includes(directionToDelete)) {
+                            const newDirections = localDirections.filter((d) => d !== directionToDelete)
+                            setLocalDirections(newDirections)
+                            const contactId = deal?.contact?.id
+                            if (contactId) {
+                              await updateContact(contactId, { directions: newDirections }, dealId)
+                              queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Failed to remove direction:', error)
+                        }
+                        setDirectionToDelete(null)
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {/* Contact Methods - Multi-select with Checkboxes */}
               <div onClick={(e) => e.stopPropagation()} className="flex items-start gap-3 methods-dropdown-container mb-3">
@@ -1097,52 +1280,172 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                   </button>
 
                   {openMethods && (
-                    <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50 space-y-1.5">
-                      {['Whatsapp', 'Telegram', 'Direct'].map((method) => (
-                        <div key={method} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`method-${method}`}
-                            checked={localContactMethods.includes(method)}
-                            onChange={async (e) => {
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50">
+                      {localContactMethods.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            setLocalContactMethods([])
+                            try {
+                              const contactId = deal?.contact?.id || await ensureContact()
+                              await updateContact(contactId, { contactMethods: [] }, dealId)
+                              queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                              invalidateActivities()
+                            } catch (error) {
+                              console.error('Failed to clear contact methods:', error)
+                              setLocalContactMethods(deal?.contact?.contactMethods || [])
+                            }
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground mb-2 w-full text-left"
+                        >
+                          Очистить
+                        </button>
+                      )}
+                      <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                        {contactMethodsOptions.map((method) => (
+                          <div key={method} className="flex items-center gap-2 group min-w-0">
+                            <input
+                              type="checkbox"
+                              id={`method-${method}`}
+                              checked={localContactMethods.includes(method)}
+                              onChange={async (e) => {
+                                try {
+                                  const isChecked = e.target.checked
+                                  const newMethods = isChecked
+                                    ? [...localContactMethods, method]
+                                    : localContactMethods.filter((m) => m !== method)
+
+                                  setLocalContactMethods(newMethods)
+
+                                  const contactId = deal?.contact?.id || await ensureContact()
+                                  await updateContact(contactId, { contactMethods: newMethods }, dealId)
+
+                                  await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                                  await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
+                                  invalidateActivities()
+                                } catch (error) {
+                                  console.error('Failed to update contact methods:', error)
+                                  setLocalContactMethods(deal?.contact?.contactMethods || [])
+                                  await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
+                                }
+                              }}
+                              className="h-4 w-4 rounded border border-border/60 cursor-pointer"
+                            />
+                            <label htmlFor={`method-${method}`} className="text-sm cursor-pointer flex-1 min-w-0 truncate" title={getContactMethodLabel(method)}>
+                              {getContactMethodLabel(method)}
+                            </label>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setMethodToDelete(method)
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
+                              title="Удалить способ связи"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Inline add new method */}
+                      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border/40">
+                        <Input
+                          type="text"
+                          placeholder="Новый способ связи..."
+                          value={newMethodValue}
+                          onChange={(e) => setNewMethodValue(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={async (e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter' && newMethodValue.trim() && !addingMethod) {
+                              e.preventDefault()
+                              const value = newMethodValue.trim()
+                              setAddingMethod(true)
                               try {
-                                const isChecked = e.target.checked
-
-                                // Calculate new methods
-                                const newMethods = isChecked
-                                  ? [...localContactMethods, method]
-                                  : localContactMethods.filter((m) => m !== method)
-
-                                // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
-                                setLocalContactMethods(newMethods)
-
-                                // Then send to server in background (backend logs activity)
-                                const contactId = deal?.contact?.id || await ensureContact()
-                                await updateContact(contactId, { contactMethods: newMethods }, dealId)
-
-                                // Invalidate caches after successful update
-                                await queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
-                                await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
-                                invalidateActivities()
-
+                                const updatedOptions = await addSystemFieldOption('contact', 'contactMethods', value)
+                                setLocalMethodsOptions(updatedOptions)
+                                setNewMethodValue('')
                               } catch (error) {
-                                console.error('Failed to update contact methods:', error)
-                                // Revert to server state
-                                setLocalContactMethods(deal?.contact?.contactMethods || [])
-                                await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
+                                console.error('Failed to add method:', error)
+                                showError('Не удалось добавить способ связи')
+                              } finally {
+                                setAddingMethod(false)
                               }
-                            }}
-                            className="h-4 w-4 rounded border border-border/60 cursor-pointer"
-                          />
-                          <label htmlFor={`method-${method}`} className="text-sm cursor-pointer">
-                            {getContactMethodLabel(method)}
-                          </label>
-                        </div>
-                      ))}
+                            }
+                          }}
+                          className="h-7 text-xs bg-transparent !border-none !shadow-none flex-1"
+                        />
+                        <button
+                          type="button"
+                          disabled={addingMethod}
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            if (!newMethodValue.trim() || addingMethod) return
+                            const value = newMethodValue.trim()
+                            setAddingMethod(true)
+                            try {
+                              const updatedOptions = await addSystemFieldOption('contact', 'contactMethods', value)
+                              setLocalMethodsOptions(updatedOptions)
+                              setNewMethodValue('')
+                            } catch (error) {
+                              console.error('Failed to add method:', error)
+                              showError('Не удалось добавить способ связи')
+                            } finally {
+                              setAddingMethod(false)
+                            }
+                          }}
+                          className="p-1 hover:text-primary transition-colors disabled:opacity-50"
+                          title="Добавить способ связи"
+                        >
+                          {addingMethod ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* AlertDialog for contact method deletion confirmation */}
+              <AlertDialog open={!!methodToDelete} onOpenChange={(open) => !open && setMethodToDelete(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить способ связи?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Способ связи «{methodToDelete}» будет удалён из списка доступных вариантов. Это действие нельзя отменить.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        if (!methodToDelete) return
+                        try {
+                          const updatedOptions = await removeSystemFieldOption('contact', 'contactMethods', methodToDelete)
+                          setLocalMethodsOptions(updatedOptions)
+                          if (localContactMethods.includes(methodToDelete)) {
+                            const newMethods = localContactMethods.filter((m) => m !== methodToDelete)
+                            setLocalContactMethods(newMethods)
+                            const contactId = deal?.contact?.id
+                            if (contactId) {
+                              await updateContact(contactId, { contactMethods: newMethods }, dealId)
+                              queryClient.invalidateQueries({ queryKey: contactKeys.detail(contactId) })
+                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Failed to remove method:', error)
+                        }
+                        setMethodToDelete(null)
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {/* Website or TG Channel */}
               <div className="flex items-center gap-3">
@@ -1253,6 +1556,26 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
 
               {openReasons && (
                 <div className="absolute top-full left-0 right-0 mt-1 rounded-md p-2 bg-card shadow-md z-50">
+                  {localRejectionReasons.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        setLocalRejectionReasons([])
+                        try {
+                          await updateDeal({ rejectionReasons: [] })
+                          queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                          invalidateActivities()
+                        } catch (error) {
+                          console.error('Failed to clear rejection reasons:', error)
+                          setLocalRejectionReasons(deal?.rejectionReasons || [])
+                        }
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground mb-2 w-full text-left"
+                    >
+                      Очистить
+                    </button>
+                  )}
                   {rejectionReasonsOptions.length > 10 && (
                     <Input
                       type="text"
@@ -1263,100 +1586,146 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
                     />
                   )}
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                    {rejectionReasonsOptions.length > 0 ? (
-                      rejectionReasonsOptions
-                        .filter((reason) =>
-                          getRejectionReasonLabel(reason)
-                            .toLowerCase()
-                            .includes(searchReasons.toLowerCase())
-                        )
-                        .map((reason) => (
-                      <div key={reason} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`reason-${reason}`}
-                          checked={localRejectionReasons.includes(reason)}
-                          onChange={async (e) => {
-                            try {
-                              const isChecked = e.target.checked
-
-                              // Calculate new reasons
-                              const newReasons = isChecked
-                                ? [...localRejectionReasons, reason]
-                                : localRejectionReasons.filter((r) => r !== reason)
-
-                              // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
-                              setLocalRejectionReasons(newReasons)
-
-                              // Then send to server in background (backend logs activity)
-                              await updateDeal({ rejectionReasons: newReasons })
-
-                              // Invalidate — React Query refetches in background
-                              queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
-                              invalidateActivities()
-
-                            } catch (error) {
-                              console.error('Failed to update rejection reasons:', error)
-                              // Revert to server state
-                              setLocalRejectionReasons(deal?.rejectionReasons || [])
-                              await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
-                            }
-                          }}
-                          className="h-4 w-4 rounded border border-border/60 cursor-pointer"
-                        />
-                        <label htmlFor={`reason-${reason}`} className="text-sm cursor-pointer">
-                          {getRejectionReasonLabel(reason)}
-                        </label>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      {['price', 'competitor', 'timing', 'budget', 'requirements', 'other'].map((reason) => (
-                        <div key={reason} className="flex items-center gap-2">
+                    {rejectionReasonsOptions
+                      .filter((reason) =>
+                        getRejectionReasonLabel(reason)
+                          .toLowerCase()
+                          .includes(searchReasons.toLowerCase())
+                      )
+                      .map((reason) => (
+                        <div key={reason} className="flex items-center gap-2 group min-w-0">
                           <input
                             type="checkbox"
                             id={`reason-${reason}`}
-                            checked={deal.rejectionReasons?.includes(reason) || false}
+                            checked={localRejectionReasons.includes(reason)}
                             onChange={async (e) => {
                               try {
                                 const isChecked = e.target.checked
-
-                                // Calculate new reasons
                                 const newReasons = isChecked
                                   ? [...localRejectionReasons, reason]
                                   : localRejectionReasons.filter((r) => r !== reason)
 
-                                // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT UI UPDATE
                                 setLocalRejectionReasons(newReasons)
-
-                                // Then send to server in background (backend logs activity)
                                 await updateDeal({ rejectionReasons: newReasons })
-
-                                // Invalidate after successful update
-                                await queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                                queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
                                 invalidateActivities()
-
                               } catch (error) {
                                 console.error('Failed to update rejection reasons:', error)
-                                // Revert to server state
                                 setLocalRejectionReasons(deal?.rejectionReasons || [])
                                 await queryClient.refetchQueries({ queryKey: ['dealFullDetail', dealId] })
                               }
                             }}
                             className="h-4 w-4 rounded border border-border/60 cursor-pointer"
                           />
-                          <label htmlFor={`reason-${reason}`} className="text-sm cursor-pointer">
+                          <label htmlFor={`reason-${reason}`} className="text-sm cursor-pointer flex-1 min-w-0 truncate" title={getRejectionReasonLabel(reason)}>
                             {getRejectionReasonLabel(reason)}
                           </label>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setReasonToDelete(reason)
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
+                            title="Удалить причину"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </div>
                       ))}
-                    </>
-                  )}
+                  </div>
+                  {/* Inline add new reason */}
+                  <div className="flex items-center gap-1 mt-2 pt-2 border-t border-border/40">
+                    <Input
+                      type="text"
+                      placeholder="Новая причина отказа..."
+                      value={newReasonValue}
+                      onChange={(e) => setNewReasonValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={async (e) => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter' && newReasonValue.trim() && !addingReason) {
+                          e.preventDefault()
+                          const value = newReasonValue.trim()
+                          setAddingReason(true)
+                          try {
+                            const updatedOptions = await addSystemFieldOption('deal', 'rejectionReasons', value)
+                            setLocalReasonsOptions(updatedOptions)
+                            setNewReasonValue('')
+                          } catch (error) {
+                            console.error('Failed to add reason:', error)
+                            showError('Не удалось добавить причину отказа')
+                          } finally {
+                            setAddingReason(false)
+                          }
+                        }
+                      }}
+                      className="h-7 text-xs bg-transparent !border-none !shadow-none flex-1"
+                    />
+                    <button
+                      type="button"
+                      disabled={addingReason}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!newReasonValue.trim() || addingReason) return
+                        const value = newReasonValue.trim()
+                        setAddingReason(true)
+                        try {
+                          const updatedOptions = await addSystemFieldOption('deal', 'rejectionReasons', value)
+                          setLocalReasonsOptions(updatedOptions)
+                          setNewReasonValue('')
+                        } catch (error) {
+                          console.error('Failed to add reason:', error)
+                          showError('Не удалось добавить причину отказа')
+                        } finally {
+                          setAddingReason(false)
+                        }
+                      }}
+                      className="p-1 hover:text-primary transition-colors disabled:opacity-50"
+                      title="Добавить причину отказа"
+                    >
+                      {addingReason ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* AlertDialog for rejection reason deletion confirmation */}
+          <AlertDialog open={!!reasonToDelete} onOpenChange={(open) => !open && setReasonToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Удалить причину отказа?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Причина «{reasonToDelete}» будет удалена из списка доступных вариантов. Это действие нельзя отменить.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!reasonToDelete) return
+                    try {
+                      const updatedOptions = await removeSystemFieldOption('deal', 'rejectionReasons', reasonToDelete)
+                      setLocalReasonsOptions(updatedOptions)
+                      if (localRejectionReasons.includes(reasonToDelete)) {
+                        const newReasons = localRejectionReasons.filter((r) => r !== reasonToDelete)
+                        setLocalRejectionReasons(newReasons)
+                        await updateDeal({ rejectionReasons: newReasons })
+                        queryClient.invalidateQueries({ queryKey: ['dealFullDetail', dealId] })
+                      }
+                    } catch (error) {
+                      console.error('Failed to remove reason:', error)
+                    }
+                    setReasonToDelete(null)
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Удалить
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Tasks - Moved to end */}
           <div className="space-y-2 pt-4 border-t border-border/50">

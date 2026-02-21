@@ -93,6 +93,39 @@ export class SystemFieldOptionsService {
   }
 
   /**
+   * Remove an option from a system field
+   * Returns the updated list of options
+   */
+  async removeOption(
+    entityType: 'deal' | 'contact',
+    fieldName: string,
+    option: string,
+  ): Promise<string[]> {
+    const currentOptions = await this.getOptions(entityType, fieldName);
+    const updatedOptions = currentOptions.filter(
+      (o) => o.toLowerCase() !== option.toLowerCase(),
+    );
+
+    if (updatedOptions.length === currentOptions.length) {
+      return currentOptions;
+    }
+
+    await this.prisma.systemFieldOptions.update({
+      where: {
+        entityType_fieldName: {
+          entityType,
+          fieldName,
+        },
+      },
+      data: {
+        options: updatedOptions,
+      },
+    });
+
+    return updatedOptions;
+  }
+
+  /**
    * Initialize default options for system fields
    * Called on first import or system setup
    */
