@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -221,12 +222,12 @@ export function UserDetailModal({ userId, isOpen, onClose, onUserUpdated }: User
             {/* Header */}
             <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border/50 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={user.avatar || undefined} />
-                  <AvatarFallback className="bg-primary/20 text-primary">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={`${getApiBaseUrl()}/users/${user.id}/avatar`} />
+                    <AvatarFallback className="bg-primary/20 text-primary">
+                      {user.firstName[0]}{user.lastName[0]}
+                    </AvatarFallback>
+                  </Avatar>
                 <div>
                   <h2 className="text-xl font-semibold">
                     {user.firstName} {user.lastName}

@@ -320,8 +320,19 @@ export class AuthService {
   async getCurrentUser(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
         permissions: true,
+        avatarColor: true,
+        // avatar excluded intentionally - it's base64 and can be 200KB+
+        // Use GET /users/me for profile page with avatar
       },
     });
 
@@ -331,7 +342,7 @@ export class AuthService {
 
     const userPermissions = this.getUserPermissions(user.role, user.permissions);
 
-    const { password: _, ...userResponse } = user;
+    const { permissions: _, ...userResponse } = user;
 
     return {
       ...userResponse,

@@ -18,7 +18,7 @@ function LayoutContent({ children }: LayoutProps) {
   const [searchOpen, setSearchOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background crm-layout-root">
       <Sidebar />
       <Topbar />
       <main 

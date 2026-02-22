@@ -68,6 +68,14 @@ export class UsersService {
     return user;
   }
 
+  async getAvatar(id: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { avatar: true },
+    });
+    return user?.avatar || null;
+  }
+
   async findAll() {
     return this.prisma.user.findMany({
       select: {
@@ -75,7 +83,8 @@ export class UsersService {
         email: true,
         firstName: true,
         lastName: true,
-        avatar: true,
+        // avatar excluded from list — base64 data URLs bloat response (220KB+ per user)
+        avatarColor: true,
         phone: true,
         telegramUsername: true,
         role: true,
@@ -99,6 +108,7 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        avatarColor: true,
         phone: true,
         telegramUsername: true,
         role: true,
@@ -180,6 +190,9 @@ export class UsersService {
     if (updateUserDto.avatar !== undefined) {
       updateData.avatar = sanitizeOptionalTextFields(updateUserDto.avatar);
     }
+    if (updateUserDto.avatarColor !== undefined) {
+      updateData.avatarColor = updateUserDto.avatarColor || null;
+    }
     if (updateUserDto.phone !== undefined) {
       updateData.phone = sanitizeOptionalTextFields(updateUserDto.phone) || undefined;
     }
@@ -201,6 +214,7 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatar: true,
+        avatarColor: true,
         phone: true,
         telegramUsername: true,
         role: true,

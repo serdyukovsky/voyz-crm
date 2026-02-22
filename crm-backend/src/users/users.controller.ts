@@ -7,7 +7,10 @@ import {
   Param,
   Delete,
   UseGuards,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -21,6 +24,7 @@ import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { PERMISSIONS } from '@/common/constants/permissions';
+import { Public } from '@/auth/decorators/public.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -56,6 +60,29 @@ export class UsersController {
     const userId = currentUser.userId || currentUser.id;
     const user = await this.usersService.findOne(userId);
     return user;
+  }
+
+  @Get(':id/avatar')
+  @Public()
+  @ApiOperation({ summary: 'Get user avatar image' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Avatar image' })
+  @ApiResponse({ status: 404, description: 'No avatar' })
+  async getAvatar(@Param('id') id: string, @Res() res: Response) {
+    const avatar = await this.usersService.getAvatar(id);
+    if (!avatar) {
+      throw new NotFoundException('No avatar');
+    }
+    // Parse base64 data URL: "data:image/png;base64,iVBOR..."
+    const match = avatar.match(/^data:(.+);base64,(.+)$/);
+    if (!match) {
+      throw new NotFoundException('Invalid avatar format');
+    }
+    const contentType = match[1];
+    const buffer = Buffer.from(match[2], 'base64');
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(buffer);
   }
 
   @Get(':id')

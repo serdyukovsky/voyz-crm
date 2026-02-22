@@ -1,7 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { getActivities, type Activity, type ActivityFilters } from '@/lib/api/activities'
+
+export const activityKeys = {
+  all: ['activities'] as const,
+  list: (entityType: string, entityId: string) => [...activityKeys.all, entityType, entityId] as const,
+}
 
 interface UseActivityOptions {
   entityType: 'deal' | 'contact' | 'company' | 'task'
@@ -10,50 +15,20 @@ interface UseActivityOptions {
 }
 
 export function useActivity({ entityType, entityId, filters }: UseActivityOptions) {
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const loadActivities = useCallback(async () => {
-    if (!entityId) {
-      setActivities([])
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-      console.log('Loading activities for:', { entityType, entityId, filters })
-      const data = await getActivities({
-        entityType,
-        entityId,
-        ...filters,
-      })
-      console.log('Loaded activities:', data.length, 'activities', data)
-      setActivities(data)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to load activities'))
-      console.error('Failed to load activities:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [entityType, entityId, filters])
-
-  useEffect(() => {
-    loadActivities()
-  }, [loadActivities])
+  const { data: activities = [], isLoading: loading, error } = useQuery({
+    queryKey: activityKeys.list(entityType, entityId),
+    queryFn: () => getActivities({
+      entityType,
+      entityId,
+      ...filters,
+    }),
+    enabled: !!entityId,
+    staleTime: 2 * 60 * 1000,
+  })
 
   return {
     activities,
     loading,
     error,
-    refetch: loadActivities,
   }
 }
-
-
-
-
-
-

@@ -14,6 +14,8 @@ import { useTranslation } from '@/lib/i18n/i18n-context'
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
+import { getApiBaseUrl } from "@/lib/config"
+
 export default function ProfilePage() {
   console.log('🚀 ProfilePage: Component rendered')
   
@@ -36,7 +38,6 @@ export default function ProfilePage() {
   const [telegramUsername, setTelegramUsername] = useState("")
   const [avatar, setAvatar] = useState<string | undefined>(undefined)
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(undefined)
-  
   console.log('🚀 ProfilePage: Current state:', { firstName, lastName, email, isLoading, user: user?.id })
 
   // Phone mask formatting (same as in create-user-modal)
@@ -136,7 +137,7 @@ export default function ProfilePage() {
           setTelegramUsername(userData.telegramUsername || "")
           setAvatar(userData.avatar)
           setAvatarPreview(userData.avatar)
-          
+
           console.log('✅ ProfilePage: State set to:', {
             firstName: userData.firstName,
             lastName: userData.lastName,
@@ -264,7 +265,7 @@ export default function ProfilePage() {
       if (avatar) {
         updateData.avatar = avatar
       }
-      
+
       const updatedUser = await updateMyProfile(updateData)
 
       // Update localStorage with new data
@@ -282,6 +283,7 @@ export default function ProfilePage() {
             ...(updatedUser.avatar && { avatar: updatedUser.avatar }),
           }
           localStorage.setItem('user', JSON.stringify(updatedLocalUser))
+          window.dispatchEvent(new Event('user-changed'))
         }
       }
 
@@ -384,12 +386,12 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="flex items-center gap-6 pb-6">
               <div className="relative">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={avatarPreview || avatar} alt={`${firstName} ${lastName}`} />
-                  <AvatarFallback className="bg-primary/20 text-primary text-xl font-medium">
-                    {getUserInitials()}
-                  </AvatarFallback>
-                </Avatar>
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={user?.id ? `${getApiBaseUrl()}/users/${user.id}/avatar` : undefined} alt={`${firstName} ${lastName}`} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xl font-medium">
+                      {getUserInitials()}
+                    </AvatarFallback>
+                  </Avatar>
                 {avatarPreview && (
                   <Button
                     variant="destructive"

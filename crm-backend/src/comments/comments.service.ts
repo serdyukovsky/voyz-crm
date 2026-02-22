@@ -26,7 +26,7 @@ export class CommentsService {
         userId,
       },
       include: {
-        user: true,
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
 
@@ -108,7 +108,7 @@ export class CommentsService {
   async findByDeal(dealId: string) {
     return this.prisma.comment.findMany({
       where: { dealId },
-      include: { user: true },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -116,7 +116,7 @@ export class CommentsService {
   async findByTask(taskId: string) {
     return this.prisma.comment.findMany({
       where: { taskId },
-      include: { user: true },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -124,7 +124,7 @@ export class CommentsService {
   async findByContact(contactId: string) {
     return this.prisma.comment.findMany({
       where: { contactId },
-      include: { user: true },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -143,7 +143,7 @@ export class CommentsService {
     const updatedComment = await this.prisma.comment.update({
       where: { id },
       data: { type },
-      include: { user: true },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
     });
 
     // Update the activity payload to reflect the new type

@@ -13,6 +13,7 @@ import { deleteTask, updateTask } from '@/lib/api/tasks'
 import { useTasks } from '@/hooks/use-tasks'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { useToastNotification } from '@/hooks/use-toast-notification'
+import { getApiBaseUrl } from '@/lib/config'
 
 interface Task {
   id: string
@@ -25,6 +26,7 @@ interface Task {
   assignee: string
   assigneeId?: string
   assigneeAvatar?: string | null
+  assigneeColor?: string | null
   completed: boolean
   status: string
   description?: string
@@ -331,19 +333,19 @@ function TasksListView({ searchQuery, userFilter, selectedTaskId, onTaskSelect }
               </td>
                 <td className="p-3">
                   <div className="flex items-center gap-1.5">
-                    <Avatar className="h-5 w-5">
-                      {task.assigneeAvatar && (
-                        <AvatarImage src={task.assigneeAvatar} alt={task.assignee} />
-                      )}
-                      <AvatarFallback className="text-[10px] font-medium">
-                        {task.assignee
-                          .split(' ')
-                          .map(n => n[0])
-                          .join('')
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
+                      <Avatar className="h-5 w-5">
+                        {task.assigneeId && (
+                          <AvatarImage src={`${getApiBaseUrl()}/users/${task.assigneeId}/avatar`} alt={task.assignee} />
+                        )}
+                        <AvatarFallback className="text-[10px] font-medium">
+                          {task.assignee
+                            .split(' ')
+                            .map(n => n[0])
+                            .join('')
+                            .toUpperCase()
+                            .slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
                     <span className="text-sm text-muted-foreground">{task.assignee}</span>
                   </div>
                 </td>

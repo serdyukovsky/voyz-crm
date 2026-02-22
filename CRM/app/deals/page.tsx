@@ -637,6 +637,41 @@ export default function DealsPage() {
     }
   }
 
+  const handleBulkAddTag = async (tag: string) => {
+    if (selectedDeals.length === 0) return
+
+    const dealsToUpdate = [...selectedDeals]
+
+    // Optimistically update list data
+    setListDeals(prevDeals =>
+      prevDeals.map(deal =>
+        dealsToUpdate.includes(deal.id)
+          ? { ...deal, tags: [...new Set([...(deal.tags || []), tag])] }
+          : deal
+      )
+    )
+    setSelectedDeals([])
+
+    const results = await Promise.all(
+      dealsToUpdate.map(dealId => {
+        const deal = listDeals.find(d => d.id === dealId)
+        const currentTags = deal?.tags || []
+        if (currentTags.includes(tag)) return Promise.resolve(deal) // Already has tag
+        return updateDeal(dealId, { tags: [...currentTags, tag] }).catch(error => {
+          console.error(`Failed to add tag to deal ${dealId}:`, error)
+          return null
+        })
+      })
+    )
+
+    const failedCount = results.filter(r => r === null).length
+    if (failedCount > 0) {
+      showError('Ошибка', `Не удалось добавить тег к ${failedCount} сделкам`)
+    } else {
+      showSuccess(`Тег «${tag}» добавлен`)
+    }
+  }
+
   const { showSuccess, showError } = useToastNotification()
   const [listDeals, setListDeals] = useState<APIDeal[]>([])
   const [listLoading, setListLoading] = useState(false)
@@ -1055,6 +1090,7 @@ export default function DealsPage() {
               onSelectDeals={setSelectedDeals}
               onBulkDelete={handleBulkDelete}
               onBulkChangeStage={handleBulkChangeStage}
+              onBulkAddTag={handleBulkAddTag}
               stages={stages}
               selectedDealId={selectedDealId}
               onDealClick={handleDealClick}

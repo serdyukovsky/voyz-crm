@@ -23,6 +23,7 @@ import {
   Pin,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getApiBaseUrl } from '@/lib/config'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -335,17 +336,17 @@ function ActivityItem({ activity, isLast, pipelineStages }: { activity: Activity
 
       <div className="flex-1 pb-4 min-w-0">
         <div className="flex items-start gap-2">
-          <Avatar className="h-6 w-6 shrink-0">
-            <AvatarImage src={activity.user.avatar} />
-            <AvatarFallback className="text-xs">
-              {activity.user.name
-                .split(' ')
-                .map(n => n[0])
-                .join('')
-                .toUpperCase()
-                .slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
+            <Avatar className="h-6 w-6 shrink-0">
+              <AvatarImage src={`${getApiBaseUrl()}/users/${activity.user.id}/avatar`} />
+              <AvatarFallback className="text-xs">
+                {activity.user.name
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-foreground leading-relaxed">
               <span className="font-medium">{activity.user.name}</span>
@@ -427,11 +428,15 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
     return { pinnedNotes: pinned, regularActivities: regular }
   }, [activities])
 
-  // Group regular activities by date
+  // Group regular activities by date, pre-filtering out activities with no message
   const groupedActivities = useMemo(() => {
     const groups: Record<string, Activity[]> = {}
 
     regularActivities.forEach(activity => {
+      // Pre-filter: skip activities that formatActivityMessage would return null for
+      const message = formatActivityMessage(activity, pipelineStages, t)
+      if (message === null) return
+
       const date = parseISO(activity.createdAt)
       const dateKey = format(date, 'yyyy-MM-dd')
 
@@ -449,7 +454,7 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
     })
 
     return groups
-  }, [regularActivities])
+  }, [regularActivities, pipelineStages, t])
 
   const sortedDates = useMemo(() => 
     Object.keys(groupedActivities).sort((a, b) => 
@@ -532,16 +537,11 @@ export function ActivityTimeline({ activities, className, pipelineStages, onUnpi
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-4 pt-2">
-                {dateActivities
-                  .filter(activity => {
-                    const message = formatActivityMessage(activity, pipelineStages, t)
-                    return message !== null
-                  })
-                  .map((activity, index, filteredActivities) => (
+                {dateActivities.map((activity, index) => (
                     <ActivityItem
                       key={activity.id}
                       activity={activity}
-                      isLast={index === filteredActivities.length - 1}
+                      isLast={index === dateActivities.length - 1}
                       pipelineStages={pipelineStages}
                     />
                   ))}

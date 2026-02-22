@@ -209,6 +209,7 @@ export class DealsService {
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
           name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
+          avatarColor: deal.assignedTo.avatarColor || null,
         } : null,
         createdBy: deal.createdBy ? {
           id: deal.createdBy.id,
@@ -663,6 +664,7 @@ export class DealsService {
             id: true,
             firstName: true,
             lastName: true,
+            avatarColor: true,
           },
         },
         contact: {
@@ -839,7 +841,6 @@ export class DealsService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
           },
         },
         assignedTo: {
@@ -848,7 +849,7 @@ export class DealsService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            avatarColor: true,
           },
         },
         contact: {
@@ -987,6 +988,7 @@ export class DealsService {
       assignedTo: deal.assignedTo ? {
         id: deal.assignedTo.id,
         name: `${deal.assignedTo.firstName || ''} ${deal.assignedTo.lastName || ''}`.trim() || 'Unknown User',
+        avatarColor: deal.assignedTo.avatarColor || null,
       } : null,
       contact: deal.contact ? {
         id: deal.contact.id,
@@ -1029,108 +1031,72 @@ export class DealsService {
         rejectionReasons: deal.rejectionReasons || [],
       };
 
-      // Add contact with stats if contact exists
+      // Load contact and company stats in PARALLEL (not sequentially)
+      perfLogStep?.('stats.load.start');
+      const [contactStats, companyStats] = await Promise.all([
+        deal.contact && !contactStatsMap
+          ? this.getContactStats(deal.contact.id).catch(err => {
+              console.error('formatDealResponse - failed to get contact stats:', err);
+              return null;
+            })
+          : Promise.resolve(contactStatsMap?.get(deal.contact?.id) || null),
+        deal.company && !companyStatsMap
+          ? this.getCompanyStats(deal.company.id).catch(err => {
+              console.error('formatDealResponse - failed to get company stats:', err);
+              return null;
+            })
+          : Promise.resolve(companyStatsMap?.get(deal.company?.id) || null),
+      ]);
+      perfLogStep?.('stats.load.complete');
+
+      // Add contact with stats
       if (deal.contact) {
-        try {
-          perfLogStep?.('contactStats.load.start');
-          // Use batch-loaded stats if available, otherwise load individually
-          const contactStats = contactStatsMap?.get(deal.contact.id) || 
-            (contactStatsMap ? null : await this.getContactStats(deal.contact.id));
-          perfLogStep?.('contactStats.load.complete');
-          
-          // If stats not found in batch map, use default (shouldn't happen, but safe fallback)
-          const stats = contactStats || { activeDeals: 0, closedDeals: 0, totalDeals: 0, totalDealVolume: 0 };
-          
-          result.contact = {
-            id: deal.contact.id,
-            fullName: deal.contact.fullName || 'Unknown Contact',
-            email: deal.contact.email || null,
-            phone: deal.contact.phone || null,
-            position: deal.contact.position || null,
-            companyName: deal.contact.companyName || null,
-            company: deal.contact.company || null,
-            social: (deal.contact.social && typeof deal.contact.social === 'object') 
-              ? deal.contact.social 
-              : ({} as {
-                instagram?: string;
-                telegram?: string;
-                whatsapp?: string;
-                vk?: string;
-              }),
-            // New fields
-            link: deal.contact.link || null,
-            subscriberCount: deal.contact.subscriberCount || null,
-            directions: deal.contact.directions || [],
-            contactMethods: deal.contact.contactMethods || [],
-            websiteOrTgChannel: deal.contact.websiteOrTgChannel || null,
-            contactInfo: deal.contact.contactInfo || null,
-            stats: stats,
-          };
-        } catch (contactError) {
-          console.error('formatDealResponse - failed to get contact stats:', contactError);
-          // Return contact without stats if stats fail
-          result.contact = {
-            id: deal.contact.id,
-            fullName: deal.contact.fullName || 'Unknown Contact',
-            email: deal.contact.email || null,
-            phone: deal.contact.phone || null,
-            position: deal.contact.position || null,
-            companyName: deal.contact.companyName || null,
-            company: deal.contact.company || null,
-            social: (deal.contact.social && typeof deal.contact.social === 'object') 
-              ? deal.contact.social 
-              : {},
-            stats: { dealsCount: 0, totalAmount: 0, closedDealsCount: 0, closedAmount: 0 },
-          };
-        }
+        const stats = contactStats || { activeDeals: 0, closedDeals: 0, totalDeals: 0, totalDealVolume: 0 };
+        result.contact = {
+          id: deal.contact.id,
+          fullName: deal.contact.fullName || 'Unknown Contact',
+          email: deal.contact.email || null,
+          phone: deal.contact.phone || null,
+          position: deal.contact.position || null,
+          companyName: deal.contact.companyName || null,
+          company: deal.contact.company || null,
+          social: (deal.contact.social && typeof deal.contact.social === 'object')
+            ? deal.contact.social
+            : ({} as {
+              instagram?: string;
+              telegram?: string;
+              whatsapp?: string;
+              vk?: string;
+            }),
+          link: deal.contact.link || null,
+          subscriberCount: deal.contact.subscriberCount || null,
+          directions: deal.contact.directions || [],
+          contactMethods: deal.contact.contactMethods || [],
+          websiteOrTgChannel: deal.contact.websiteOrTgChannel || null,
+          contactInfo: deal.contact.contactInfo || null,
+          stats: stats,
+        };
       } else {
         result.contact = null;
       }
 
-      // Add company with stats if company exists
+      // Add company with stats
       if (deal.company) {
-        try {
-          perfLogStep?.('companyStats.load.start');
-          // Use batch-loaded stats if available, otherwise load individually
-          const companyStats = companyStatsMap?.get(deal.company.id) || 
-            (companyStatsMap ? null : await this.getCompanyStats(deal.company.id));
-          perfLogStep?.('companyStats.load.complete');
-          
-          // If stats not found in batch map, use default (shouldn't happen, but safe fallback)
-          const stats = companyStats || { totalDeals: 0, activeDeals: 0, closedDeals: 0, totalDealVolume: 0 };
-          
-          result.company = {
-            id: deal.company.id,
-            name: deal.company.name || 'Unknown Company',
-            industry: deal.company.industry || null,
-            website: deal.company.website || null,
-            email: deal.company.email || null,
-            phone: deal.company.phone || null,
-            social: (deal.company.social && typeof deal.company.social === 'object') 
-              ? deal.company.social 
-              : {},
-            address: deal.company.address || null,
-            notes: deal.company.notes || null,
-            stats: stats,
-          };
-        } catch (companyError) {
-          console.error('formatDealResponse - failed to get company stats:', companyError);
-          // Return company without stats if stats fail
-          result.company = {
-            id: deal.company.id,
-            name: deal.company.name || 'Unknown Company',
-            industry: deal.company.industry || null,
-            website: deal.company.website || null,
-            email: deal.company.email || null,
-            phone: deal.company.phone || null,
-            social: (deal.company.social && typeof deal.company.social === 'object') 
-              ? deal.company.social 
-              : {},
-            address: deal.company.address || null,
-            notes: deal.company.notes || null,
-            stats: { dealsCount: 0, totalAmount: 0, closedDealsCount: 0, closedAmount: 0 },
-          };
-        }
+        const stats = companyStats || { totalDeals: 0, activeDeals: 0, closedDeals: 0, totalDealVolume: 0 };
+        result.company = {
+          id: deal.company.id,
+          name: deal.company.name || 'Unknown Company',
+          industry: deal.company.industry || null,
+          website: deal.company.website || null,
+          email: deal.company.email || null,
+          phone: deal.company.phone || null,
+          social: (deal.company.social && typeof deal.company.social === 'object')
+            ? deal.company.social
+            : {},
+          address: deal.company.address || null,
+          notes: deal.company.notes || null,
+          stats: stats,
+        };
       } else {
         result.company = null;
       }
@@ -1277,6 +1243,7 @@ export class DealsService {
         assignedTo: deal.assignedTo ? {
           id: deal.assignedTo.id,
           name: `${deal.assignedTo.firstName} ${deal.assignedTo.lastName}` || 'Unknown User',
+          avatarColor: deal.assignedTo.avatarColor || null,
         } : null,
         stage: deal.stage ? {
           id: deal.stage.id,
@@ -1468,19 +1435,14 @@ export class DealsService {
    * This is 10-100x faster for contacts with many deals
    */
   private async getContactStats(contactId: string) {
-    // Use aggregate for efficient counting and summing on database level
+    // Two parallel aggregate queries (faster than sequential)
     const [totalStats, closedStats] = await Promise.all([
-      // Total deals count
       this.prisma.deal.aggregate({
         where: { contactId },
         _count: { id: true },
       }),
-      // Closed deals count and volume (closedAt is not null)
       this.prisma.deal.aggregate({
-        where: { 
-          contactId,
-          closedAt: { not: null },
-        },
+        where: { contactId, closedAt: { not: null } },
         _count: { id: true },
         _sum: { amount: true },
       }),
@@ -1488,14 +1450,12 @@ export class DealsService {
 
     const totalDeals = totalStats._count.id;
     const closedDeals = closedStats._count.id;
-    const activeDeals = totalDeals - closedDeals;
-    const totalDealVolume = Number(closedStats._sum.amount || 0);
 
     return {
-      activeDeals,
+      activeDeals: totalDeals - closedDeals,
       closedDeals,
       totalDeals,
-      totalDealVolume,
+      totalDealVolume: Number(closedStats._sum.amount || 0),
     };
   }
 

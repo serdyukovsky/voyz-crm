@@ -218,6 +218,35 @@ export async function getDeal(id: string): Promise<Deal> {
   return response.json()
 }
 
+export interface DealFullDetail {
+  deal: Deal
+  tasks: any[]
+  activities: any[]
+  comments: any[]
+  users: any[]
+  allTags?: { id: string; name: string; color: string }[]
+  systemFieldOptions: {
+    rejectionReasons: string[]
+    directions: string[]
+    contactMethods: string[]
+  }
+}
+
+export async function getDealFullDetail(id: string): Promise<DealFullDetail> {
+  const API_BASE_URL = getApiBaseUrl()
+  const response = await fetch(`${API_BASE_URL}/deals/${id}/detail`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch deal detail')
+  }
+
+  return response.json()
+}
+
 export async function createDeal(data: {
   title: string
   amount?: number

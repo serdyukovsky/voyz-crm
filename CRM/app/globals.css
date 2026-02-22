@@ -41,39 +41,47 @@
 }
 
 .dark {
-  /* Dark theme variables matching Linear's deep slate aesthetic */
-  --background: oklch(0.12 0.01 264);
-  --foreground: oklch(0.94 0.01 264);
-  --card: oklch(0.15 0.01 264);
-  --card-foreground: oklch(0.94 0.01 264);
-  --popover: oklch(0.14 0.01 264);
-  --popover-foreground: oklch(0.94 0.01 264);
-  --primary: oklch(0.60 0.18 264);
-  --primary-foreground: oklch(0.98 0.01 264);
-  --secondary: oklch(0.20 0.01 264);
-  --secondary-foreground: oklch(0.88 0.01 264);
-  --muted: oklch(0.24 0.01 264);
-  --muted-foreground: oklch(0.56 0.01 264);
-  --accent: oklch(0.60 0.18 264);
-  --accent-foreground: oklch(0.98 0.01 264);
+  /*
+   * Dark theme — GitHub Dark Dimmed inspired
+   * Chrome:   sidebar/topbar  0.18
+   * Base:     background      0.21
+   * Surface:  card            0.25
+   * Elevated: popover         0.28
+   * Border:   0.34  — clear separation
+   * Text:     0.78  — soft white, not blinding
+   */
+  --background: oklch(0.21 0.005 264);
+  --foreground: oklch(0.78 0.005 264);
+  --card: oklch(0.25 0.005 264);
+  --card-foreground: oklch(0.78 0.005 264);
+  --popover: oklch(0.28 0.005 264);
+  --popover-foreground: oklch(0.78 0.005 264);
+  --primary: oklch(0.78 0.005 264);
+  --primary-foreground: oklch(0.18 0.005 264);
+  --secondary: oklch(0.27 0.005 264);
+  --secondary-foreground: oklch(0.72 0.005 264);
+  --muted: oklch(0.27 0.005 264);
+  --muted-foreground: oklch(0.52 0.008 264);
+  --accent: oklch(0.27 0.005 264);
+  --accent-foreground: oklch(0.72 0.005 264);
   --destructive: oklch(0.55 0.20 25);
-  --destructive-foreground: oklch(0.98 0.01 264);
-  --border: oklch(0.24 0.01 264);
-  --input: oklch(0.20 0.01 264);
-  --ring: oklch(0.60 0.18 264);
-  --chart-1: oklch(0.60 0.18 264);
-  --chart-2: oklch(0.65 0.18 180);
-  --chart-3: oklch(0.70 0.18 90);
-  --chart-4: oklch(0.60 0.18 320);
-  --chart-5: oklch(0.65 0.18 45);
-  --sidebar: oklch(0.10 0.01 264);
-  --sidebar-foreground: oklch(0.88 0.01 264);
-  --sidebar-primary: oklch(0.60 0.18 264);
-  --sidebar-primary-foreground: oklch(0.98 0.01 264);
-  --sidebar-accent: oklch(0.18 0.01 264);
-  --sidebar-accent-foreground: oklch(0.94 0.01 264);
-  --sidebar-border: oklch(0.20 0.01 264);
-  --sidebar-ring: oklch(0.60 0.18 264);
+  --destructive-foreground: oklch(0.85 0.005 264);
+  --border: oklch(0.34 0.005 264);
+  --input: oklch(0.34 0.005 264);
+  --ring: oklch(0.50 0.12 264);
+  --chart-1: oklch(0.55 0.18 264);
+  --chart-2: oklch(0.60 0.18 180);
+  --chart-3: oklch(0.65 0.18 90);
+  --chart-4: oklch(0.55 0.18 320);
+  --chart-5: oklch(0.60 0.18 45);
+  --sidebar: oklch(0.18 0.005 264);
+  --sidebar-foreground: oklch(0.72 0.005 264);
+  --sidebar-primary: oklch(0.50 0.15 264);
+  --sidebar-primary-foreground: oklch(0.85 0.005 264);
+  --sidebar-accent: oklch(0.25 0.006 264);
+  --sidebar-accent-foreground: oklch(0.78 0.005 264);
+  --sidebar-border: oklch(0.30 0.005 264);
+  --sidebar-ring: oklch(0.50 0.12 264);
 }
 
 @theme inline {
@@ -124,6 +132,7 @@
   body {
     @apply bg-background text-foreground;
   }
+
   
   /* Remove outline from charts and graphs */
   .recharts-wrapper,
@@ -289,4 +298,67 @@
   .animate-dot-bounce {
     animation: dot-bounce 1.4s ease-in-out infinite;
   }
+}
+
+/* Avatar ring — animated color border */
+
+/* Dark theme depth system */
+
+/* Layer 2: Cards — lift from background */
+.dark [data-slot="card"] {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.25),
+    0 3px 8px oklch(0 0 0 / 0.10);
+  border-color: oklch(0.30 0.006 264);
+}
+
+/* Card hover — subtle lift */
+.dark [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px oklch(0 0 0 / 0.30),
+    0 6px 16px oklch(0 0 0 / 0.15);
+  border-color: oklch(0.34 0.008 264);
+}
+
+/* Layer 3: Popovers, dropdowns, dialogs — highest elevation */
+.dark [data-slot="popover-content"],
+.dark [role="dialog"] > div,
+.dark [role="listbox"],
+.dark [data-slot="dropdown-menu-content"] {
+  box-shadow:
+    0 2px 4px oklch(0 0 0 / 0.35),
+    0 10px 24px oklch(0 0 0 / 0.25);
+}
+
+/* Topbar — matches sidebar tone */
+.dark header[role="banner"] {
+  background-color: oklch(0.18 0.005 264);
+  box-shadow: 0 1px 0 oklch(0.30 0.005 264);
+}
+
+/* Sidebar — inner glow on right edge */
+.dark aside,
+.dark nav[data-slot="sidebar"] {
+  box-shadow: inset -1px 0 0 oklch(0.24 0.006 264);
+}
+
+/* Inputs — inset shadow for depth */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.2);
+}
+
+/* Buttons — subtle depth */
+.dark button.bg-primary {
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.3);
+}
+
+/* Tables — subtle row separation */
+.dark table {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 0.3),
+    0 2px 8px oklch(0 0 0 / 0.1);
+  border-radius: 8px;
+  overflow: hidden;
 }

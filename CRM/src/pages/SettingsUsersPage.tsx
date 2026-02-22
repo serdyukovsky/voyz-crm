@@ -3,6 +3,7 @@ import { CRMLayout } from "@/components/crm/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Mail, MoreVertical, Edit, Trash2 } from 'lucide-react'
@@ -161,12 +162,12 @@ export default function UsersSettingsPage() {
                       <TableRow key={user.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={user.avatar} />
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                {user.firstName[0]}{user.lastName[0]}
-                              </AvatarFallback>
-                            </Avatar>
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={`${getApiBaseUrl()}/users/${user.id}/avatar`} />
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                  {user.firstName[0]}{user.lastName[0]}
+                                </AvatarFallback>
+                              </Avatar>
                             <div>
                               <div className="font-medium text-sm">
                                 {user.firstName} {user.lastName}
