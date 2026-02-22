@@ -3,7 +3,8 @@
 import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-import { Trash2, MoveRight, Link as LinkIcon, Users, Loader2 } from 'lucide-react'
+import { Trash2, MoveRight, Link as LinkIcon, Users, Loader2, Tag } from 'lucide-react'
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { getApiBaseUrl } from "@/lib/config"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ interface DealsListViewProps {
   onBulkDelete?: () => void
   onBulkChangeStage?: (stage: string) => void
   onBulkAssign?: () => void
+  onBulkAddTag?: (tag: string) => void
   stages?: Stage[]
   selectedDealId?: string | null
   onDealClick?: (dealId: string | null) => void
@@ -43,6 +45,7 @@ export function DealsListView({
   onBulkDelete,
   onBulkChangeStage,
   onBulkAssign,
+  onBulkAddTag,
   stages = [],
   selectedDealId: externalSelectedDealId,
   onDealClick,
@@ -56,6 +59,8 @@ export function DealsListView({
   const { t } = useTranslation()
   const { isCollapsed } = useSidebar()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false)
+  const [bulkTagValue, setBulkTagValue] = useState('')
   const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
   const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
@@ -189,6 +194,48 @@ export function DealsListView({
                         {stage.label}
                       </button>
                     ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
+              >
+                <Tag className="mr-2 h-4 w-4" />
+                Добавить тег
+              </Button>
+              {isTagDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => {
+                      setIsTagDropdownOpen(false)
+                      setBulkTagValue('')
+                    }}
+                  />
+                  <div className="absolute top-full right-0 mt-2 w-56 bg-popover text-popover-foreground border border-border/40 rounded-lg shadow-lg z-50 p-2">
+                    <Input
+                      autoFocus
+                      type="text"
+                      placeholder="Введите тег..."
+                      value={bulkTagValue}
+                      onChange={(e) => setBulkTagValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && bulkTagValue.trim()) {
+                          e.preventDefault()
+                          if (onBulkAddTag) onBulkAddTag(bulkTagValue.trim())
+                          setBulkTagValue('')
+                          setIsTagDropdownOpen(false)
+                        } else if (e.key === 'Escape') {
+                          setBulkTagValue('')
+                          setIsTagDropdownOpen(false)
+                        }
+                      }}
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </>
               )}

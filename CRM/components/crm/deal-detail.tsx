@@ -34,6 +34,7 @@ import { createComment, updateCommentType, type Comment, type CommentType } from
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { getDealFullDetail, updateDeal as updateDealApi } from '@/lib/api/deals'
 import { addSystemFieldOption, removeSystemFieldOption } from '@/lib/api/system-field-options'
+import { createTag, getTags, type Tag } from '@/lib/api/tags'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -172,6 +173,9 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const [localReasonsOptions, setLocalReasonsOptions] = useState<string[]>([])
   const [addingReason, setAddingReason] = useState(false)
 
+  // State for tags
+  const [localTags, setLocalTags] = useState<string[]>([])
+
   // Refs for debounce timers
   const linkTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const subscriberCountTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -200,6 +204,13 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
   const rejectionReasonsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.rejectionReasons || []
   const directionsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.directions || []
   const contactMethodsOptionsFromServer = fullDetailQuery.data?.systemFieldOptions?.contactMethods || []
+  // Separate tags query so it's always fresh and updates after tag creation
+  const tagsQuery = useQuery({
+    queryKey: ['tags'],
+    queryFn: getTags,
+    staleTime: 30 * 1000,
+  })
+  const allTags: Tag[] = tagsQuery.data || []
 
   // Sync local options with server data
   useEffect(() => {
@@ -267,6 +278,12 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       setLocalRejectionReasons([])
     }
   }, [deal?.rejectionReasons])
+
+  // Sync tags local state
+  useEffect(() => {
+    setLocalTags(deal?.tags || [])
+  }, [deal?.tags])
+
   // Tasks from combined query — no separate fetch needed
   const rawTasks = fullDetailQuery.data?.tasks || []
   const tasks: Task[] = useMemo(() => {
@@ -796,7 +813,7 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
       {/* LEFT COLUMN: Deal Info - Show immediately when deal is loaded */}
       <div className="w-full md:w-[420px] flex-shrink-0 overflow-y-auto border-r border-border/50 bg-accent/5 scroll-smooth animate-in fade-in-0 duration-200">
         <DealHeader
-          deal={deal}
+          deal={deal ? { ...deal, tags: localTags } : deal}
           onTitleUpdate={handleTitleUpdate}
           onBack={onClose ? undefined : handleBack}
           onClose={onClose}
@@ -810,6 +827,35 @@ export function DealDetail({ dealId, onClose }: DealDetailProps & { onClose?: ()
           }}
           onDelete={() => {
             // TODO: Implement delete
+          }}
+          allTags={allTags}
+          tagsLoading={tagsQuery.isLoading}
+          onTagAdd={async (tag, color) => {
+            if (localTags.includes(tag)) return
+            const newTags = [...localTags, tag]
+            setLocalTags(newTags)
+            try {
+              // Create/update tag in registry
+              await createTag(tag, color)
+              await updateDeal({ tags: newTags })
+              // Refresh tags list and activities
+              queryClient.invalidateQueries({ queryKey: ['tags'] })
+              invalidateActivities()
+            } catch (error) {
+              console.error('Failed to add tag:', error)
+              setLocalTags(deal?.tags || [])
+            }
+          }}
+          onTagRemove={async (tag) => {
+            const newTags = localTags.filter((t) => t !== tag)
+            setLocalTags(newTags)
+            try {
+              await updateDeal({ tags: newTags })
+              invalidateActivities()
+            } catch (error) {
+              console.error('Failed to remove tag:', error)
+              setLocalTags(deal?.tags || [])
+            }
           }}
         />
 

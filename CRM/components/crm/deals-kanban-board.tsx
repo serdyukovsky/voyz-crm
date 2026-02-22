@@ -52,7 +52,7 @@ import { useToastNotification } from "@/hooks/use-toast-notification"
 import { useDeals, dealKeys } from "@/hooks/use-deals"
 import { usePipelines, pipelineKeys } from "@/hooks/use-pipelines"
 import { useDebouncedValue } from "@/lib/utils/debounce"
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { cn } from "@/lib/utils"
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { io, Socket } from 'socket.io-client'
@@ -61,6 +61,7 @@ import { CreateDealModal } from './create-deal-modal'
 import { AddStageModal } from './add-stage-modal'
 import { useSidebar } from './sidebar-context'
 import { TaskIndicator } from './task-indicator'
+import { getTags, type Tag } from '@/lib/api/tags'
 
 interface DealCardData {
   id: string
@@ -183,6 +184,7 @@ interface DealCardProps {
   onOpenInSidebar: (dealId: string) => void
   onRequestDelete?: (dealId: string) => void
   searchQuery?: string
+  tagColorMap?: Map<string, string>
 }
 
 const DealCard = memo(function DealCard({
@@ -195,7 +197,8 @@ const DealCard = memo(function DealCard({
   onReassignContact,
   onOpenInSidebar,
   onRequestDelete,
-  searchQuery
+  searchQuery,
+  tagColorMap,
 }: DealCardProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [menuReady, setMenuReady] = useState(false)
@@ -344,6 +347,31 @@ const DealCard = memo(function DealCard({
           )}
         </div>
 
+        {/* Tags — only render when tagColorMap is ready to avoid gray flash */}
+        {deal.tags && deal.tags.length > 0 && tagColorMap !== undefined && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {deal.tags.map((tag, idx) => {
+              const color = tagColorMap.get(tag) || '#6B7280'
+              return (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-normal"
+                  style={{
+                    backgroundColor: `${color}20`,
+                    color: color,
+                  }}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
+                  {tag}
+                </span>
+              )
+            })}
+          </div>
+        )}
+
         {/* Responsible */}
         {deal.assignedTo && (
           <div className="mb-2" data-no-navigate>
@@ -463,6 +491,7 @@ interface KanbanColumnProps {
   isAnyStageDragging?: boolean
   pipelineId: string
   searchQuery?: string
+  tagColorMap?: Map<string, string>
 }
 
 // Helper function to check if stage is "Won" or "Lost"
@@ -501,7 +530,8 @@ const KanbanColumn = memo(function KanbanColumn({
   isStageDragged = false,
   isAnyStageDragging = false,
   pipelineId,
-  searchQuery
+  searchQuery,
+  tagColorMap,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useToastNotification()
@@ -1202,6 +1232,7 @@ const KanbanColumn = memo(function KanbanColumn({
                   onOpenInSidebar={onOpenInSidebar}
                   onRequestDelete={onDeleteDeal}
                   searchQuery={searchQuery}
+                  tagColorMap={tagColorMap}
                 />
               ))}
               {hasMore && (
@@ -1237,6 +1268,19 @@ export function DealsKanbanBoard({
   // Pipelines через React Query (один запрос, кеширование, без каскадов)
   const { data: pipelinesData, isLoading: pipelinesLoading } = usePipelines()
   const pipelines = pipelinesData || []
+
+  // Tags color map for kanban cards — undefined while loading to avoid gray flash
+  const { data: allTagsData, isFetched: tagsLoaded } = useQuery({
+    queryKey: ['tags'],
+    queryFn: getTags,
+    staleTime: 5 * 60 * 1000,
+  })
+  const tagColorMap = useMemo(() => {
+    if (!tagsLoaded) return undefined
+    const map = new Map<string, string>()
+    allTagsData?.forEach(tag => map.set(tag.name, tag.color))
+    return map
+  }, [allTagsData, tagsLoaded])
 
   // Helpers для обратной совместимости со stage management кодом
   const loadPipelines = useCallback(async () => {
@@ -2377,6 +2421,7 @@ export function DealsKanbanBoard({
               isAnyStageDragging={isAnyStageDragging}
               pipelineId={selectedPipeline.id}
               searchQuery={filters.searchQuery || filters.title}
+              tagColorMap={tagColorMap}
             />
           )
           })}
