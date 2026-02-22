@@ -22,6 +22,7 @@ import { LoggingModule } from './logging/logging.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EmailsModule } from './emails/emails.module';
 import { StatsModule } from './stats/stats.module';
+import { TagsModule } from './tags/tags.module';
 // import { ChatModule } from './chat/chat.module';
 import { SeedModule } from './seed/seed.module';
 import { GithubWebhookModule } from './integrations/github/github-webhook.module';
@@ -58,6 +59,7 @@ import { CorsPreflightGuard } from './common/guards/cors-preflight.guard';
     AnalyticsModule,
     EmailsModule,
     StatsModule,
+    TagsModule,
     // ChatModule,
   ],
   providers: [

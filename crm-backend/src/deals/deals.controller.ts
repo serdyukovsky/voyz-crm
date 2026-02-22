@@ -20,6 +20,7 @@ import { CommentsService } from '@/comments/comments.service';
 import { ActivityService } from '@/activity/activity.service';
 import { SystemFieldOptionsService } from '@/system-field-options/system-field-options.service';
 import { UsersService } from '@/users/users.service';
+import { TagsService } from '@/tags/tags.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RbacGuard } from '@/common/guards/rbac.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
@@ -38,6 +39,7 @@ export class DealsController {
     private readonly activityService: ActivityService,
     private readonly systemFieldOptionsService: SystemFieldOptionsService,
     private readonly usersService: UsersService,
+    private readonly tagsService: TagsService,
   ) {}
 
   private parseList(value?: string | string[]): string[] | undefined {
@@ -227,7 +229,7 @@ export class DealsController {
   @ApiResponse({ status: 200, description: 'Full deal detail' })
   @ApiResponse({ status: 404, description: 'Deal not found' })
   async getFullDetail(@Param('id') id: string) {
-    const [deal, tasks, activities, comments, users, rejectionReasons, directions, contactMethods] = await Promise.all([
+    const [deal, tasks, activities, comments, users, rejectionReasons, directions, contactMethods, allTags] = await Promise.all([
       this.dealsService.findOne(id),
       this.tasksService.findAll({ dealId: id, limit: 100 }),
       this.activityService.findByDeal(id),
@@ -236,6 +238,7 @@ export class DealsController {
       this.systemFieldOptionsService.getOptions('deal', 'rejectionReasons'),
       this.systemFieldOptionsService.getOptions('contact', 'directions'),
       this.systemFieldOptionsService.getOptions('contact', 'contactMethods'),
+      this.tagsService.findAll(),
     ]);
 
     return {
@@ -244,6 +247,7 @@ export class DealsController {
       activities,
       comments,
       users,
+      allTags,
       systemFieldOptions: {
         rejectionReasons,
         directions,

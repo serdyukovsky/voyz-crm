@@ -508,6 +508,15 @@ model SystemFieldOptions {
   @@map("system_field_options")
 }
 
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  color String @default("#6B7280")
+
+  @@index([name])
+  @@map("tags")
+}
+
 model Log {
   id        String   @id @default(uuid())
   level     String

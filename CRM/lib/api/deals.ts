@@ -224,6 +224,7 @@ export interface DealFullDetail {
   activities: any[]
   comments: any[]
   users: any[]
+  allTags?: { id: string; name: string; color: string }[]
   systemFieldOptions: {
     rejectionReasons: string[]
     directions: string[]
