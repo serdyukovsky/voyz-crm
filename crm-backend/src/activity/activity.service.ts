@@ -30,7 +30,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -52,7 +52,8 @@ export class ActivityService {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     // Transform activities to include computed 'name' field for user
@@ -78,7 +79,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -126,7 +127,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -221,7 +222,7 @@ export class ActivityService {
             firstName: true,
             lastName: true,
             email: true,
-            avatar: true,
+            avatarColor: true,
           },
         },
         deal: {
@@ -243,7 +244,8 @@ export class ActivityService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' }, // Changed to desc to show latest first
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     // Transform activities to include computed 'name' field for user

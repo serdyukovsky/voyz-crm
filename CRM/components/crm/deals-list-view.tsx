@@ -3,8 +3,10 @@
 import { Deal, Stage } from "./kanban-board"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-import { Trash2, MoveRight, Link as LinkIcon, Users, Hash, Loader2 } from 'lucide-react'
+import { Trash2, MoveRight, Link as LinkIcon, Users, Loader2, Tag } from 'lucide-react'
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -24,6 +26,7 @@ interface DealsListViewProps {
   onBulkDelete?: () => void
   onBulkChangeStage?: (stage: string) => void
   onBulkAssign?: () => void
+  onBulkAddTag?: (tag: string) => void
   stages?: Stage[]
   selectedDealId?: string | null
   onDealClick?: (dealId: string | null) => void
@@ -42,6 +45,7 @@ export function DealsListView({
   onBulkDelete,
   onBulkChangeStage,
   onBulkAssign,
+  onBulkAddTag,
   stages = [],
   selectedDealId: externalSelectedDealId,
   onDealClick,
@@ -53,7 +57,10 @@ export function DealsListView({
   selectionMode = 'PAGE'
 }: DealsListViewProps) {
   const { t } = useTranslation()
+  const { isCollapsed } = useSidebar()
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false)
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false)
+  const [bulkTagValue, setBulkTagValue] = useState('')
   const [internalSelectedDealId, setInternalSelectedDealId] = useState<string | null>(null)
   const selectedDealId = externalSelectedDealId !== undefined ? externalSelectedDealId : internalSelectedDealId
   const scrollPositionRef = useRef<number>(0)
@@ -191,6 +198,48 @@ export function DealsListView({
                 </>
               )}
             </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsTagDropdownOpen(!isTagDropdownOpen)}
+              >
+                <Tag className="mr-2 h-4 w-4" />
+                Добавить тег
+              </Button>
+              {isTagDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => {
+                      setIsTagDropdownOpen(false)
+                      setBulkTagValue('')
+                    }}
+                  />
+                  <div className="absolute top-full right-0 mt-2 w-56 bg-popover text-popover-foreground border border-border/40 rounded-lg shadow-lg z-50 p-2">
+                    <Input
+                      autoFocus
+                      type="text"
+                      placeholder="Введите тег..."
+                      value={bulkTagValue}
+                      onChange={(e) => setBulkTagValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && bulkTagValue.trim()) {
+                          e.preventDefault()
+                          if (onBulkAddTag) onBulkAddTag(bulkTagValue.trim())
+                          setBulkTagValue('')
+                          setIsTagDropdownOpen(false)
+                        } else if (e.key === 'Escape') {
+                          setBulkTagValue('')
+                          setIsTagDropdownOpen(false)
+                        }
+                      }}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -231,23 +280,10 @@ export function DealsListView({
                 </div>
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[200px]">{t('deals.title')}</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[180px]">Ссылка</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">Подписчики</th>
               <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[180px]">
-                <div className="flex items-center gap-1.5">
-                  <LinkIcon className="h-3.5 w-3.5" />
-                  <span>Ссылка</span>
-                </div>
-              </th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">
-                <div className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  <span>Подписчики</span>
-                </div>
-              </th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[180px]">
-                <div className="flex items-center gap-1.5">
-                  <Hash className="h-3.5 w-3.5" />
-                  <span>Направления</span>
-                </div>
+                Направления
               </th>
               <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[120px]">{t('deals.stage')}</th>
               <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-[140px]">{t('deals.responsible')}</th>
@@ -268,11 +304,12 @@ export function DealsListView({
                 <tr
                   key={deal.id}
                   className={cn(
-                    "border-b border-border/40 hover:bg-card/30 transition-colors",
+                    "border-b border-border/40 hover:bg-card/30 transition-colors cursor-pointer",
                     isHighlighted && "bg-blue-50/30 dark:bg-blue-950/10 border-blue-200/40 dark:border-blue-800/25"
                   )}
+                  onClick={(e) => handleDealClick(deal.id, e)}
                 >
-                  <td className="px-2 py-2 align-middle">
+                  <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -284,13 +321,12 @@ export function DealsListView({
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <button
-                      onClick={(e) => handleDealClick(deal.id, e)}
-                      className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left truncate block w-full"
+                    <span
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block w-full"
                       title={deal.title}
                     >
                       {deal.title}
-                    </button>
+                    </span>
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">
                     {deal.contact?.link ? (
@@ -321,17 +357,30 @@ export function DealsListView({
                   </td>
                   <td className="px-3 py-2">
                     {deal.contact?.directions && deal.contact.directions.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {deal.contact.directions.slice(0, 2).map((direction, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/50 text-xs text-muted-foreground truncate max-w-full"
-                            title={direction}
-                          >
-                            <Hash className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{direction}</span>
-                          </span>
-                        ))}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {deal.contact.directions.slice(0, 2).map((direction, idx) => {
+                          const colors = [
+                            'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                            'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+                            'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                            'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+                            'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+                            'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+                            'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+                          ]
+                          const hash = direction.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+                          const colorClass = colors[hash % colors.length]
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-normal truncate max-w-full ${colorClass}`}
+                              title={direction}
+                            >
+                              {direction}
+                            </span>
+                          )
+                        })}
                         {deal.contact.directions.length > 2 && (
                           <span className="text-xs text-muted-foreground/70">+{deal.contact.directions.length - 2}</span>
                         )}
@@ -360,18 +409,18 @@ export function DealsListView({
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
-                      <Avatar className="h-5 w-5">
-                        {deal.assignedTo.avatar && (
-                          <AvatarImage src={deal.assignedTo.avatar} alt={deal.assignedTo.name} />
-                        )}
-                        <AvatarFallback className="text-[10px] font-medium">
-                          {deal.assignedTo.name
-                            .split(' ')
-                            .map(n => n[0])
-                            .join('')
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                        <Avatar className="h-5 w-5">
+                          {deal.assignedTo.id && (
+                            <AvatarImage src={`${getApiBaseUrl()}/users/${deal.assignedTo.id}/avatar`} alt={deal.assignedTo.name} />
+                          )}
+                          <AvatarFallback className="text-[10px] font-medium">
+                            {deal.assignedTo.name
+                              .split(' ')
+                              .map(n => n[0])
+                              .join('')
+                              .toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                       <span className="text-xs text-muted-foreground truncate">{deal.assignedTo.name}</span>
                     </div>
                   </td>

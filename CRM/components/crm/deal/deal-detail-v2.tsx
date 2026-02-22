@@ -6,6 +6,7 @@ import { DollarSign, ChevronDown, Check, Plus } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getApiBaseUrl } from "@/lib/config"
 import { TaskDetailModal } from "../task-detail-modal"
 import { DealHeader } from './deal-header'
 import { DealFieldsPanel } from './deal-fields-panel'
@@ -323,12 +324,12 @@ export function DealDetail({ dealId }: DealDetailProps) {
                 className="w-full flex items-center justify-between px-3 h-9 rounded-md bg-background/50 border border-border/50 hover:border-border transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <Avatar className="h-5 w-5">
-                    <AvatarImage src={currentUser.avatar} />
-                    <AvatarFallback className="text-[10px]">
-                      {currentUser.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
+                    <Avatar className="h-5 w-5">
+                      <AvatarImage src={`${getApiBaseUrl()}/users/${currentUser.id}/avatar`} />
+                      <AvatarFallback className="text-[10px]">
+                        {currentUser.name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
                   <span className="text-sm text-foreground">{assignedUser}</span>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -347,12 +348,12 @@ export function DealDetail({ dealId }: DealDetailProps) {
                       className="w-full flex items-center justify-between gap-2 px-3 h-9 hover:bg-accent/50 first:rounded-t-md last:rounded-b-md transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-5 w-5">
-                          <AvatarImage src={user.avatar} />
-                          <AvatarFallback className="text-[10px]">
-                            {user.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={`${getApiBaseUrl()}/users/${user.id}/avatar`} />
+                            <AvatarFallback className="text-[10px]">
+                              {user.name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
                         <span className="text-sm text-foreground">{user.name}</span>
                       </div>
                       {assignedUser === user.name && (

@@ -15,6 +15,7 @@ model User {
   firstName              String
   lastName               String
   avatar                 String?
+  avatarColor            String?
   role                   UserRole                @default(MANAGER)
   isActive               Boolean                 @default(true)
   lastLoginAt            DateTime?
@@ -505,6 +506,15 @@ model SystemFieldOptions {
   @@unique([entityType, fieldName])
   @@index([entityType, fieldName])
   @@map("system_field_options")
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  color String @default("#6B7280")
+
+  @@index([name])
+  @@map("tags")
 }
 
 model Log {

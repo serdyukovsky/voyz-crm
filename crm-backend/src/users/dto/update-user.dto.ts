@@ -40,6 +40,11 @@ export class UpdateUserDto {
   @IsString()
   avatar?: string;
 
+  @ApiProperty({ example: '#6366f1', required: false, description: 'Avatar ring color (hex)' })
+  @IsOptional()
+  @IsString()
+  avatarColor?: string;
+
   @ApiProperty({ example: '+7 (999) 999-99-99', required: false })
   @IsOptional()
   @IsString()

@@ -18,6 +18,7 @@ export interface Task {
   assignedTo?: {
     id: string
     name: string
+    avatarColor?: string | null
   }
   createdAt?: string
   updatedAt?: string

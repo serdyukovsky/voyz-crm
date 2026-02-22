@@ -18,9 +18,9 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     
     try {
       const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY)
-      return saved === 'true'
+      return saved !== null ? saved === 'true' : true
     } catch {
-      return false
+      return true
     }
   })
 

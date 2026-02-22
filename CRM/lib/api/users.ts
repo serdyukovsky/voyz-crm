@@ -9,6 +9,7 @@ export interface User {
   lastName: string
   fullName?: string
   avatar?: string
+  avatarColor?: string | null
   phone?: string
   telegramUsername?: string
   role: UserRole
@@ -37,6 +38,7 @@ export interface UpdateUserDto {
   role?: UserRole
   isActive?: boolean
   avatar?: string
+  avatarColor?: string
 }
 
 export async function getUsers(): Promise<User[]> {

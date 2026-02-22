@@ -16,6 +16,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Link } from 'react-router-dom'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { getApiBaseUrl } from '@/lib/config'
+
 import { useSidebar } from './sidebar-context'
 import { useSearch } from './search-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -67,17 +69,17 @@ export function Topbar() {
 
   // Load user data from localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const loadUser = () => {
       const userStr = localStorage.getItem('user')
       if (userStr) {
         try {
-          const userData = JSON.parse(userStr)
-          setUser(userData)
-        } catch (error) {
-          console.error('Failed to parse user data from localStorage:', error)
-        }
+          setUser(JSON.parse(userStr))
+        } catch {}
       }
     }
+    loadUser()
+    window.addEventListener('user-changed', loadUser)
+    return () => window.removeEventListener('user-changed', loadUser)
   }, [])
 
   // Get user initials for avatar
@@ -258,12 +260,12 @@ export function Topbar() {
                 className="h-8 w-8 rounded-full p-0 hover:bg-secondary/50"
                 aria-label="User menu"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.avatar} alt={getUserName(user)} />
-                  <AvatarFallback className="bg-primary/20 text-primary text-xs font-medium">
-                    {getUserInitials(user)}
-                  </AvatarFallback>
-                </Avatar>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.id ? `${getApiBaseUrl()}/users/${user.id}/avatar` : undefined} alt={getUserName(user)} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xs font-medium">
+                      {getUserInitials(user)}
+                    </AvatarFallback>
+                  </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
