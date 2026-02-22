@@ -309,7 +309,7 @@ export function DealsListView({
                   )}
                   onClick={(e) => handleDealClick(deal.id, e)}
                 >
-                  <td className="px-2 py-2 align-middle">
+                  <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
