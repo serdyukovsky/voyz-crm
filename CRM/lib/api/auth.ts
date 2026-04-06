@@ -36,6 +36,7 @@ export async function login(credentials: LoginDto): Promise<LoginResponse> {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // Required for cross-origin cookie storage (refresh token)
       body: JSON.stringify(normalizedCredentials),
     })
 
@@ -117,6 +118,7 @@ export async function logout() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
+        credentials: 'include', // Required to send refresh cookie and clear it on server
       })
       
       // Check if response is ok, but don't throw error if it fails

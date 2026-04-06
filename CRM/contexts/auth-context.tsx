@@ -100,10 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshToken()
         .then(() => {
           console.log('[Auth] Proactive refresh: token renewed')
-          scheduleTokenRefresh() // schedule next refresh
+          scheduleTokenRefresh()
         })
         .catch((err) => {
           console.warn('[Auth] Proactive refresh failed:', err)
+          // Retry after 30s so the timer is never permanently lost
+          refreshTimerRef.current = setTimeout(() => scheduleTokenRefresh(), 30_000)
         })
       return
     }
@@ -113,9 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         await refreshToken()
         console.log('[Auth] Proactive refresh: token renewed')
-        scheduleTokenRefresh() // schedule next refresh with new token
+        scheduleTokenRefresh()
       } catch (err) {
         console.warn('[Auth] Proactive refresh failed:', err)
+        // Retry after 30s so the timer is never permanently lost
+        refreshTimerRef.current = setTimeout(() => scheduleTokenRefresh(), 30_000)
       }
     }, delay)
   }, [])
