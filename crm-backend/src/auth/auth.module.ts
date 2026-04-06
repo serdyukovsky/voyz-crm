@@ -20,7 +20,7 @@ import { CommonModule } from '@/common/common.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_SECRET') || 'access-secret-key',
+        secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
           expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '1h',
         },
@@ -36,7 +36,7 @@ import { CommonModule } from '@/common/common.module';
       provide: 'JwtRefreshService',
       useFactory: (configService: ConfigService) => {
         return new JwtService({
-          secret: configService.get<string>('JWT_REFRESH_SECRET') || 'refresh-secret-key',
+          secret: configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
           signOptions: {
             expiresIn: configService.get<string>('REFRESH_TOKEN_EXPIRES_IN') || '30d',
           },

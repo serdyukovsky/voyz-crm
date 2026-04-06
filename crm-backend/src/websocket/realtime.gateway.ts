@@ -47,10 +47,12 @@ export class RealtimeGateway
   async handleConnection(client: Socket) {
     try {
       const token = client.handshake.auth?.token;
-      if (token) {
-        const payload = await this.jwtService.verifyAsync(token);
-        client.data.userId = payload.sub;
+      if (!token) {
+        client.disconnect();
+        return;
       }
+      const payload = await this.jwtService.verifyAsync(token);
+      client.data.userId = payload.sub;
     } catch (error) {
       client.disconnect();
     }

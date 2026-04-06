@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, Post, UseGuards, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SeedService } from './seed.service';
 
@@ -9,6 +9,9 @@ export class SeedController {
 
   @Post('test-data')
   async createTestData() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Not available in production');
+    }
     return this.seedService.createTestData();
   }
 }
