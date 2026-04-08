@@ -74,13 +74,14 @@ export class AuthController {
     const maxAge = this.parseExpiresIn(refreshTokenExpiresIn);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
 
+    const isHttps = this.configService.get<string>('COOKIE_SECURE') === 'true';
+
     res.cookie('refreshToken', result.refresh_token, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps,
+      sameSite: 'lax',
       path: '/api/auth',
       maxAge: maxAge,
-      domain: isProduction ? this.configService.get<string>('COOKIE_DOMAIN') : undefined,
     });
 
     // Return only access token and user (refresh token is in cookie)
@@ -161,13 +162,14 @@ export class AuthController {
     const maxAge = this.parseExpiresIn(refreshTokenExpiresIn);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
 
+    const isHttps = this.configService.get<string>('COOKIE_SECURE') === 'true';
+
     res.cookie('refreshToken', result.refresh_token, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps,
+      sameSite: 'lax',
       path: '/api/auth',
       maxAge: maxAge,
-      domain: isProduction ? this.configService.get<string>('COOKIE_DOMAIN') : undefined,
     });
 
     // Return only access token (refresh token is in cookie)
@@ -227,14 +229,13 @@ export class AuthController {
     await this.authService.logout(user.userId || user.id, refreshToken, typeof ipAddress === 'string' ? ipAddress : String(ipAddress), userAgent);
 
     // Clear refresh token cookie
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
-    
+    const isHttps = this.configService.get<string>('COOKIE_SECURE') === 'true';
+
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps,
+      sameSite: 'lax',
       path: '/api/auth',
-      domain: isProduction ? this.configService.get<string>('COOKIE_DOMAIN') : undefined,
     });
 
     return { message: 'Logged out successfully' };
