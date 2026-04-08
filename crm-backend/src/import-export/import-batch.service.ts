@@ -221,19 +221,16 @@ export class ImportBatchService {
     // Add new directions to system options if they don't exist
     if (allDirections.size > 0) {
       try {
-        console.log('[BATCH CREATE CONTACTS] Updating directions options with values:', Array.from(allDirections));
         const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
           'contact',
           'directions',
           Array.from(allDirections),
         );
-        console.log('[BATCH CREATE CONTACTS] directions options updated successfully. Total options:', updatedOptions.length);
       } catch (error) {
         console.error('[BATCH CREATE CONTACTS] Failed to update directions options:', error);
         // Don't fail the import if options update fails
       }
     } else {
-      console.log('[BATCH CREATE CONTACTS] No directions values found in import data');
     }
 
     // Add new contactMethods to system options if they don't exist
@@ -446,19 +443,16 @@ export class ImportBatchService {
     // Add new rejectionReasons to system options if they don't exist
     if (allRejectionReasons.size > 0) {
       try {
-        console.log('[BATCH CREATE DEALS] Updating rejectionReasons options with values:', Array.from(allRejectionReasons));
         const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
           'deal',
           'rejectionReasons',
           Array.from(allRejectionReasons),
         );
-        console.log('[BATCH CREATE DEALS] rejectionReasons options updated successfully. Total options:', updatedOptions.length);
       } catch (error) {
         console.error('[BATCH CREATE DEALS] Failed to update rejectionReasons options:', error);
         // Don't fail the import if options update fails
       }
     } else {
-      console.log('[BATCH CREATE DEALS] No rejectionReasons values found in import data');
     }
 
     // CRITICAL: Update custom field options for multi-select fields
@@ -584,21 +578,6 @@ export class ImportBatchService {
           customFields: row.customFields,
         };
         
-        console.log(`[BATCH CREATE DEAL DATA] Row ${index + 1}:`, {
-          number: row.number,
-          title: baseDealData.title,
-          amount: amountValue,
-          budget: baseDealData.budget,
-          description: baseDealData.description ? baseDealData.description.substring(0, 50) + '...' : null,
-          tags: baseDealData.tags,
-          rejectionReasons: baseDealData.rejectionReasons,
-          reason: baseDealData.reason,
-          assignedToId: baseDealData.assignedToId,
-          contactId: baseDealData.contactId,
-          companyId: baseDealData.companyId,
-          expectedCloseAt: baseDealData.expectedCloseAt,
-          isUpdate: !!existing,
-        });
 
         if (existing) {
           // Обновление существующей сделки
@@ -665,15 +644,6 @@ export class ImportBatchService {
           }
           
           // Log update data to verify structure
-          console.log(`[BATCH UPDATE DATA] Row ${index + 1}, Deal ${existing.id}:`, {
-            hasAmount: 'amount' in updateData,
-            amountValue: 'amount' in updateData ? updateData.amount : 'NOT INCLUDED',
-            updateDataKeys: Object.keys(updateData),
-            hasPipeline: !!updateData.pipeline,
-            hasStage: !!updateData.stage,
-            hasPipelineId: 'pipelineId' in updateData,
-            hasStageId: 'stageId' in updateData,
-          });
           
           toUpdate.push({
             id: existing.id,
@@ -725,30 +695,10 @@ export class ImportBatchService {
 
     // Batch создание
     const createBatches = this.chunkArray(toCreate, this.BATCH_SIZE);
-    console.log('[BATCH CREATE DEALS] Starting batch creation:', {
-      totalDeals: toCreate.length,
-      batches: createBatches.length,
-      batchSize: this.BATCH_SIZE,
-      sampleDeal: toCreate[0] ? {
-        number: toCreate[0].number,
-        title: toCreate[0].title,
-        pipelineId: toCreate[0].pipelineId,
-        stageId: toCreate[0].stageId,
-      } : null,
-    });
     
     for (let batchIndex = 0; batchIndex < createBatches.length; batchIndex++) {
       const batch = createBatches[batchIndex];
       try {
-        console.log(`[BATCH CREATE DEALS] Processing batch ${batchIndex + 1}/${createBatches.length}:`, {
-          batchSize: batch.length,
-          sampleDeal: batch[0] ? {
-            number: batch[0].number,
-            title: batch[0].title,
-            pipelineId: batch[0].pipelineId,
-            stageId: batch[0].stageId,
-          } : null,
-        });
         
         // CRITICAL: Use the actual count from createMany, not batch.length
         // createMany returns { count: number } - the actual number of created records
@@ -764,15 +714,6 @@ export class ImportBatchService {
             
             // Log each deal before createMany
             batch.forEach((deal, dealIndex) => {
-              console.log('[IMPORT CREATE DEAL]', {
-                title: deal.title,
-                pipelineId: deal.pipelineId,
-                stageId: deal.stageId,
-                ownerId: deal.assignedToId || null,
-                row: dealIndex + 1, // Index in batch (1-based)
-                batchIndex: batchIndex + 1,
-                number: deal.number,
-              });
             });
             
             const createResult = await tx.deal.createMany({
@@ -798,13 +739,6 @@ export class ImportBatchService {
             const actuallyCreated = createResult.count;
             const skipped = batch.length - actuallyCreated;
             
-            console.log(`[BATCH CREATE DEALS] Batch ${batchIndex + 1} result:`, {
-              batchSize: batch.length,
-              actuallyCreated,
-              skipped,
-              existingInDB: existingNumbersSet.size,
-              sampleExisting: Array.from(existingNumbersSet).slice(0, 3),
-            });
             
             if (skipped > 0) {
               console.warn(`[BATCH CREATE DEALS] WARNING: ${skipped} deals were skipped (duplicates or errors)`);
@@ -912,22 +846,18 @@ export class ImportBatchService {
           // Remove amount if it's null, undefined, or NaN
           if ('amount' in sanitizedData && (sanitizedData.amount === null || sanitizedData.amount === undefined || isNaN(Number(sanitizedData.amount)))) {
             delete sanitizedData.amount;
-            console.log(`[BATCH UPDATE SANITIZE] Removed null/undefined amount from deal ${item.id}`);
           }
           
           // CRITICAL: Remove pipelineId and stageId - they must use connect syntax (pipeline: { connect: { id } })
           if ('pipelineId' in sanitizedData) {
             delete sanitizedData.pipelineId;
-            console.log(`[BATCH UPDATE SANITIZE] Removed pipelineId from deal ${item.id} - must use pipeline: { connect: { id } }`);
           }
           if ('stageId' in sanitizedData) {
             delete sanitizedData.stageId;
-            console.log(`[BATCH UPDATE SANITIZE] Removed stageId from deal ${item.id} - must use stage: { connect: { id } }`);
           }
           // CRITICAL: Remove reason - this field doesn't exist in Prisma schema
           if ('reason' in sanitizedData) {
             delete sanitizedData.reason;
-            console.log(`[BATCH UPDATE SANITIZE] Removed reason from deal ${item.id} - field doesn't exist in Prisma schema`);
           }
           
           return {

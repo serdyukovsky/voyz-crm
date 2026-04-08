@@ -22,11 +22,11 @@ export class DealsService {
   async create(data: any, userId: string) {
     try {
       // Log incoming data for debugging
-      console.log('DealsService.create - incoming data:', JSON.stringify(data, null, 2));
+      // Data validation
 
       // Extract IDs from objects if needed (defensive programming)
       const extractId = (value: any, fieldName: string): string | null => {
-        console.log(`extractId(${fieldName}):`, typeof value, value);
+        // extractId
         if (!value) return null;
         if (typeof value === 'string') return value;
         if (typeof value === 'object') {
@@ -344,7 +344,6 @@ export class DealsService {
     }
 
     if (filters?.search) {
-      console.log('🔍 DealsService: Search filter:', filters.search);
       // Search across title, description, number, deal link, and contact link
       andFilters.push({
         OR: [
@@ -582,17 +581,7 @@ export class DealsService {
     limit?: number;
     cursor?: string; // base64 encoded cursor
   }): Promise<PaginatedResponse<any>> {
-    // Debug logging for task status filtering
-    if (filters?.taskStatuses?.length) {
-      console.log('📋 Filtering by taskStatuses:', filters.taskStatuses);
-    }
-
     const where = this.buildWhere(filters);
-
-    // Debug: Log the where condition when filtering by tasks
-    if (filters?.taskStatuses?.length) {
-      console.log('📋 WHERE condition:', JSON.stringify(where, null, 2));
-    }
 
     // Managers can see all deals (no filtering by user)
 
@@ -721,24 +710,8 @@ export class DealsService {
     }
 
     // Debug logging for task filtering
-    if (filters?.taskStatuses?.length) {
-      console.log('📋 Query returned', deals.length, 'deals with taskStatuses filter');
-    }
-
-    // Debug logging for search
-    if (filters?.search) {
-      console.log('🔍 DealsService: Found', deals.length, 'deals for search:', filters.search);
-      const dealsWithLinks = deals.filter(d => d.link);
-      if (dealsWithLinks.length > 0) {
-        console.log('🔗 Deals with links:', dealsWithLinks.map(d => ({ id: d.id, title: d.title, link: d.link })));
-      }
-    }
-
     // Always return paginated response format (even if empty)
     if (deals.length === 0) {
-      if (filters?.taskStatuses?.length) {
-        console.log('📋 No deals found matching taskStatuses filter');
-      }
       return { data: [], nextCursor: undefined, hasMore: false, total };
     }
 
@@ -768,17 +741,6 @@ export class DealsService {
   }
 
   async findOne(id: string) {
-    // ⚡ PERFORMANCE TEST: Measure execution time
-    const perfStart = Date.now();
-    const perfLog: Array<{ step: string; time: number; ms: number }> = [];
-    
-    const perfLogStep = (step: string) => {
-      const now = Date.now();
-      const elapsed = now - perfStart;
-      perfLog.push({ step, time: now, ms: elapsed });
-    };
-
-    perfLogStep('start');
     const deal = await this.prisma.deal.findUnique({
       where: { id },
       select: {
@@ -924,30 +886,9 @@ export class DealsService {
       throw new NotFoundException(`Deal with ID ${id} not found`);
     }
 
-    perfLogStep('deal.findUnique complete');
-
     // Managers can see all deals (no filtering)
 
-    const result = await this.formatDealResponse(deal, undefined, undefined, undefined, perfLogStep);
-    
-    perfLogStep('formatDealResponse complete');
-    const totalTime = Date.now() - perfStart;
-    
-    // ⚡ PERFORMANCE LOG: Output timing information
-    console.log(`\n⚡ DEAL FINDONE PERFORMANCE [${id}]:`);
-    console.log(`  Total time: ${totalTime}ms`);
-    if (perfLog.length > 1) {
-      perfLog.forEach((log, index) => {
-        if (index > 0) {
-          const prevLog = perfLog[index - 1];
-          const stepTime = log.ms - prevLog.ms;
-          console.log(`  ${log.step}: +${stepTime}ms (total: ${log.ms}ms)`);
-        }
-      });
-    }
-    console.log('');
-    
-    return result;
+    return this.formatDealResponse(deal);
   }
 
   /**

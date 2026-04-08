@@ -32,7 +32,6 @@ export class ImportExportController {
     private readonly autoMappingService: AutoMappingService,
     private readonly prisma: PrismaService,
   ) {
-    console.log('🔥 ImportExportController initialized');
   }
 
   /**
@@ -44,16 +43,8 @@ export class ImportExportController {
   @ApiOperation({ summary: 'Получение метаданных полей для импорта' })
   @ApiQuery({ name: 'entityType', enum: ['contact', 'deal'], required: true })
   async getImportMeta(@Query('entityType') entityType: 'contact' | 'deal') {
-    console.log('🔥🔥🔥 ImportExportController.getImportMeta - START');
-    console.log('🔥 getImportMeta - entityType:', entityType);
     try {
       const result: any = await this.csvImportService.getImportMeta(entityType);
-      console.log('🔥 getImportMeta - SUCCESS:', {
-        systemFieldsCount: result?.systemFields?.length || 0,
-        customFieldsCount: result?.customFields?.length || 0,
-        pipelinesCount: result?.pipelines?.length || 0,
-        usersCount: result?.users?.length || 0,
-      });
       return result;
     } catch (error) {
       console.error('🔥🔥🔥 ImportExportController.getImportMeta - ERROR:', {
@@ -129,21 +120,8 @@ export class ImportExportController {
     const isDryRun = dryRun === 'true' || dryRun === '1';
     
     // 🔥 CRITICAL: Log immediately to confirm this endpoint is called
-    console.log('🔥🔥🔥 CONTROLLER ENTRY - importDeals endpoint called');
-    console.log('🔥 Request path:', req.path);
-    console.log('🔥 Request method:', req.method);
-    console.log('🔥 Request URL:', req.url);
-    console.log('🔥 Content-Type:', req.headers['content-type']);
-    console.log('🔥 DTO type:', typeof dto);
-    console.log('🔥 DTO is null?', dto === null);
-    console.log('🔥 DTO is undefined?', dto === undefined);
-    console.log('🔥 DTO keys:', dto ? Object.keys(dto) : 'null');
     if (dto && typeof dto === 'object') {
-      console.log('🔥 DTO rows count:', dto.rows ? (Array.isArray(dto.rows) ? dto.rows.length : 'NOT ARRAY') : 'NO ROWS');
-      console.log('🔥 DTO has mapping?', !!dto.mapping);
-      console.log('🔥 DTO pipelineId:', dto.pipelineId);
     }
-    console.log('🔥 DTO value (first 1000 chars):', JSON.stringify(dto, null, 2).substring(0, 1000));
     
     // CRITICAL: Check if dto is empty or null
     if (!dto || typeof dto !== 'object' || Object.keys(dto).length === 0) {
@@ -159,17 +137,6 @@ export class ImportExportController {
       throw new BadRequestException('Request body is empty. Please send rows and mapping as JSON.');
     }
     
-    console.log('🔥 DTO received:', {
-      hasRows: !!dto?.rows,
-      rowsCount: dto?.rows?.length || 0,
-      hasMapping: !!dto?.mapping,
-      mappingKeys: dto?.mapping ? Object.keys(dto.mapping) : [],
-      pipelineId: dto?.pipelineId,
-      hasFile: 'file' in (dto || {}),
-      allKeys: dto ? Object.keys(dto) : [],
-      dryRun,
-      isDryRun,
-    });
     
     // CRITICAL: Check if file is somehow in the request
     if (dto && 'file' in dto) {
@@ -185,19 +152,11 @@ export class ImportExportController {
       throw new BadRequestException('Invalid request: file field should not be present. Use rows instead.');
     }
     
-    console.log('[IMPORT CONTROLLER]', { 
-      userId: user?.id || user?.userId,
-      dryRun,
-      isDryRun,
-      rowsCount: dto?.rows?.length || 0,
-      pipelineId: dto?.pipelineId,
-    });
     
     // CRITICAL: Validate rows - CSV parsing is done on frontend
     // In dry-run, return globalErrors instead of throwing
     if (!dto.rows || !Array.isArray(dto.rows) || dto.rows.length === 0) {
       if (isDryRun) {
-        // In dry-run, NEVER throw - always return 200 with errors
         return {
           summary: {
             total: 0,
@@ -211,6 +170,20 @@ export class ImportExportController {
         };
       }
       throw new BadRequestException('Rows are required and must be a non-empty array');
+    }
+
+    // Limit rows to prevent OOM on large imports
+    const MAX_IMPORT_ROWS = 10_000;
+    if (dto.rows.length > MAX_IMPORT_ROWS) {
+      const msg = `Too many rows (${dto.rows.length}). Maximum is ${MAX_IMPORT_ROWS} per import. Please split the file.`;
+      if (isDryRun) {
+        return {
+          summary: { total: 0, created: 0, updated: 0, failed: 0, skipped: 0 },
+          errors: [],
+          globalErrors: [msg],
+        };
+      }
+      throw new BadRequestException(msg);
     }
 
     // Validate mapping
@@ -259,14 +232,6 @@ export class ImportExportController {
     
     // CRITICAL: Wrap entire import in try/catch to prevent 500 errors in dry-run
     try {
-      console.log('[IMPORT CONTROLLER] About to call csvImportService.importDeals:', {
-        rowsCount: dto.rows?.length || 0,
-        hasMapping: !!dto.mapping,
-        pipelineId: dto.pipelineId,
-        hasUser: !!user,
-        userId: user?.id || user?.userId,
-        isDryRun,
-      });
       
       const result = await this.csvImportService.importDeals(
         dto.rows, // Parsed CSV rows from frontend
@@ -279,11 +244,9 @@ export class ImportExportController {
         dto.userValueMapping, // Manual mapping: { "CSV value": "user-id" }
       );
       
-      console.log('[IMPORT CONTROLLER] csvImportService.importDeals completed successfully');
 
       // Log dry-run result for debugging
       if (isDryRun) {
-        console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
       }
 
       return result;

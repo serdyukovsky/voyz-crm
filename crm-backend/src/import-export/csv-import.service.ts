@@ -46,16 +46,9 @@ export class CsvImportService {
    */
   async getImportMeta(entityType: 'contact' | 'deal'): Promise<ImportMetaResponseDto> {
     try {
-      console.log('[IMPORT META] Getting import meta for entityType:', entityType);
       // ALWAYS return mixed import meta (full list of fields for both contact and deal)
       // This supports MIXED CSV IMPORT where one CSV can contain both entities
       const result = await this.getMixedImportMeta();
-      console.log('[IMPORT META] Successfully retrieved import meta:', {
-        systemFieldsCount: result.systemFields?.length || 0,
-        customFieldsCount: result.customFields?.length || 0,
-        pipelinesCount: result.pipelines?.length || 0,
-        usersCount: result.users?.length || 0,
-      });
       return result;
     } catch (error) {
       console.error('[IMPORT META ERROR] Failed to get import meta:', {
@@ -109,7 +102,6 @@ export class CsvImportService {
    * Получение метаданных для импорта сделок
    */
   private async getDealsImportMeta(): Promise<DealsImportMetaDto> {
-    console.log('🔥🔥🔥 getDealsImportMeta - START');
     // Системные поля сделок
     const systemFields: ImportFieldDto[] = [
       { key: 'number', label: 'Deal Number', required: false, type: 'string', description: 'Номер сделки', group: 'basic', entity: 'deal' },
@@ -158,14 +150,10 @@ export class CsvImportService {
     }
 
     // Получение пайплайнов со стадиями
-    console.log('🔥 getDealsImportMeta - fetching pipelines...');
     const pipelines: PipelineDto[] = await this.getPipelinesWithStages();
-    console.log('🔥 getDealsImportMeta - pipelines fetched:', pipelines.length);
 
     // Получение активных пользователей
-    console.log('🔥 getDealsImportMeta - fetching users...');
     const users: UserDto[] = await this.getActiveUsers();
-    console.log('🔥 getDealsImportMeta - users fetched:', users.length);
 
     const result = {
       systemFields,
@@ -174,12 +162,6 @@ export class CsvImportService {
       users,
     };
     
-    console.log('🔥🔥🔥 getDealsImportMeta - SUCCESS, returning:', {
-      systemFieldsCount: result.systemFields.length,
-      customFieldsCount: result.customFields.length,
-      pipelinesCount: result.pipelines.length,
-      usersCount: result.users.length,
-    });
     
     return result;
   }
@@ -188,30 +170,12 @@ export class CsvImportService {
    * Получение метаданных для MIXED импорта (контакты + сделки в одном плоском массиве)
    */
   private async getMixedImportMeta(): Promise<any> {
-    console.log('🔥🔥🔥 getMixedImportMeta - START');
     try {
-      console.log('[IMPORT META] Getting contact meta...');
       // Получаем метаданные контактов
       const contactMeta = await this.getContactsImportMeta();
-      console.log('[IMPORT META] Contact meta retrieved:', {
-        systemFieldsCount: contactMeta.systemFields?.length || 0,
-        customFieldsCount: contactMeta.customFields?.length || 0,
-        usersCount: contactMeta.users?.length || 0,
-      });
       
-      console.log('[IMPORT META] Getting deal meta...');
       // Получаем метаданные сделок
       const dealMeta = await this.getDealsImportMeta();
-      console.log('🔥🔥🔥 getDealsImportMeta returned:', {
-        systemFieldsCount: dealMeta.systemFields?.length || 0,
-        customFieldsCount: dealMeta.customFields?.length || 0,
-        pipelinesCount: dealMeta.pipelines?.length || 0,
-        usersCount: dealMeta.users?.length || 0,
-        systemFieldsType: typeof dealMeta.systemFields,
-        systemFieldsIsArray: Array.isArray(dealMeta.systemFields),
-        customFieldsType: typeof dealMeta.customFields,
-        customFieldsIsArray: Array.isArray(dealMeta.customFields),
-      });
     
     // CRITICAL: Ensure systemFields and customFields are always arrays (never undefined)
     const systemFields = Array.isArray(dealMeta.systemFields) ? dealMeta.systemFields : [];
@@ -251,12 +215,6 @@ export class CsvImportService {
       users: dealMeta.users || [],
     };
     
-    console.log('🔥🔥🔥 getMixedImportMeta - SUCCESS, returning:', {
-      systemFieldsCount: result.systemFields.length,
-      customFieldsCount: result.customFields.length,
-      pipelinesCount: result.pipelines.length,
-      usersCount: result.users.length,
-    });
     
     return result;
     } catch (error) {
@@ -350,7 +308,6 @@ export class CsvImportService {
       if (!this.prisma) {
         throw new Error('PrismaService is NOT injected');
       }
-      console.log('[IMPORT META] Fetching pipelines...');
       const pipelines = await this.prisma.pipeline.findMany({
         where: { isActive: true },
         include: {
@@ -360,7 +317,6 @@ export class CsvImportService {
         },
         orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
       });
-      console.log('[IMPORT META] Found pipelines:', pipelines.length);
 
       return pipelines.map((pipeline) => ({
       id: pipeline.id,
@@ -573,27 +529,9 @@ export class CsvImportService {
     userValueMapping?: Record<string, string>, // Manual mapping: { "CSV value": "user-id" }
   ): Promise<ImportResultDto> {
     // 🔥 DIAGNOSTIC: Log entry point
-    console.log('🔥 IMPORT ENTRY - importDeals called');
-    console.log('🔥 Parameters:', {
-      rowsCount: rows?.length || 0,
-      hasMapping: !!mapping,
-      mappingKeys: mapping ? Object.keys(mapping) : [],
-      hasRejectionReasonsMapping: !!mapping?.rejectionReasons,
-      rejectionReasonsMappingColumn: mapping?.rejectionReasons,
-      pipelineId,
-      dryRun,
-      hasUser: !!user,
-      userId: user?.id || user?.userId,
-    });
     
     // 🔥 DIAGNOSTIC: Log first row sample
     if (rows && rows.length > 0) {
-      console.log('🔥 First row sample:', {
-        rowKeys: Object.keys(rows[0]),
-        hasRejectionReasonsColumn: mapping?.rejectionReasons ? rows[0].hasOwnProperty(mapping.rejectionReasons) : false,
-        rejectionReasonsValue: mapping?.rejectionReasons ? rows[0][mapping.rejectionReasons] : undefined,
-        sampleData: Object.entries(rows[0]).slice(0, 5),
-      });
     }
     
     // CRITICAL: Top-level try/catch to prevent 500 errors
@@ -620,16 +558,6 @@ export class CsvImportService {
       const userId = user?.id || user?.userId;
       
       // Log mapping and context before validation - ensure keys match expectations
-      console.log('[IMPORT CONTEXT]', { 
-        userId,
-        dryRun, 
-        pipelineId,
-        hasUser: !!user,
-        mapping,
-        mappingKeys: Object.keys(mapping || {}),
-        hasTitleMapping: mapping?.title ? true : false,
-        titleColumn: mapping?.title
-      });
 
       const summary: ImportSummary = {
         total: 0,
@@ -704,9 +632,6 @@ export class CsvImportService {
         try {
           // CRITICAL: Always try to load pipeline, even in dry-run
           // Pipeline model doesn't have workspaceId, so we load it by ID only
-          console.log('[IMPORT PIPELINE DEBUG] Attempting to load pipeline:', { 
-            pipelineId
-          });
             
             if (!this.prisma) {
               throw new Error('PrismaService is NOT injected');
@@ -720,12 +645,6 @@ export class CsvImportService {
               },
             });
             
-            console.log('[IMPORT PIPELINE DEBUG] Pipeline load result:', { 
-              pipelineId, 
-              found: !!pipeline,
-              hasStages: !!(pipeline?.stages),
-              stagesCount: pipeline?.stages?.length || 0
-            });
             
             if (!pipeline) {
               // Pipeline not found - pipeline remains null
@@ -733,7 +652,6 @@ export class CsvImportService {
               warnings.push(`Pipeline with ID "${pipelineId}" not found, stage validation will be skipped`);
               stagesMap = new Map<string, string>();
               defaultStageId = undefined;
-              console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: false, stagesCount: 0, reason: 'pipeline not found' });
             } else {
               pipelineLoaded = true;
               // CRITICAL: Only access pipeline.stages if pipeline is not null
@@ -749,11 +667,9 @@ export class CsvImportService {
                   stagesMap.set(stage.name, stage.id);
                   stagesMap.set(stage.id, stage.id);
                 });
-                console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: true, stagesCount });
               } else {
                 stagesMap = new Map<string, string>();
                 defaultStageId = undefined;
-                console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: true, stagesCount: 0, reason: 'no stages array' });
               }
             }
         } catch (error) {
@@ -764,14 +680,12 @@ export class CsvImportService {
           stagesMap = new Map<string, string>();
           defaultStageId = undefined;
           pipeline = null;
-          console.log('[IMPORT PIPELINE DEBUG]', { pipelineId, pipelineLoaded: false, stagesCount: 0, reason: 'exception', error: error instanceof Error ? error.message : 'Unknown' });
         }
       } else {
         // No pipelineId provided - initialize empty maps
         // Pipeline remains null - will be handled at row level
         stagesMap = new Map<string, string>();
         defaultStageId = undefined;
-        console.log('[IMPORT PIPELINE DEBUG]', { pipelineId: null, pipelineLoaded: false, stagesCount: 0, reason: 'pipelineId missing' });
       }
       
       // Load users for resolution - wrap in try/catch for dry-run safety
@@ -829,7 +743,6 @@ export class CsvImportService {
     }
     
     // Log: Сразу после парсинга CSV
-    console.log('[IMPORT DEBUG] parsed rows:', rows.length);
     
     // Map для сбора всех стадий из CSV (stageName -> firstRowNumber)
     const csvStagesMap = new Map<string, number>();
@@ -877,14 +790,6 @@ export class CsvImportService {
           const reason = 'Empty row';
           const titleColumn = mapping.title;
           const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
-          console.log('[IMPORT ROW SKIPPED]', {
-            row: rowNumber,
-            reason,
-            title,
-            pipelineId: pipelineId || '',
-            stageId: '',
-            hasErrors: 0
-          });
           summary.skipped++;
           continue;
         }
@@ -895,18 +800,6 @@ export class CsvImportService {
         try {
           // Log mapping and parsed row before validation (first row only for debugging)
           if (rowNumber === 1) {
-            console.log('[IMPORT ROW VALIDATION]', {
-              rowNumber,
-              mapping,
-              csvRowKeys: Object.keys(trimmedRow),
-              csvRowSample: Object.fromEntries(
-                Object.entries(trimmedRow).slice(0, 5).map(([k, v]) => [k, typeof v === 'string' ? v.substring(0, 50) : v])
-              ),
-              titleMapping: mapping.title,
-              titleColumn: mapping.title,
-              titleValue: mapping.title ? trimmedRow[mapping.title] : undefined,
-              titleExists: mapping.title ? (mapping.title in trimmedRow) : false
-            });
           }
           
           // Defensive guards for each row
@@ -932,14 +825,6 @@ export class CsvImportService {
           if (rowErrors.length > 0) {
             const reason = rowErrors.map(e => e.error).join('; ') || 'Critical validation errors';
             const title = titleValue || '';
-            console.log('[IMPORT ROW SKIPPED]', {
-              row: rowNumber,
-              reason,
-              title,
-              pipelineId: pipelineId || '',
-              stageId: '',
-              hasErrors: rowErrors.length
-            });
             errors.push(...rowErrors);
             summary.failed++;
             continue;
@@ -963,21 +848,6 @@ export class CsvImportService {
           
             if (dealData) {
             // Log dealData to verify all fields are present
-            console.log(`[MAP DEAL ROW RESULT] Row ${rowNumber}:`, {
-              number: dealData.number,
-              title: dealData.title,
-              amount: dealData.amount,
-              budget: dealData.budget,
-              assignedToId: dealData.assignedToId,
-              contactId: dealData.contactId,
-              companyId: dealData.companyId,
-              expectedCloseAt: dealData.expectedCloseAt,
-              description: dealData.description ? dealData.description.substring(0, 50) + '...' : null,
-              tags: dealData.tags,
-              rejectionReasons: dealData.rejectionReasons,
-              stageId: dealData.stageId,
-              stageValue: dealData.stageValue,
-            });
             
             // Guard 3: Stage check (if no stageValue and no defaultStage)
             if (!dealData.stageId && !dealData.stageValue && !defaultStageId) {
@@ -989,14 +859,6 @@ export class CsvImportService {
             const reason = 'Stage is required. Please map a stage field or ensure pipeline has a default stage.';
             const titleColumn = mapping.title;
             const title = titleColumn ? (trimmedRow[titleColumn] || '') : '';
-            console.log('[IMPORT ROW SKIPPED]', {
-              row: rowNumber,
-              reason,
-              title,
-              pipelineId: pipelineId || 'N/A',
-              stageId: dealData.stageId || 'N/A',
-              hasErrors: 1
-            });
             summary.failed++;
               continue;
             }
@@ -1045,19 +907,6 @@ export class CsvImportService {
 
       // Process stages and create deals (async operations)
       try {
-        console.log('[IMPORT DEALS] Processing stages and deals:', {
-          processedRowsCount: processedRows.length,
-          dryRun,
-          hasPipeline: !!pipeline,
-          pipelineId,
-          sampleProcessedRow: processedRows[0] ? {
-            hasStageId: !!processedRows[0].stageId,
-            hasStageValue: !!processedRows[0].stageValue,
-            stageId: processedRows[0].stageId,
-            stageValue: processedRows[0].stageValue,
-            title: processedRows[0].title,
-          } : null,
-        });
         
             const stagesToCreate: StageToCreate[] = [];
             
@@ -1135,15 +984,9 @@ export class CsvImportService {
               
               if (!dryRun && stagesToCreate.length > 0 && pipeline) {
                 // Only create stages in actual import mode with pipeline
-                console.log('[IMPORT DEALS] Creating stages:', {
-                  stagesToCreateCount: stagesToCreate.length,
-                  stagesToCreate: stagesToCreate.map(s => s.name),
-                  pipelineId,
-                });
                 
                 for (const stageToCreate of stagesToCreate) {
                   try {
-                    console.log('[IMPORT DEALS] Creating stage:', stageToCreate.name);
                     if (!this.prisma) {
                       throw new Error('PrismaService is NOT injected');
                     }
@@ -1156,11 +999,6 @@ export class CsvImportService {
                         isDefault: false,
                         type: 'OPEN',
                       },
-                    });
-                    console.log('[IMPORT DEALS] Stage created:', {
-                      id: newStage.id,
-                      name: newStage.name,
-                      pipelineId: newStage.pipelineId,
                     });
                     
                     const normalizedName = stageToCreate.name.toLowerCase().trim();
@@ -1253,18 +1091,6 @@ export class CsvImportService {
               
               // Filter valid rows (must have stageId or stageValue)
               // CRITICAL: If no stageId and no stageValue, use defaultStageId if available
-              console.log('[IMPORT DEALS] Before filtering validRows:', {
-                updatedRowsCount: updatedRows.length,
-                defaultStageId,
-                hasPipeline: !!pipeline,
-                sampleRow: updatedRows[0] ? {
-                  hasStageId: !!updatedRows[0].stageId,
-                  hasStageValue: !!updatedRows[0].stageValue,
-                  stageId: updatedRows[0].stageId,
-                  stageValue: updatedRows[0].stageValue,
-                  title: updatedRows[0].title,
-                } : null,
-              });
               
               const validRows = updatedRows.filter(row => {
                 // Row is valid if it has stageId, stageValue, or we can use defaultStageId
@@ -1280,25 +1106,11 @@ export class CsvImportService {
                 return false;
               });
               
-              console.log('[IMPORT DEALS] After filtering validRows:', {
-                validRowsCount: validRows.length,
-                updatedRowsCount: updatedRows.length,
-                filteredOut: updatedRows.length - validRows.length,
-                dryRun,
-              });
               
-              console.log('[IMPORT DEALS] About to check validRows.length:', {
-                validRowsLength: validRows.length,
-                dryRun,
-                willEnterDryRun: dryRun === true,
-                willEnterActualImport: dryRun === false,
-              });
               
               if (validRows.length > 0) {
-                console.log('[IMPORT DEALS] Entering validRows.length > 0 block, dryRun:', dryRun);
                 if (dryRun) {
                   // Log: Перед dry-run simulate
-                  console.log('[IMPORT DEBUG] DRY RUN rows:', rows.length);
                   // CRITICAL: Dry-run must execute ALL the same validations as actual import
                   // The ONLY difference: NO DB write operations (no batchCreateDeals call)
                   
@@ -1333,15 +1145,6 @@ export class CsvImportService {
                     const stageValueValue = typeof row.stageValue === 'string' ? row.stageValue.trim() : '';
                     if (!stageIdValue && !stageValueValue) {
                       const reason = 'Stage is required for deal import';
-                      console.log('[IMPORT ROW SKIPPED]', {
-                        row: rowNumber,
-                        reason,
-                        title: row.title || 'N/A',
-                        pipelineId: row.pipelineId || 'N/A',
-                        stageId: row.stageId || 'MISSING',
-                        stageValue: row.stageValue || 'MISSING',
-                        hasErrors: 1
-                      });
                       errors.push({
                         row: rowNumber,
                         field: 'stageId',
@@ -1354,14 +1157,6 @@ export class CsvImportService {
                     // ЖЕСТКАЯ ВАЛИДАЦИЯ: title обязателен (same as actual import)
                     if (!row.title || row.title.trim() === '') {
                       const reason = 'Title is required for deal import';
-                      console.log('[IMPORT ROW SKIPPED]', {
-                        row: rowNumber,
-                        reason,
-                        title: 'MISSING',
-                        pipelineId: row.pipelineId || 'N/A',
-                        stageId: row.stageId || 'N/A',
-                        hasErrors: 1
-                      });
                       errors.push({
                         row: rowNumber,
                         field: 'title',
@@ -1400,16 +1195,6 @@ export class CsvImportService {
                     });
                   }
                   
-                  console.log('[IMPORT DEALS] Dry-run validation complete:', {
-                    dealsCount: dealsWithNumber.length,
-                    filteredOut: validRows.length - dealsWithNumber.length,
-                    sampleDeal: dealsWithNumber[0] ? {
-                      number: dealsWithNumber[0].number,
-                      title: dealsWithNumber[0].title,
-                      pipelineId: dealsWithNumber[0].pipelineId,
-                      stageId: dealsWithNumber[0].stageId,
-                    } : null,
-                  });
                   
                   // CRITICAL: In dry-run, simulate batchCreateDeals logic WITHOUT actual DB writes
                   // Check existing deals to determine created vs updated
@@ -1452,44 +1237,13 @@ export class CsvImportService {
                     }
                   });
                   
-                  console.log('[IMPORT RESULT MUTATION]', { 
-                    summary: { ...summary }, 
-                    dryRun: true, 
-                    reason: 'dry-run simulation complete',
-                    dealsWithNumberCount: dealsWithNumber.length,
-                    existingDealsCount: existingDeals.size
-                  });
                 } else {
                   // Log: Перед actual import
-                  console.log('[IMPORT DEBUG] ACTUAL IMPORT rows:', rows.length);
                   // Actual import - create/update deals
-                  console.log('[IMPORT DEALS] Starting actual import (not dry-run):', {
-                    validRowsCount: validRows.length,
-                    userId,
-                    pipelineId,
-                    pipeline: pipeline ? 'LOADED' : 'NULL',
-                    hasPipeline: !!pipeline,
-                    pipelineLoaded: pipelineLoaded,
-                  });
                   
                   // CRITICAL DEBUG: Check condition before actual import
-                  console.log('[IMPORT ACTUAL CRITICAL CHECK]', {
-                    pipeline: pipeline ? 'LOADED' : 'NULL',
-                    hasPipeline: !!pipeline,
-                    pipelineId: pipelineId,
-                    validRowsCount: validRows.length,
-                    willCallBatchCreateDeals: validRows.length > 0,
-                    processedRowsCount: processedRows.length,
-                    updatedRowsCount: updatedRows.length,
-                  });
                   
-                  console.log('[IMPORT DEALS] Proceeding with import:', {
-                    hasPipeline: !!pipeline,
-                    validRowsCount: validRows.length,
-                    userId,
-                  });
                   // Log: ПЕРЕД началом обработки строк в actual import
-                  console.log('[IMPORT ACTUAL] start', { rows: rows.length });
                   // Proceed with import
                   // CRITICAL: Validate stageId BEFORE adding to dealsWithNumber
                   // Filter out rows without valid stageId and add them to errors
@@ -1526,14 +1280,6 @@ export class CsvImportService {
                         // ЖЕСТКАЯ ВАЛИДАЦИЯ: stageId обязателен
                         if (!row.stageId || row.stageId.trim() === '') {
                           const reason = 'Stage is required for deal import';
-                          console.log('[IMPORT ROW SKIPPED]', {
-                            row: rowNumber,
-                            reason,
-                            title: row.title || 'N/A',
-                            pipelineId: row.pipelineId || 'N/A',
-                            stageId: row.stageId || 'MISSING',
-                            hasErrors: 1
-                          });
                           errors.push({
                             row: rowNumber,
                             field: 'stageId',
@@ -1546,14 +1292,6 @@ export class CsvImportService {
                         // ЖЕСТКАЯ ВАЛИДАЦИЯ: title обязателен
                         if (!row.title || row.title.trim() === '') {
                           const reason = 'Title is required for deal import';
-                          console.log('[IMPORT ROW SKIPPED]', {
-                            row: rowNumber,
-                            reason,
-                            title: 'MISSING',
-                            pipelineId: row.pipelineId || 'N/A',
-                            stageId: row.stageId || 'N/A',
-                            hasErrors: 1
-                          });
                           errors.push({
                             row: rowNumber,
                             field: 'title',
@@ -1598,7 +1336,6 @@ export class CsvImportService {
                             }
                           }
                           if (resolvedStageId) {
-                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Resolved stage "${stageValueStr}" via stagesMap`);
                           }
                         }
                         
@@ -1606,7 +1343,6 @@ export class CsvImportService {
                           const stageExists = pipeline.stages.some((s: any) => s.id === resolvedStageId);
                           if (!stageExists) {
                             // StageId doesn't belong to current pipeline - need to resolve
-                            console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: StageId "${resolvedStageId}" doesn't belong to pipeline "${rowPipelineId}", attempting to resolve...`);
                             
                             // Try to resolve by stageValue (stage name from CSV)
                             if (normalizedStageName) {
@@ -1622,12 +1358,10 @@ export class CsvImportService {
                               
                               if (foundStageId) {
                                 resolvedStageId = foundStageId;
-                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: Found matching stage via stagesMap (${foundStageId})`);
                               } else {
                                 // No matching stage found - use default stage
                                 if (defaultStageId) {
                                   resolvedStageId = defaultStageId;
-                                  console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: No matching stage found, using default stage "${defaultStageId}"`);
                                   warnings.push(`Row ${rowNumber}: Stage "${row.stageValue}" not found in pipeline, using default stage`);
                                 } else {
                                   console.error(`[IMPORT STAGE FIX] Row ${rowNumber}: Cannot resolve stage - no matching stage and no default stage`);
@@ -1643,7 +1377,6 @@ export class CsvImportService {
                               // No stageValue - use default stage
                               if (defaultStageId) {
                                 resolvedStageId = defaultStageId;
-                                console.log(`[IMPORT STAGE FIX] Row ${rowNumber}: No stageValue, using default stage "${defaultStageId}"`);
                                 warnings.push(`Row ${rowNumber}: Stage "${row.stageId}" doesn't belong to pipeline, using default stage`);
                               } else {
                                 console.error(`[IMPORT STAGE FIX] Row ${rowNumber}: Cannot resolve stage - no stageValue and no default stage`);
@@ -1678,20 +1411,6 @@ export class CsvImportService {
                           customFields: row.customFields !== undefined ? row.customFields : undefined,
                         };
                         
-                        console.log(`[IMPORT DEAL DATA] Row ${rowNumber} deal data:`, {
-                          number: dealToCreate.number,
-                          title: dealToCreate.title,
-                          amount: dealToCreate.amount,
-                          budget: dealToCreate.budget,
-                          assignedToId: dealToCreate.assignedToId,
-                          contactId: dealToCreate.contactId,
-                          companyId: dealToCreate.companyId,
-                          expectedCloseAt: dealToCreate.expectedCloseAt,
-                          description: dealToCreate.description ? dealToCreate.description.substring(0, 50) + '...' : null,
-                          tags: dealToCreate.tags,
-                          rejectionReasons: dealToCreate.rejectionReasons,
-                          reason: dealToCreate.reason,
-                        });
                         
                         dealsWithNumber.push(dealToCreate);
                         
@@ -1734,33 +1453,9 @@ export class CsvImportService {
                         }
                       }
                       
-                      console.log('[IMPORT DEALS] Calling batchCreateDeals:', {
-                        dealsCount: dealsWithNumber.length,
-                        filteredOut: validRows.length - dealsWithNumber.length,
-                        sampleDeal: dealsWithNumber[0] ? {
-                          number: dealsWithNumber[0].number,
-                          title: dealsWithNumber[0].title,
-                          pipelineId: dealsWithNumber[0].pipelineId,
-                          stageId: dealsWithNumber[0].stageId,
-                          hasRejectionReasons: !!dealsWithNumber[0].rejectionReasons,
-                          rejectionReasons: dealsWithNumber[0].rejectionReasons,
-                          rejectionReasonsLength: dealsWithNumber[0].rejectionReasons?.length || 0,
-                        } : null,
-                        allDealsRejectionReasons: dealsWithNumber.slice(0, 3).map(d => ({
-                          number: d.number,
-                          hasRejectionReasons: !!d.rejectionReasons,
-                          rejectionReasons: d.rejectionReasons,
-                        })),
-                      });
                       
                       const result = await this.importBatchService.batchCreateDeals(dealsWithNumber, userId);
                       
-                      console.log('[IMPORT DEALS] batchCreateDeals result:', {
-                        created: result.created,
-                        updated: result.updated,
-                        errorsCount: result.errors.length,
-                        errors: result.errors.slice(0, 5), // First 5 errors
-                      });
                       
                       summary.created += result.created;
                       summary.updated += result.updated;
@@ -1775,7 +1470,6 @@ export class CsvImportService {
                                                mapping.notes || mapping.social;
                       
                       if (hasContactFields && dealsWithNumber.length > 0) {
-                        console.log('[IMPORT CONTACTS] Contact fields detected, creating contacts for deals...');
                         
                         // Find created deals by numbers
                         const dealNumbers = dealsWithNumber.map(d => d.number).filter((n): n is string => Boolean(n));
@@ -1785,7 +1479,6 @@ export class CsvImportService {
                         const allDirectionsFromDeals = new Set<string>();
                         const allContactMethodsFromDeals = new Set<string>();
                         
-                        console.log(`[IMPORT DEALS] Processing ${dealContactDataMap.size} contacts for deals`);
                         
                         // Create contacts for each deal
                         for (const [dealNumber, { contactData, csvRowIndex }] of dealContactDataMap.entries()) {
@@ -1794,22 +1487,11 @@ export class CsvImportService {
                             if (!deal) continue;
                             
                             // Collect directions and contactMethods for system options update
-                            console.log(`[IMPORT DEALS] Processing contact for deal ${dealNumber}:`, {
-                              hasDirections: !!contactData.directions,
-                              directionsType: Array.isArray(contactData.directions) ? 'array' : typeof contactData.directions,
-                              directionsValue: contactData.directions,
-                              directionsLength: Array.isArray(contactData.directions) ? contactData.directions.length : 0,
-                              hasContactMethods: !!contactData.contactMethods,
-                              contactMethodsType: Array.isArray(contactData.contactMethods) ? 'array' : typeof contactData.contactMethods,
-                              contactMethodsValue: contactData.contactMethods,
-                              contactMethodsLength: Array.isArray(contactData.contactMethods) ? contactData.contactMethods.length : 0,
-                            });
                             
                             if (contactData.directions && Array.isArray(contactData.directions) && contactData.directions.length > 0) {
                               contactData.directions.forEach((direction) => {
                                 if (direction && typeof direction === 'string' && direction.trim()) {
                                   allDirectionsFromDeals.add(direction.trim());
-                                  console.log(`[IMPORT DEALS] Added direction "${direction.trim()}" to collection`);
                                 }
                               });
                             }
@@ -1817,7 +1499,6 @@ export class CsvImportService {
                               contactData.contactMethods.forEach((method) => {
                                 if (method && typeof method === 'string' && method.trim()) {
                                   allContactMethodsFromDeals.add(method.trim());
-                                  console.log(`[IMPORT DEALS] Added contactMethod "${method.trim()}" to collection`);
                                 }
                               });
                             }
@@ -1861,7 +1542,6 @@ export class CsvImportService {
                               contact.directions.forEach((direction) => {
                                 if (direction && typeof direction === 'string' && direction.trim()) {
                                   allDirectionsFromDeals.add(direction.trim());
-                                  console.log(`[IMPORT DEALS] Added direction "${direction.trim()}" from created contact ${contact.id}`);
                                 }
                               });
                             }
@@ -1869,12 +1549,10 @@ export class CsvImportService {
                               contact.contactMethods.forEach((method) => {
                                 if (method && typeof method === 'string' && method.trim()) {
                                   allContactMethodsFromDeals.add(method.trim());
-                                  console.log(`[IMPORT DEALS] Added contactMethod "${method.trim()}" from created contact ${contact.id}`);
                                 }
                               });
                             }
                             
-                            console.log(`[IMPORT CONTACT] Created contact ${contact.id} for deal ${deal.number}`);
                           } catch (error) {
                             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
                             console.error(`[IMPORT CONTACT ERROR] Failed to create contact for deal ${dealNumber}:`, errorMessage);
@@ -1886,56 +1564,36 @@ export class CsvImportService {
                         }
                         
                         // CRITICAL: Update system field options with directions and contactMethods from contacts created during deal import
-                        console.log('[IMPORT DEALS] Collected directions from contacts:', {
-                          count: allDirectionsFromDeals.size,
-                          values: Array.from(allDirectionsFromDeals),
-                        });
-                        console.log('[IMPORT DEALS] Collected contactMethods from contacts:', {
-                          count: allContactMethodsFromDeals.size,
-                          values: Array.from(allContactMethodsFromDeals),
-                        });
                         
                         if (allDirectionsFromDeals.size > 0) {
                           try {
-                            console.log('[IMPORT DEALS] Updating directions options from contacts created during deal import:', Array.from(allDirectionsFromDeals));
                             const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
                               'contact',
                               'directions',
                               Array.from(allDirectionsFromDeals),
                             );
-                            console.log('[IMPORT DEALS] directions options updated successfully. Total options:', updatedOptions.length);
                           } catch (error) {
                             console.error('[IMPORT DEALS] Failed to update directions options from contacts:', error);
                             // Don't fail the import if options update fails
                           }
                         } else {
-                          console.log('[IMPORT DEALS] No directions found in contacts, skipping system options update');
                         }
                         
                         if (allContactMethodsFromDeals.size > 0) {
                           try {
-                            console.log('[IMPORT DEALS] Updating contactMethods options from contacts created during deal import:', Array.from(allContactMethodsFromDeals));
                             const updatedOptions = await this.systemFieldOptionsService.addOptionsIfMissing(
                               'contact',
                               'contactMethods',
                               Array.from(allContactMethodsFromDeals),
                             );
-                            console.log('[IMPORT DEALS] contactMethods options updated successfully. Total options:', updatedOptions.length);
                           } catch (error) {
                             console.error('[IMPORT DEALS] Failed to update contactMethods options from contacts:', error);
                             // Don't fail the import if options update fails
                           }
                         } else {
-                          console.log('[IMPORT DEALS] No contactMethods found in contacts, skipping system options update');
                         }
                       }
                       
-                      console.log('[IMPORT RESULT MUTATION]', { 
-                        summary: { ...summary }, 
-                        dryRun: false, 
-                        reason: 'after batchCreateDeals and contacts',
-                        batchResult: { created: result.created, updated: result.updated, errors: result.errors.length }
-                      });
 
                       result.errors.forEach((err) => {
                         errors.push({
@@ -2010,19 +1668,8 @@ export class CsvImportService {
               };
               
               // Log import context for debugging
-              console.log('[IMPORT CONTEXT]', { 
-                dryRun, 
-                rows: processedRows.length,
-                parsedRows: summary.total 
-              });
               
               // Log final result before return
-              console.log('[IMPORT RESULT MUTATION]', { 
-                summary: { ...summary }, 
-                dryRun, 
-                reason: 'final result before return',
-                resultSummary: result.summary
-              });
               
               // CRITICAL: Invariant check for actual import
               // If validRows.length > 0, result CANNOT be all zeros
@@ -2075,15 +1722,8 @@ export class CsvImportService {
               }
               
               if (dryRun) {
-                console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
               } else {
                 // Log: В КОНЦЕ функции перед return для actual import
-                console.log('[IMPORT ACTUAL] result', {
-                  created: summary.created,
-                  updated: summary.updated,
-                  skipped: summary.skipped,
-                  failed: summary.failed
-                });
               }
               
               return result;
@@ -2098,30 +1738,12 @@ export class CsvImportService {
               };
               
               // Log import context for debugging
-              console.log('[IMPORT CONTEXT]', { 
-                dryRun, 
-                rows: 0,
-                parsedRows: summary.total 
-              });
               
               // Log final result before return (no rows case)
-              console.log('[IMPORT RESULT MUTATION]', { 
-                summary: { ...summary }, 
-                dryRun, 
-                reason: 'final result before return (no rows)',
-                resultSummary: result.summary
-              });
               
               if (dryRun) {
-                console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
               } else {
                 // Log: В КОНЦЕ функции перед return для actual import (no rows case)
-                console.log('[IMPORT ACTUAL] result', {
-                  created: summary.created,
-                  updated: summary.updated,
-                  skipped: summary.skipped,
-                  failed: summary.failed
-                });
               }
               
               return result;
@@ -2157,13 +1779,6 @@ export class CsvImportService {
                 globalErrors: globalErrors.length > 0 ? globalErrors : undefined,
                 warnings: warnings.length > 0 ? warnings : undefined,
               };
-              console.log('[IMPORT RESULT MUTATION]', { 
-                summary: { ...summary }, 
-                dryRun: true, 
-                reason: 'error catch block (dry-run)',
-                resultSummary: result.summary
-              });
-              console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
               return result;
             } else {
               // In actual import, throw for global exception filter
@@ -2203,13 +1818,6 @@ export class CsvImportService {
           })) : [],
           globalErrors: [`Import error: ${errorMessage}`],
         };
-        console.log('[IMPORT RESULT MUTATION]', { 
-          summary: { ...result.summary }, 
-          dryRun: true, 
-          reason: 'top-level catch block (dry-run)',
-          resultSummary: result.summary
-        });
-        console.log('[DRY RUN RESULT]', JSON.stringify(result, null, 2));
         return result;
             } else {
         // For actual import, throw with detailed message in development mode
@@ -2663,40 +2271,18 @@ export class CsvImportService {
 
     // Парсинг rejectionReasons (разделенные запятой)
     const rejectionReasons: string[] = [];
-    console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons mapping check:`, {
-      hasMapping: !!mapping.rejectionReasons,
-      mappingColumn: mapping.rejectionReasons,
-      csvRowKeys: Object.keys(csvRow),
-      csvRowHasColumn: mapping.rejectionReasons ? csvRow.hasOwnProperty(mapping.rejectionReasons) : false,
-    });
     
     if (mapping.rejectionReasons) {
       const reasonsValue = getValue(mapping.rejectionReasons);
-      console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons value extraction:`, {
-        mappingColumn: mapping.rejectionReasons,
-        rawValue: reasonsValue,
-        csvRowValue: csvRow[mapping.rejectionReasons],
-      });
       
       if (reasonsValue) {
         const parsedReasons = reasonsValue.split(',').map((r) => r.trim()).filter(Boolean);
         rejectionReasons.push(...parsedReasons);
-        console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons parsed:`, {
-          parsedReasons,
-          count: parsedReasons.length,
-        });
       } else {
-        console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons value is empty or undefined`);
       }
     } else {
-      console.log(`[MAP DEAL ROW] Row ${rowNumber} - rejectionReasons mapping not found in mapping object`);
     }
     
-    console.log(`[MAP DEAL ROW] Row ${rowNumber} - final rejectionReasons:`, {
-      rejectionReasons,
-      length: rejectionReasons.length,
-      willBeIncluded: rejectionReasons.length > 0,
-    });
 
 
 
@@ -2735,12 +2321,6 @@ export class CsvImportService {
       customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
     };
     
-    console.log(`[MAP DEAL ROW] Row ${rowNumber} - RETURN result:`, {
-      hasRejectionReasons: !!result.rejectionReasons,
-      rejectionReasons: result.rejectionReasons,
-      rejectionReasonsLength: result.rejectionReasons?.length || 0,
-      allFields: Object.keys(result),
-    });
     
     return result;
   }
@@ -2771,12 +2351,6 @@ export class CsvImportService {
     websiteOrTgChannel?: string | null;
     contactInfo?: string | null;
   } | null {
-    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Called with mapping:`, {
-      hasDirectionsMapping: !!mapping.directions,
-      directionsColumn: mapping.directions,
-      csvRowKeys: Object.keys(csvRow).slice(0, 10),
-      csvRowHasDirectionsColumn: mapping.directions ? csvRow.hasOwnProperty(mapping.directions) : false,
-    });
     
     const getValue = (fieldName?: string): string | undefined => {
       if (!fieldName) return undefined;
@@ -2862,22 +2436,12 @@ export class CsvImportService {
     const directions: string[] = [];
     if (mapping.directions) {
       const directionsValue = getValue(mapping.directions);
-      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Parsing directions:`, {
-        hasMapping: !!mapping.directions,
-        mappingColumn: mapping.directions,
-        rawValue: directionsValue,
-        csvRowHasColumn: mapping.directions ? csvRow.hasOwnProperty(mapping.directions) : false,
-        csvRowValue: mapping.directions ? csvRow[mapping.directions] : undefined,
-      });
       if (directionsValue) {
         const parsed = directionsValue.split(',').map((d) => d.trim()).filter(Boolean);
         directions.push(...parsed);
-        console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Parsed directions:`, parsed);
       } else {
-        console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No directions value found`);
       }
     } else {
-      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No directions mapping found`);
     }
 
     // Парсинг contactMethods (разделенные запятой)
@@ -2897,21 +2461,9 @@ export class CsvImportService {
                                getValue(mapping.position) || getValue(mapping.companyName) ||
                                getValue(mapping.notes) || social;
     
-    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Checking if contact should be created:`, {
-      hasAnyContactField,
-      hasEmail: !!normalizedEmail,
-      hasPhone: !!normalizedPhone,
-      hasFullName: !!getValue(mapping.fullName),
-      hasDirections: directions.length > 0,
-      directionsCount: directions.length,
-      directions: directions,
-      hasContactMethods: contactMethods.length > 0,
-      contactMethodsCount: contactMethods.length,
-    });
     
     if (!hasAnyContactField) {
       // No contact fields - don't create contact
-      console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: No contact fields found, returning null`);
       return null;
     }
 
@@ -2933,13 +2485,6 @@ export class CsvImportService {
       contactInfo: sanitizeOptionalTextFields(getValue(mapping.contactInfo)) || null,
     };
     
-    console.log(`[MAP CONTACT FIELDS] Row ${rowNumber}: Returning contact data:`, {
-      hasDirections: !!result.directions,
-      directions: result.directions,
-      directionsLength: result.directions?.length || 0,
-      hasContactMethods: !!result.contactMethods,
-      contactMethods: result.contactMethods,
-    });
     
     return result;
   }
@@ -2959,7 +2504,6 @@ export class CsvImportService {
         stages: true,
       },
     };
-    console.log('PRISMA PIPELINE FIND UNIQUE PAYLOAD (loadPipelineStagesMap):', pipelineFindPayload);
     if (!this.prisma) {
       throw new Error('PrismaService is NOT injected');
     }
@@ -2995,7 +2539,6 @@ export class CsvImportService {
         email: true,
       },
     };
-    console.log('PRISMA USER FIND MANY PAYLOAD (loadUsersMap):', userFindManyPayload);
     if (!this.prisma) {
       throw new Error('PrismaService is NOT injected');
     }
